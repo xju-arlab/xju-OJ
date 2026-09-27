@@ -89,6 +89,7 @@ export const m = {
   Rating: '评分',
   // Announcements.vue
   Contest_Announcements: '比赛公告',
+  View_All_Contest_Announcements: '查看全部公告',
   By: '创建人',
   // ApplyResetPassword.vue
   The_email_doesnt_exist: '该电子邮件地址不存在',

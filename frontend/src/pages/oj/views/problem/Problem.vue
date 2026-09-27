@@ -1,5 +1,6 @@
 <template>
   <div class="problem-page-root">
+  <ContestAnnouncementBanner v-if="canReadAnnouncements" :key="contestID" :contest-id="contestID" />
   <div v-if="problemLoaded" class="problem-workspace">
     <div id="problem-main">
       <!--problem main-->
@@ -203,6 +204,7 @@
   import {FormMixin} from '@oj/components/mixins'
   import {JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey} from '@/utils/constants'
   import api from '@oj/api'
+  import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import { dispatchRemoteSubmission, isRemoteBridgeInstalled, subscribeRemoteBridgeEvents } from '@oj/remoteBridge'
   import { applyDevelopmentProblemFixture, cloneFixtures, MOCK_PROBLEMS, MOCK_SUBMISSIONS } from '@oj/mocks/fixtures'
 
@@ -217,7 +219,7 @@
   export default {
     name: 'Problem',
     components: {
-      CodeMirror
+      CodeMirror, ContestAnnouncementBanner
     },
     mixins: [FormMixin],
     data () {
@@ -580,9 +582,13 @@
       }
     },
     computed: {
-      ...mapGetters(['problemSubmitDisabled', 'contestRuleType', 'OIContestRealTimePermission', 'contestStatus', 'user']),
+      ...mapGetters(['problemSubmitDisabled', 'contestRuleType', 'OIContestRealTimePermission', 'contestStatus', 'user', 'isAuthenticated', 'contestMenuDisabled', 'isContestAdmin']),
       contest () {
         return this.$store.state.contest.contest
+      },
+      canReadAnnouncements () {
+        if (!this.contestID || !this.isAuthenticated || String(this.contest.id) !== String(this.contestID)) return false
+        return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       contestEnded () {
         return this.contestStatus === CONTEST_STATUS.ENDED

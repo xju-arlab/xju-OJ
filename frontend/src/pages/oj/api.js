@@ -199,6 +199,14 @@ export default {
       }
     })
   },
+  async pollContestAnnouncementList (contestId) {
+    const response = await axios.get('contest/announcement', {
+      params: { contest_id: contestId },
+      timeout: 10000
+    })
+    if (response.data.error !== null) throw new Error('Contest announcements unavailable')
+    return response
+  },
   getContestProblemList (contestId) {
     return ajax('contest/problem', 'get', {
       params: {

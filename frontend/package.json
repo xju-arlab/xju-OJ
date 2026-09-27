@@ -12,6 +12,7 @@
     "test:routes": "node tests/e2e/route_contract_test.js",
     "test:auth-error": "node tests/auth_error_test.mjs",
     "test:contest-submissions": "node tests/contest_submission_test.mjs",
+    "test:contest-announcements": "node tests/contest_announcement_test.mjs",
     "test:remote-bridge": "node --check static/userscripts/xju-oj-remote-bridge.user.js && node tests/remote_bridge_contract_test.js && node tests/remote_bridge_runtime_test.js && node tests/remote_bridge_reliability_test.cjs && node tests/submission_status_test.mjs",
     "lint:modern": "node tests/modern-stack-scan.cjs"
   },

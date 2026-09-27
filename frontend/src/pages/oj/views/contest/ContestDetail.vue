@@ -1,5 +1,6 @@
 <template>
   <div :class="['contest-detail-page', { 'is-problem-page': isProblemRoute }]">
+    <ContestAnnouncementBanner v-if="!isProblemRoute && canReadAnnouncements" :key="contestID" :contest-id="contestID" />
     <template v-if="!isProblemRoute">
       <section class="contest-hero" aria-labelledby="contest-title">
         <div class="contest-breadcrumb">
@@ -115,9 +116,11 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE } from '@/utils/constants'
+  import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
   export default {
     name: 'ContestDetail',
+    components: { ContestAnnouncementBanner },
     data () {
       return {
         routeName: '',
@@ -167,8 +170,12 @@
       }),
       ...mapGetters([
         'contestMenuDisabled', 'contestRuleType', 'contestStatus', 'isContestAdmin',
-        'OIContestRealTimePermission'
+        'isAuthenticated', 'OIContestRealTimePermission'
       ]),
+      canReadAnnouncements () {
+        if (!this.isAuthenticated || !this.contestID || String(this.contest.id) !== String(this.contestID)) return false
+        return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
+      },
       isProblemRoute () {
         return this.routeName === 'contest-problem-details'
       },

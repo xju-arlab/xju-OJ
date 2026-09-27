@@ -89,6 +89,7 @@ export const m = {
   Rating: 'Rating',
   // Announcements.vue
   Contest_Announcements: 'Contest Announcements',
+  View_All_Contest_Announcements: 'View all announcements',
   By: 'By',
   // ApplyResetPassword.vue
   The_email_doesnt_exist: 'The email doesn\'t exist',

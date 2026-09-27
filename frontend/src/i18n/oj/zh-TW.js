@@ -75,6 +75,7 @@ export const m = {
   Rating: '評分',
   // Announcements.vue
   Contest_Announcements: '比賽公告',
+  View_All_Contest_Announcements: '查看全部公告',
   By: '創建者',
   // ApplyResetPassword.vue
   The_email_doesnt_exist: '此電子郵件並不存在',
