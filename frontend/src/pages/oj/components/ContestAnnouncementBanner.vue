@@ -11,7 +11,8 @@
     <div class="announcement-list">
       <article v-for="announcement in recent" :key="announcement.id" class="announcement-item">
         <h2>{{announcement.title}}</h2>
-        <p v-if="announcement.contentText">{{announcement.contentText}}</p>
+        <div v-if="announcement.content" v-katex v-html="announcement.content"
+             class="announcement-content markdown-body"></div>
       </article>
     </div>
   </section>
@@ -20,12 +21,6 @@
 <script>
   import api from '@oj/api'
   import { activeContestAnnouncements, ANNOUNCEMENT_VISIBLE_MS } from '@oj/contestAnnouncements.mjs'
-
-  function plainText (html) {
-    const template = document.createElement('template')
-    template.innerHTML = (html || '').replace(/<br\s*\/?>|<\/(?:p|div|li|h[1-6])>/gi, ' ')
-    return (template.content.textContent || '').replace(/\s+/g, ' ').trim()
-  }
 
   export default {
     name: 'ContestAnnouncementBanner',
@@ -61,10 +56,7 @@
       updateRecent () {
         clearTimeout(this.expiryTimer)
         const now = this.nowMs()
-        this.recent = activeContestAnnouncements(this.announcements, now).map(announcement => ({
-          ...announcement,
-          contentText: plainText(announcement.content)
-        }))
+        this.recent = activeContestAnnouncements(this.announcements, now)
         if (!this.recent.length) return
         const nextExpiry = Math.min(...this.recent.map(item => Date.parse(item.create_time) + ANNOUNCEMENT_VISIBLE_MS))
         this.expiryTimer = setTimeout(this.updateRecent, Math.max(1, nextExpiry - now + 1))
@@ -141,7 +133,14 @@
     line-height: 1.45;
     overflow-wrap: anywhere;
   }
-  .announcement-item p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .announcement-content { margin-top: 8px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  .announcement-content :deep(p),
+  .announcement-content :deep(ul),
+  .announcement-content :deep(ol) { margin: 0 0 6px; font-size: inherit; line-height: inherit; }
+  .announcement-content :deep(ul),
+  .announcement-content :deep(ol) { padding-left: 22px; }
+  .announcement-content :deep(li) { line-height: inherit; }
+  .announcement-content :deep(> :last-child) { margin-bottom: 0; }
   @media (max-width: 620px) {
     .announcement-header { flex-wrap: wrap; }
     .announcement-header a { margin-left: 0; }
