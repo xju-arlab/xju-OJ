@@ -200,6 +200,11 @@ class JudgeDispatcher(DispatcherBase):
 
         if self.contest_id:
             if self.contest.status != ContestStatus.CONTEST_UNDERWAY:
+                # Practice submissions made after the contest should update the
+                # user's problem status, without changing official statistics.
+                if (self.contest.status == ContestStatus.CONTEST_ENDED and
+                        self.submission.create_time >= self.contest.end_time):
+                    self.update_contest_problem_status(include_statistics=False)
                 logger.info(
                     "Contest debug mode, id: " + str(self.contest_id) + ", submission id: " + self.submission.id)
                 return
@@ -300,7 +305,7 @@ class JudgeDispatcher(DispatcherBase):
                 user_profile.oi_problems_status["problems"] = oi_problems_status
                 user_profile.save(update_fields=["submission_number", "accepted_number", "oi_problems_status"])
 
-    def update_contest_problem_status(self):
+    def update_contest_problem_status(self, include_statistics=True):
         with transaction.atomic():
             user = User.objects.select_for_update().get(id=self.submission.user_id)
             user_profile = user.userprofile
@@ -329,6 +334,9 @@ class JudgeDispatcher(DispatcherBase):
                     contest_problems_status[problem_id]["status"] = self.submission.result
                 user_profile.oi_problems_status["contest_problems"] = contest_problems_status
                 user_profile.save(update_fields=["oi_problems_status"])
+
+            if not include_statistics:
+                return
 
             problem = Problem.objects.select_for_update().get(contest_id=self.contest_id, id=self.problem.id)
             result = str(self.submission.result)

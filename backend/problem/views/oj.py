@@ -105,7 +105,9 @@ class ContestProblemAPI(APIView):
                     return self.error("Contest has not started yet.")
                 if self.contest.status != ContestStatus.CONTEST_ENDED and not self.contest.is_registered(request.user):
                     return self.error("Please register for the contest first")
-                if self.contest.password and not self.contest.is_registered(request.user):
+                if (self.contest.status != ContestStatus.CONTEST_ENDED
+                        and self.contest.password
+                        and not self.contest.is_registered(request.user)):
                     return self.error("Please register for the contest first")
             try:
                 problem = Problem.objects.select_related("created_by").get(_id=problem_id,

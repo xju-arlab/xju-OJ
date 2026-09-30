@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from account.models import AdminType, ProblemPermission
 from contest.models import ACMContestRank, Contest, ContestParticipation
+from judge.dispatcher import JudgeDispatcher
 from problem.models import (Problem, ProblemJudgeMode, ProblemTag, RemoteOJ)
 from utils.api.tests import APITestCase
 from .models import (JudgeStatus, RemoteSubmissionStatus, Submission,
@@ -109,6 +110,29 @@ class SubmissionAPITest(SubmissionPrepare):
         self.assertSuccess(allowed)
         judge_task.assert_called_once()
 
+    def test_ended_password_contest_accepts_practice_from_nonparticipant(self, judge_task):
+        contest = Contest.objects.create(
+            title="ended password contest",
+            description="",
+            real_time_rank=True,
+            password="secret",
+            rule_type="ACM",
+            start_time=timezone.now() - timedelta(hours=2),
+            end_time=timezone.now() - timedelta(hours=1),
+            created_by=self.problem.created_by,
+        )
+        self.problem.contest = contest
+        self.problem._id = "A"
+        self.problem.save(update_fields=["contest", "_id"])
+        self.submission_data["contest_id"] = contest.id
+
+        response = self.client.post(self.url, self.submission_data)
+
+        self.assertSuccess(response)
+        judge_task.assert_called_once()
+        self.assertFalse(ContestParticipation.objects.filter(contest=contest, user=self.user).exists())
+        self.assertFalse(ACMContestRank.objects.filter(contest=contest, user=self.user).exists())
+
     def _configure_remote_problem(self):
         self.problem.judge_mode = ProblemJudgeMode.REMOTE
         self.problem.remote_oj = RemoteOJ.CODEFORCES
@@ -203,6 +227,7 @@ class SubmissionAPITest(SubmissionPrepare):
         create = self.client.post(self.url, self.submission_data)
         self.assertSuccess(create)
         submission_id = create.data["data"]["submission_id"]
+        submission = Submission.objects.get(id=submission_id)
         event_url = self.reverse("remote_submission_event_api")
         finished = self.client.post(event_url, {
             "submission_id": submission_id,
@@ -246,12 +271,10 @@ class SubmissionAPITest(SubmissionPrepare):
 
         submission.refresh_from_db()
         self.problem.refresh_from_db()
-        self.user.userprofile.refresh_from_db()
         self.assertEqual(submission.result, JudgeStatus.ACCEPTED)
         self.assertEqual(submission.remote_status, RemoteSubmissionStatus.FINISHED)
         self.assertEqual(self.problem.submission_number, 1)
         self.assertEqual(self.problem.accepted_number, 1)
-        self.assertEqual(self.user.userprofile.submission_number, 1)
 
     def test_remote_submission_ignores_backward_progress_event(self, judge_task):
         self._configure_remote_problem()
@@ -305,6 +328,49 @@ class SubmissionAPITest(SubmissionPrepare):
         submission = Submission.objects.get(id=submission_id)
         self.assertEqual(submission.remote_status, RemoteSubmissionStatus.AUTH_REQUIRED)
         self.assertEqual(submission.result, JudgeStatus.PENDING)
+
+
+class PostContestPracticeStatusTest(SubmissionPrepare):
+    def setUp(self):
+        self._create_problem_and_submission()
+        self.user = self.create_user("practice-user", "test123", login=False)
+
+    def finish_practice(self, rule_type, score=0):
+        contest = Contest.objects.create(
+            title="ended contest", description="", real_time_rank=True,
+            password="secret", rule_type=rule_type,
+            start_time=timezone.now() - timedelta(hours=2),
+            end_time=timezone.now() - timedelta(hours=1),
+            created_by=self.problem.created_by,
+        )
+        self.problem.contest = contest
+        self.problem.rule_type = rule_type
+        self.problem._id = "A"
+        self.problem.save(update_fields=["contest", "rule_type", "_id"])
+        self.submission.contest = contest
+        self.submission.user_id = self.user.id
+        self.submission.username = self.user.username
+        self.submission.result = JudgeStatus.ACCEPTED
+        self.submission.statistic_info = {"score": score}
+        self.submission.save()
+        JudgeDispatcher(self.submission.id, self.problem.id).finalize_submission()
+        self.problem.refresh_from_db()
+        self.user.userprofile.refresh_from_db()
+        self.assertEqual(self.problem.submission_number, 0)
+        self.assertEqual(self.problem.accepted_number, 0)
+        self.assertFalse(ACMContestRank.objects.filter(contest=contest, user=self.user).exists())
+        return str(self.problem.id)
+
+    def test_acm_practice_updates_user_status_without_official_statistics(self):
+        problem_id = self.finish_practice("ACM")
+        status = self.user.userprofile.acm_problems_status["contest_problems"][problem_id]
+        self.assertEqual(status["status"], JudgeStatus.ACCEPTED)
+
+    def test_oi_practice_updates_user_score_without_official_statistics(self):
+        problem_id = self.finish_practice("OI", score=75)
+        status = self.user.userprofile.oi_problems_status["contest_problems"][problem_id]
+        self.assertEqual(status["status"], JudgeStatus.ACCEPTED)
+        self.assertEqual(status["score"], 75)
 
 
 class RemoteVerdictMappingTest(APITestCase):

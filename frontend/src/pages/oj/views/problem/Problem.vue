@@ -116,8 +116,8 @@
             <div v-else-if="this.contestID && !OIContestRealTimePermission && submissionExists">
               <Alert type="success" show-icon>{{$t('m.You_have_submitted_a_solution')}}</Alert>
             </div>
-            <div v-if="contestEnded">
-              <Alert type="warning" show-icon>{{$t('m.Contest_has_ended')}}</Alert>
+            <div v-if="contestEnded && !statusVisible">
+              <Alert type="info" show-icon>{{$t('m.Contest_Practice_Notice')}}</Alert>
             </div>
           </div>
 
@@ -134,7 +134,7 @@
               <Icon v-else type="send" />
               <span v-if="submitting">{{$t('m.Submitting')}}</span>
               <span v-else-if="submitted">{{$t('m.Submitted_successfully')}}</span>
-              <span v-else>{{$t('m.Submit')}}</span>
+              <span v-else>{{contestEnded ? $t('m.Submit_Practice') : $t('m.Submit')}}</span>
             </LegacyButton>
           </div>
         </div>
@@ -497,6 +497,7 @@
           api.submitCode(data).then(res => {
             const responseData = res.data.data || {}
             this.submissionId = responseData.submission_id
+            this.loadRecentSubmissions(this.problemID)
             if (responseData.remote_task) {
               dispatchRemoteSubmission(responseData.remote_task, data.code)
             }

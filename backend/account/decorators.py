@@ -125,7 +125,11 @@ def check_contest_permission(check_type="details"):
                 return self.error("Please register for the contest first")
 
             if self.contest.contest_type == ContestType.PASSWORD_PROTECTED_CONTEST:
-                if check_type != "problem_list" and not registered:
+                # After a contest ends its problems become available for
+                # practice, even when the user never registered during the
+                # contest window.
+                if (self.contest.status != ContestStatus.CONTEST_ENDED
+                        and check_type != "problem_list" and not registered):
                     return self.error("Please register for the contest first")
 
             # regular user get contest problems, ranks etc. before contest started

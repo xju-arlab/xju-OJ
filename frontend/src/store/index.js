@@ -33,7 +33,7 @@ const useApplicationStore = defineStore('application', {
     modalStatus: { mode: 'login', visible: false },
     user: { profile: {} },
     contest: {
-      now: moment(), access: false, rankLimit: 30, forceUpdate: false,
+      now: moment(), access: false, rankLimit: 10, forceUpdate: false,
       contest: { created_by: {}, contest_type: CONTEST_TYPE.PUBLIC },
       contestProblems: [], itemVisible: { menu: true, chart: false, realName: false }
     }
@@ -56,16 +56,17 @@ const useApplicationStore = defineStore('application', {
     isContestRegistered () { return this.isContestAdmin || this.contest.contest.registered === true },
     isContestAdmin () { return this.isAuthenticated && (this.contest.contest.created_by.id === this.currentUser.id || this.currentUser.admin_type === USER_TYPE.SUPER_ADMIN) },
     contestMenuDisabled () {
+      if (this.contestStatus === CONTEST_STATUS.ENDED) return false
       if (this.isContestRegistered) return false
       return this.contest.contest.contest_type === CONTEST_TYPE.PUBLIC ? this.contestStatus === CONTEST_STATUS.NOT_START : !this.contest.access
     },
     OIContestRealTimePermission () { return this.contestRuleType === 'ACM' || this.contestStatus === CONTEST_STATUS.ENDED || this.contest.contest.real_time_rank === true || this.isContestAdmin },
     problemSubmitDisabled () {
-      if (this.contestStatus === CONTEST_STATUS.ENDED) return true
+      if (this.contestStatus === CONTEST_STATUS.ENDED) return !this.isAuthenticated
       if (this.contestStatus === CONTEST_STATUS.NOT_START) return !this.isContestAdmin
       return !this.isAuthenticated
     },
-    passwordFormVisible () { return this.contest.contest.contest_type !== CONTEST_TYPE.PUBLIC && !this.contest.access && !this.isContestAdmin },
+    passwordFormVisible () { return this.contestStatus !== CONTEST_STATUS.ENDED && this.contest.contest.contest_type !== CONTEST_TYPE.PUBLIC && !this.contest.access && !this.isContestAdmin },
     contestStartTime: state => moment(state.contest.contest.start_time),
     contestEndTime: state => moment(state.contest.contest.end_time),
     countdown () {

@@ -70,6 +70,7 @@
       handleCommand (command) {
         if (command === 'logout') {
           api.logout().then(() => {
+            store.dispatch('clearProfile')
             this.$router.push({name: 'login'})
           })
         }

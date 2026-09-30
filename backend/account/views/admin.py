@@ -60,6 +60,8 @@ class UserAdminAPI(APIView):
             return self.error("Email already exists")
 
         pre_username = user.username
+        previous_admin_type = user.admin_type
+        previous_problem_permission = user.problem_permission
         user.username = data["username"].lower()
         user.email = data["email"].lower()
         user.admin_type = data["admin_type"]
@@ -71,6 +73,9 @@ class UserAdminAPI(APIView):
             user.problem_permission = ProblemPermission.ALL
         else:
             user.problem_permission = ProblemPermission.NONE
+        if (user.admin_type != previous_admin_type or
+                user.problem_permission != previous_problem_permission):
+            user.admin_role_manual_override = True
 
         if data["password"]:
             user.set_password(data["password"])

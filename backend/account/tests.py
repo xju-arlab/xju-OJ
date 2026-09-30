@@ -564,6 +564,21 @@ class AdminUserTest(APITestCase):
         self.assertEqual(resp_data["problem_permission"], ProblemPermission.NONE)
 
         self.assertTrue(self.regular_user.check_password("test"))
+        self.assertFalse(User.objects.get(id=self.regular_user.id).admin_role_manual_override)
+
+    def test_manual_super_admin_grant_survives_oidc_login(self):
+        from . import oidc
+
+        data = deepcopy(self.data)
+        data["admin_type"] = AdminType.SUPER_ADMIN
+        response = self.client.put(self.url, data=data)
+        self.assertSuccess(response)
+        user = User.objects.get(id=self.regular_user.id)
+        self.assertTrue(user.admin_role_manual_override)
+        oidc._apply_admin_claims(user, {"groups": ["studio-users"]})
+        user.refresh_from_db()
+        self.assertEqual(user.admin_type, AdminType.SUPER_ADMIN)
+        self.assertEqual(user.problem_permission, ProblemPermission.ALL)
 
     def test_edit_user_password(self):
         data = self.data

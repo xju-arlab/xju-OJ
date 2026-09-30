@@ -16,7 +16,7 @@
     <div v-if="showChart" class="echarts">
       <ECharts :options="options" ref="chart" auto-resize></ECharts>
     </div>
-    <Table ref="tableRank" :columns="columns" :data="dataRank" disabled-hover></Table>
+    <Table ref="tableRank" class="auto-resize" :columns="columns" :data="dataRank" disabled-hover></Table>
     <Pagination :total="total"
                 :page-size="limit" @update:page-size="limit = $event"
                 :current="page" @update:current="page = $event"
@@ -262,7 +262,10 @@
           this.columns.push({
             align: 'center',
             key: problem.id,
-            width: problems.length > 15 ? 80 : null,
+            className: 'rank-problem-cell',
+            // Element Plus defaults flex columns to at least 80px. Allow
+            // each problem column to share the actual remaining width.
+            minWidth: 1,
             renderHeader: (h, params) => {
               return h('a', {
                 'class': {
@@ -286,12 +289,12 @@
                 let status = params.row[problem.id]
                 let acTime, errorNumber
                 if (status.is_ac) {
-                  acTime = h('span', status.ac_time)
+                  acTime = h('span', {class: 'rank-problem-time'}, status.ac_time)
                 }
                 if (status.error_number !== 0) {
-                  errorNumber = h('p', '(-' + status.error_number + ')')
+                  errorNumber = h('span', {class: 'rank-problem-errors'}, '(-' + status.error_number + ')')
                 }
-                return h('div', [acTime, errorNumber])
+                return h('div', {class: 'rank-problem-result'}, [acTime, errorNumber])
               }
             }
           })
@@ -304,8 +307,7 @@
         const value = Math.max(0, Number(totalSeconds) || 0)
         const hours = Math.floor(value / 3600)
         const minutes = Math.floor((value % 3600) / 60)
-        const seconds = Math.floor(value % 60)
-        return [hours, minutes, seconds].map(part => String(part).padStart(2, '0')).join(':')
+        return [hours, minutes].map(part => String(part).padStart(2, '0')).join(':')
       },
       downloadRankCSV () {
         utils.downloadFile(`contest_rank?download_csv=1&contest_id=${this.$route.params.contestID}&force_refresh=${this.forceUpdate ? '1' : '0'}`)
@@ -328,6 +330,9 @@
   :deep(.el-table) { --el-table-row-hover-bg-color: var(--color-bg-subtle); border-radius: var(--radius-sm); }
   :deep(.el-table th.el-table__cell) { background: #fcfbf9; color: var(--color-text-muted); font-size: 12px; }
   :deep(.el-table td.el-table__cell) { padding: 9px 0; }
+  :deep(.rank-problem-cell .cell) { padding-inline: 2px; overflow: hidden; }
+  :deep(.rank-problem-result) { max-width: 100%; overflow: hidden; white-space: nowrap; font-size: clamp(9px, 0.75vw, 11px); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  :deep(.rank-problem-time), :deep(.rank-problem-errors) { display: block; margin: 0; }
   :deep(.el-table__body tr:hover > td.el-table__cell) { background-color: var(--color-bg) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.rank-hover-cell) { background-color: var(--color-bg-subtle) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.first-ac),

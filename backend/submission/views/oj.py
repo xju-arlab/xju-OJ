@@ -43,9 +43,9 @@ class SubmissionAPI(APIView):
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):
         contest = self.contest
-        if contest.status == ContestStatus.CONTEST_ENDED:
-            return self.error("The contest have ended")
-        if not request.user.is_contest_admin(contest):
+        # Ended contests accept practice submissions. The judge dispatcher
+        # excludes them from the official contest rank.
+        if contest.status != ContestStatus.CONTEST_ENDED and not request.user.is_contest_admin(contest):
             user_ip = ipaddress.ip_address(request.session.get("ip"))
             if contest.allowed_ip_ranges:
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):

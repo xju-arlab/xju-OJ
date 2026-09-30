@@ -39,6 +39,7 @@ class User(AbstractBaseUser):
     # One of UserType
     admin_type = models.TextField(default=AdminType.REGULAR_USER)
     problem_permission = models.TextField(default=ProblemPermission.NONE)
+    admin_role_manual_override = models.BooleanField(default=False)
     reset_password_token = models.TextField(null=True)
     reset_password_token_expire_time = models.DateTimeField(null=True)
     # SSO auth token

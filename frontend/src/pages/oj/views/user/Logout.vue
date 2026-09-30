@@ -9,6 +9,7 @@
     mounted () {
       const authentik = this.authProviders.authentik
       if (authentik && authentik.enabled && authentik.linked) {
+        this.$store.dispatch('clearProfile')
         window.location.assign('/api/auth/oidc/logout/?next=/')
         return
       }
