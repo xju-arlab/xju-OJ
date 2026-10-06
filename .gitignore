@@ -42,3 +42,7 @@ target/
 
 # ===== 本地参考截图 =====
 refer-images/
+
+# AOCI agent host integration (machine-bound; do not commit)
+.codex/config.toml
+.codex/config.toml.backup.*
