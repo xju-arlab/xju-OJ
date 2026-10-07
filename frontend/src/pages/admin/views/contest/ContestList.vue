@@ -72,10 +72,10 @@
           label="操作">
           <template #default="scope"><div class="contest-operation-actions">
             <icon-btn name="编辑" icon="edit" @click="goEdit(scope.row.id)"></icon-btn>
-            <icon-btn name="题目" icon="list-ol" @click="goContestProblemList(scope.row.id)"></icon-btn>
+            <icon-btn name="题目" icon="list-ol" @click="scope.row.rule_type === 'AI' ? goEdit(scope.row.id) : goContestProblemList(scope.row.id)"></icon-btn>
             <icon-btn name="公告" icon="info-circle"
                       @click="goContestAnnouncement(scope.row.id)"></icon-btn>
-            <icon-btn icon="download" name="下载通过的提交"
+            <icon-btn v-if="scope.row.rule_type !== 'AI'" icon="download" name="下载通过的提交"
                       @click="openDownloadOptions(scope.row.id)"></icon-btn>
             <icon-btn danger icon="trash" name="删除比赛"
                       @click="deleteContest(scope.row.id)"></icon-btn>
@@ -194,5 +194,6 @@
 .contest-rule { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
 .contest-rule.is-oi { color: #7656c9; }
 .contest-rule.is-acm { color: #b7791f; }
+.contest-rule.is-ai { color: #2873be; }
 .contest-operation-actions { display: flex; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
 </style>

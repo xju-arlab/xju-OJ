@@ -1,4 +1,7 @@
 export const m = {
+  AI_Studio: 'AI Studio',
+  AI: 'AI',
+  AI_Evaluation: 'AI Evaluation',
   Remote_Login_Required: 'Provider login needed',
   Remote_Verification_Required: 'Verification needed',
   Remote_Result_Stale: 'Result needs syncing',

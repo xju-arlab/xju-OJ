@@ -89,6 +89,8 @@ jobs:
           python-version: '3.10'
       - run: python -m pip install requests==2.34.2
       - run: sh -n deploy.sh
+      - run: sh -n ai/build.sh && sh -n ai/deploy.sh
+      - run: python -m unittest discover -s ai/tests -p 'test_*.py'
       - run: python -m unittest discover -s deploy/tests -p '*_test.py'
       - run: python -m unittest discover -s server/judge-server/tests -p 'test_*.py'
       - run: python -m unittest discover -s server/judger/tests -p 'test_cli_limits.py'

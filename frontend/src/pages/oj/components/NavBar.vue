@@ -5,6 +5,7 @@
         <div class="logo" aria-label="XJU-OJ"><span class="brand-mark">XJ</span><span class="brand-name">XJU-OJ</span></div>
         <Menu-item name="/"><Icon type="home" />{{$t('m.Home')}}</Menu-item>
         <Menu-item name="/problem" @mouseenter="prefetchRoute('/problem')"><Icon type="ios-keypad" />{{$t('m.NavProblems')}}</Menu-item>
+        <Menu-item class="ai-nav-item" name="/ai-studio" @mouseenter="prefetchRoute('/ai-studio')"><Icon type="ios-analytics" />{{$t('m.AI_Studio')}}</Menu-item>
         <Menu-item name="/contest" @mouseenter="prefetchRoute('/contest')"><Icon type="trophy" />{{$t('m.Contests')}}</Menu-item>
         <Menu-item name="/status" @mouseenter="prefetchRoute('/status')"><Icon type="ios-pulse-strong" />{{$t('m.NavStatus')}}</Menu-item>
         <Submenu name="rank" @mouseenter="prefetchRoutes(['/acm-rank', '/oi-rank'])"><template #title><Icon type="podium" />{{$t('m.Rank')}}</template><Menu-item name="/acm-rank">{{$t('m.ACM_Rank')}}</Menu-item><Menu-item name="/oi-rank">{{$t('m.OI_Rank')}}</Menu-item></Submenu>
@@ -113,10 +114,11 @@ export default {
 :deep(.el-input__wrapper) { min-height: 34px; }
 :deep(.el-button) { min-height: 34px; }
 @media (max-width: 1000px) { .nav-search { width: 160px; } }
-@media (max-width: 1000px) { :deep(.oj-menu > .el-sub-menu) { display: none; } }
+@media (max-width: 1000px) { :deep(.oj-menu > .el-sub-menu:not(.el-sub-menu__hide-arrow)) { display: none; } }
 @media (max-width: 760px) { .nav-inner { padding: 0 14px; } .brand-name { display: none; } .nav-actions { margin-left: 6px; } .nav-search { width: 140px; } .nav-actions > .el-button { padding: 0 8px; } }
 @media (max-width: 640px) { :deep(.oj-menu > .el-menu-item:nth-of-type(4)) { display: none; } .nav-search { width: 120px; } }
 @media (max-width: 520px) { .nav-search { display: none; } :deep(.oj-menu > .el-menu-item:nth-of-type(3)) { display: none; } }
 @media (max-width: 420px) { .nav-actions > .el-button:last-child { display: none; } }
 @media (max-width: 360px) { .logo { display: none; } }
+@media (max-width: 640px) { :deep(.oj-menu > .ai-nav-item) { display: inline-flex !important; } }
 </style>

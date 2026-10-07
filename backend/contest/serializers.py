@@ -9,7 +9,7 @@ class CreateConetestSeriaizer(serializers.Serializer):
     description = serializers.CharField()
     start_time = serializers.DateTimeField()
     end_time = serializers.DateTimeField()
-    rule_type = serializers.ChoiceField(choices=[ContestRuleType.ACM, ContestRuleType.OI])
+    rule_type = serializers.ChoiceField(choices=[ContestRuleType.ACM, ContestRuleType.OI, ContestRuleType.AI])
     password = serializers.CharField(allow_blank=True, max_length=32)
     visible = serializers.BooleanField()
     real_time_rank = serializers.BooleanField()

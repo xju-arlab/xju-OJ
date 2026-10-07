@@ -1,4 +1,7 @@
 export const m = {
+  AI_Studio: 'AI 工作臺',
+  AI: 'AI',
+  AI_Evaluation: 'AI 評測賽制',
   // 404.vue
   Go_Home: '回到首頁',
   // Problem.vue

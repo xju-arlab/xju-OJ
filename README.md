@@ -1,6 +1,6 @@
 <div align="center">
   <h1>XJU-OJ</h1>
-  <p><strong>面向机试、ACM 与 OI 的现代在线评测平台</strong></p>
+  <p><strong>面向机试、ACM、OI 与 AI 的现代在线评测平台</strong></p>
   <p>400+ 题库、本地沙箱判题与牛客 / 洛谷 / Codeforces 远程判题，统一管理比赛、提交和个人做题记录。</p>
   <p>
     <a href="https://oj.icthub.top"><img alt="OJ status" src="https://img.shields.io/website?url=https%3A%2F%2Foj.icthub.top&up_message=online&down_message=offline&label=OJ"></a>
@@ -23,6 +23,7 @@
 - **丰富题库**：现有 400+ 道题目，覆盖机试、ACM 与 OI 日常练习。
 - **双重判题能力**：内置 JudgeServer/Judger 沙箱，并通过 ScriptCat 支持牛客、洛谷和 Codeforces 浏览器远程判题。
 - **完整竞赛体验**：支持 ACM/OI 赛制、比赛报名、题目编排、实时提交状态和排名。
+- **AI 工作台**：Jupyter Notebook 作答、Codabench 自动评测、逻辑实现/模型定义/数据挑战，支持 AI 比赛、公私榜与赛后补题。部署与能力边界见 [AI Studio 文档](ai/README.md)。
 - **现代全栈架构**：Vue 3、Vite 8、Django 5.2、PostgreSQL 18、Redis 8，提供统一 Docker Compose 部署入口。
 - **安全账户体系**：支持 Authentik OIDC、会话管理、个人资料和独立管理后台。
 

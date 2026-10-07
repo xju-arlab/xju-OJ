@@ -13,6 +13,7 @@
             <Dropdown-item name="">{{$t('m.All')}}</Dropdown-item>
             <Dropdown-item name="OI">{{$t('m.OI')}}</Dropdown-item>
             <Dropdown-item name="ACM">{{$t('m.ACM')}}</Dropdown-item>
+            <Dropdown-item name="AI">AI</Dropdown-item>
           </Dropdown-menu></template>
         </Dropdown>
         <Dropdown @on-click="onStatusChange">
@@ -73,6 +74,7 @@
     data () {
       return {
         page: 1,
+        requestGeneration: 0,
         query: {
           status: '',
           keyword: '',
@@ -101,17 +103,21 @@
         this.getContestList(this.page)
       },
       getContestList (page = 1) {
-        let offset = (page - 1) * this.limit
-        api.getContestList(offset, this.limit, this.query).then((res) => {
+        const generation = ++this.requestGeneration
+        const query = { ...this.query }
+        const offset = (page - 1) * this.limit
+        api.getContestList(offset, this.limit, query).then((res) => {
+          if (generation !== this.requestGeneration) return
           const payload = res.data.data || {}
           const results = payload.results || []
           const normalized = applyDevelopmentContestFixtures(results)
-          const fallback = filterMockContests(this.query)
-          this.contests = normalized.length ? this.withContestProblems(normalized) : cloneFixtures(fallback)
-          this.total = payload.total || (normalized.length || fallback.length)
+          const fallback = filterMockContests(query)
+          this.contests = normalized.length ? this.withContestProblems(normalized) : cloneFixtures(fallback).slice(offset, offset + this.limit)
+          this.total = payload.total || normalized.length || fallback.length
         }, () => {
-          const fallback = filterMockContests(this.query)
-          this.contests = cloneFixtures(fallback)
+          if (generation !== this.requestGeneration) return
+          const fallback = filterMockContests(query)
+          this.contests = cloneFixtures(fallback).slice(offset, offset + this.limit)
           this.total = fallback.length
         })
       },
@@ -136,11 +142,13 @@
         this.changeRoute()
       },
       goContest (contest) {
+        if (contest.rule_type === 'AI') return this.$router.push({ name: 'ai-contest', params: { contestID: contest.id } })
         this.cur_contest_id = contest.id
         this.$router.push({name: 'contest-problem-list', params: {contestID: contest.id}})
       },
 
       getDuration (startTime, endTime) {
+        if (!endTime) return '时长待公布'
         const hours = Math.abs(new Date(endTime) - new Date(startTime)) / 3600000
         if (hours >= 24) return this.$t('m.Duration_Days', { count: Math.round(hours / 24) })
         return this.$t('m.Duration_Hours', { count: Number(hours.toFixed(1)) })
@@ -159,6 +167,7 @@
         return String(contest.status) === '-1'
       },
       ruleClass (rule) {
+        if (rule === 'AI') return 'rule-ai'
         return String(rule).toUpperCase() === 'OI' ? 'rule-oi' : 'rule-acm'
       },
       getProblemLabels (contest) {
@@ -192,6 +201,8 @@
   }
 </script>
 <style lang="less" scoped>
+  .ai-preview-label { margin-left: 9px; color: var(--color-text-faint); font-size: 11px; }
+  #contest-card .contest-rule.rule-ai { background: transparent; color: var(--color-link); }
   #contest-card {
     .contest-filters {
       display: flex;

@@ -978,55 +978,13 @@
   .recent-submission-row time { flex: none; color: var(--color-text-faint); }
   .recent-submission-empty { padding: 14px 0 10px; color: var(--color-text-faint); font-size: 12px; }
 
-  .judge-status-badge {
-    position: relative;
-    display: inline-flex;
-    overflow: hidden;
-    width: fit-content;
-    min-width: 72px;
-    height: 24px;
-    align-items: center;
-    justify-content: center;
-    padding: 0 9px;
-    border: 0;
-    border-radius: var(--radius-pill);
-    font-size: 12px;
-    font-weight: 650;
-    line-height: 1;
-    white-space: nowrap;
-  }
-  .judge-status-badge.is-success { --judge-status-bg: var(--tag-tools-bg); color: var(--cat-tools); background: var(--judge-status-bg); }
-  .judge-status-badge.is-error { --judge-status-bg: var(--tag-research-bg); color: var(--cat-research); background: var(--judge-status-bg); }
-  .judge-status-badge.is-warning { --judge-status-bg: var(--tag-course-bg); color: var(--cat-course); background: var(--judge-status-bg); }
-  .judge-status-badge.is-info { --judge-status-bg: var(--tag-kaggle-bg); color: var(--cat-kaggle); background: var(--judge-status-bg); }
-  .judge-status-badge:not(.is-success) {
-    background-image:
-      linear-gradient(108deg, transparent 28%, rgba(255, 255, 255, .72) 46%, transparent 64%),
-      linear-gradient(var(--judge-status-bg), var(--judge-status-bg));
-    background-position: 170% 0, 0 0;
-    background-size: 190% 100%, 100% 100%;
-    animation:
-      judge-status-shimmer 1.65s linear infinite,
-      judge-status-heartbeat 2.2s ease-in-out infinite;
-    will-change: background-position, box-shadow;
-  }
+  @import "@/styles/judge-status.less";
   .submission-status-link {
     cursor: pointer;
     transition: filter var(--transition), box-shadow var(--transition);
   }
   .submission-status-link:hover { filter: saturate(1.08) brightness(.98); }
   .submission-status-link:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-
-  @keyframes judge-status-shimmer {
-    from { background-position: 170% 0, 0 0; }
-    to { background-position: -90% 0, 0 0; }
-  }
-
-  @keyframes judge-status-heartbeat {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
-    45% { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 8%, transparent); }
-    55% { box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 4%, transparent); }
-  }
 
   #solution-column > :deep(.el-card) { margin: 0; border-right: 0; border-left: 0; border-radius: 0; box-shadow: none; }
 
@@ -1063,7 +1021,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .accepted-celebration-card, .accepted-check, .accepted-burst > span { animation: none; }
-    .judge-status-badge:not(.is-success) { animation: none; }
     .accepted-celebration-enter-active, .accepted-celebration-leave-active { transition-duration: 80ms; }
   }
 </style>

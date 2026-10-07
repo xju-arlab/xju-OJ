@@ -129,8 +129,9 @@ class ContestRegistrationAPI(APIView):
                 contest=contest,
                 user=request.user,
             )
-            rank_model = ACMContestRank if contest.rule_type == ContestRuleType.ACM else OIContestRank
-            rank_model.objects.get_or_create(contest=contest, user=request.user)
+            if contest.rule_type != ContestRuleType.AI:
+                rank_model = ACMContestRank if contest.rule_type == ContestRuleType.ACM else OIContestRank
+                rank_model.objects.get_or_create(contest=contest, user=request.user)
 
         if contest.password:
             contest_passwords = request.session.setdefault(CONTEST_PASSWORD_SESSION_KEY, {})
@@ -165,6 +166,8 @@ class ContestRankAPI(APIView):
 
     @check_contest_permission(check_type="ranks")
     def get(self, request):
+        if self.contest.rule_type == ContestRuleType.AI:
+            return self.error("Use the AI leaderboard endpoint")
         download_csv = request.GET.get("download_csv")
         force_refresh = request.GET.get("force_refresh")
         is_contest_admin = request.user.is_authenticated and request.user.is_contest_admin(self.contest)

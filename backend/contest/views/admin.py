@@ -105,6 +105,10 @@ class ContestAPI(APIView):
             ensure_created_by(contest, request.user)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
+        if contest.rule_type == "AI":
+            from ai_studio.models import AIJob
+            if AIJob.objects.filter(contest=contest).exists():
+                return self.error("This AI contest has submissions. Hide it to preserve grading records.")
         contest.delete()
         return self.success()
 

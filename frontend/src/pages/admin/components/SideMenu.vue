@@ -22,6 +22,7 @@
       <el-menu-item index="/contest">{{$t('m.Contest_List')}}</el-menu-item>
       <el-menu-item index="/contest/create">{{$t('m.Create_Contest')}}</el-menu-item>
     </el-submenu>
+    <el-menu-item index="/ai/problems"><Icon type="ios-analytics" />AI 题库</el-menu-item>
   </el-menu>
 </template>
 <script>

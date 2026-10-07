@@ -1,4 +1,7 @@
 export const m = {
+  AI_Studio: 'AI 工作台',
+  AI: 'AI',
+  AI_Evaluation: 'AI 评测赛制',
   Remote_Login_Required: '需要登录远端账号',
   Remote_Verification_Required: '需要完成验证',
   Remote_Result_Stale: '结果待同步',

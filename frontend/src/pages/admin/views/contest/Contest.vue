@@ -61,6 +61,7 @@
               <el-select v-model="contest.rule_type" class="rule-select" :disabled="disableRuleType">
                 <el-option label="ACM" value="ACM"></el-option>
                 <el-option label="OI" value="OI"></el-option>
+                <el-option label="AI" value="AI"></el-option>
               </el-select>
             </div>
             <div class="setting-card">
@@ -91,10 +92,11 @@
         </section>
 
         <ContestProblemComposer
-          v-if="isCreate"
+          v-if="isCreate && contest.rule_type !== 'AI'"
           ref="problemComposer"
           v-model="problemPlan"
           :rule-type="contest.rule_type" />
+        <AIContestSettings v-if="contest.rule_type === 'AI'" ref="aiSettings" :contest-id="isCreate ? '' : $route.params.contestId" />
 
         <div class="form-actions">
           <save :disabled="saving" @click="saveContest"></save>
@@ -108,12 +110,14 @@
   import api from '../../api.js'
   import Simditor from '../../components/Simditor.vue'
   import ContestProblemComposer from './ContestProblemComposer.vue'
+  import AIContestSettings from '../ai/ContestSettings.vue'
 
   export default {
     name: 'CreateContest',
     components: {
       Simditor,
-      ContestProblemComposer
+      ContestProblemComposer,
+      AIContestSettings
     },
     data () {
       return {
@@ -146,7 +150,7 @@
           (item.kind === 'REMOTE' && this.contest.rule_type !== 'ACM') ||
           (item.kind === 'PUBLIC' && item.ruleType && item.ruleType !== this.contest.rule_type)
         ))
-        if (incompatibleProblem) {
+        if (incompatibleProblem && this.contest.rule_type !== 'AI') {
           this.$error('题目编排中存在与当前比赛规则不兼容的题目，请先删除或切回对应规则')
           return
         }
@@ -155,9 +159,17 @@
         let data = Object.assign({}, this.contest)
         data.allowed_ip_ranges = Array.isArray(data.allowed_ip_ranges) ? data.allowed_ip_ranges : []
         try {
+          if (this.contest.rule_type === 'AI') this.$refs.aiSettings.validate()
           const res = await api[funcName](data)
           const contestId = (res.data.data || {}).id
-          if (this.isCreate && this.problemPlan.length) {
+          if (this.contest.rule_type === 'AI') {
+            try { await this.$refs.aiSettings.save(contestId) } catch (error) {
+              this.$error(`比赛已保存，AI 评测设置保存失败：${error.message}`)
+              if (this.isCreate) this.$router.replace({ name: 'edit-contest', params: { contestId } })
+              return
+            }
+          }
+          if (this.isCreate && this.contest.rule_type !== 'AI' && this.problemPlan.length) {
             try {
               await this.$refs.problemComposer.materialize(contestId)
             } catch (error) {

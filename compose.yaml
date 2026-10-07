@@ -48,6 +48,7 @@ services:
       OJ_ENV: production
       RUNTIME_ROOT: /runtime
       OJ_DATA_DIR: /data
+      AI_WORKER_TOKEN_FILE: /data/config/ai-worker-token
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"

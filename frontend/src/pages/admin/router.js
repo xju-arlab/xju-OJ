@@ -26,6 +26,7 @@ export default createRouter({
       path: '/',
       component: Home,
       children: [
+        { path: '/ai/problems', name: 'ai-problems', component: () => import('./views/ai/Problems.vue') },
         {
           path: '',
           name: 'dashboard',

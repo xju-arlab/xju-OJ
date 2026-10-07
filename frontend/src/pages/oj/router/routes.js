@@ -24,6 +24,19 @@ import * as Contest from '@oj/views/contest'
 import * as Setting from '@oj/views/setting'
 
 export default [
+  ...[
+    { path: '/ai-studio', name: 'ai-studio', props: { section: 'problems' } },
+    { path: '/ai-studio/contests', name: 'ai-contests', props: { section: 'contests' } },
+    { path: '/ai-studio/submissions', name: 'ai-submissions', props: { section: 'submissions' } }
+  ].map(route => ({ ...route, meta: { title: 'AI Studio' }, component: () => import('@oj/views/ai/AIStudio.vue') })),
+  {
+    path: '/ai-studio/problem/:problemID', name: 'ai-problem',
+    meta: { title: 'AI Studio · Notebook' }, component: () => import('@oj/views/ai/AIProblem.vue')
+  },
+  {
+    path: '/ai-studio/contest/:contestID', name: 'ai-contest',
+    meta: { title: 'AI Evaluation' }, component: () => import('@oj/views/ai/AIContest.vue')
+  },
   {
     name: 'home',
     path: '/',
