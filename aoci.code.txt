@@ -808,9 +808,9 @@ EvaluationIcon.vue[EU4T]: F:统一映射AI等待、成功、失败及部分通�
 api.js[IN7T]: F:封装同源AI和后台请求、CSRF及活动任务状态集合 | R:code:backend/ai_studio/urls.py,code:backend/ai_studio/admin_urls.py | A:request；studioApi；activeStatuses | S:超时20秒且按JSON error判断业务失败；成绩写入不经此浏览器接口授权
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/===
-README.md[SO7S]: F:说明AI工作台的计算架构、五道练习、部署备份及验收边界 | R:code:ai/prepare.py,code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-acceptance-2026-10-07.md | A:AI部署、练习导入、验收与恢复步骤 | S:CPU评测且每次运行新内核；共享令牌0600归属容器backend用户而非宿主用户；H100当前无隔离能力；正式考试单独配置
+README.md[SO7S]: F:说明AI计算架构、五道练习及在线离线部署和备份验收 | R:code:ai/prepare.py,code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-acceptance-2026-10-07.md | A:AI部署、导入、验收及恢复步骤 | S:CPU评测且每次新内核；令牌0600归容器backend用户；离线load丢失仓库digest，基础镜像可用两端核对的镜像ID；H100未启用；正式考试单独配置
 build.sh[OV8T]: F:从固定Codabench修订及本仓库构建Notebook、站点和计算镜像 | R:code:ai/notebook/Dockerfile,code:ai/codabench/Dockerfile | A:镜像tag参数；AI_UPSTREAM_CACHE；BUILD_NETWORK | S:非dev构建要求干净HEAD；核验上游精确修订及无改动；三个镜像均标记OJ和上游修订，私有运行目录不进入构建上下文
-compose.yaml[OR9S]: F:编排私有Codabench、数据库对象存储队列及Notebook和评测代理 | R:code:ai/prepare.py,code:ai/deploy.sh,code:ai/compute/worker.py | A:AI_RUNTIME；三种AI镜像；control网络；外部workspace卷 | S:不发布宿主端口；只有可信计算与Notebook代理接触Docker；学生容器另行无网络运行；工作区为有界tmpfs，CPU评测串行；服务凭据外置且不传给学生
+compose.yaml[OR9S]: F:编排私有Codabench、数据队列存储及Notebook和评测代理 | R:code:ai/prepare.py,code:ai/deploy.sh,code:ai/compute/worker.py | A:AI_RUNTIME；AI_SITE_IMAGE；AI_COMPUTE_IMAGE；AI_NOTEBOOK_IMAGE；AI_RABBIT_IMAGE；AI_MINIO_IMAGE；workspace卷 | S:不发布宿主端口；Docker仅可信计算与Notebook代理可访问；学生容器另行无网络隔离；有界tmpfs及串行CPU评测；令牌外置不交学生；Rabbit和Minio默认固定digest，离线可显式用已核对镜像ID
 deploy.sh[OV9T]: F:在干净源码和镜像溯源核验后排空备份并更新AI服务 | R:code:ai/compose.yaml,code:ai/compute/control.py,code:ai/codabench/bootstrap.py | A:私有runtime绝对路径参数 | S:排他锁且镜像必须匹配当前HEAD；先暂停排空OJ及Codabench，再备份数据库对象和配置；迁移初始化后预检并恢复接单；失败保留暂停和数据，不删除队列或卷；需先部署OJ迁移及共享令牌
 prepare.py[OC8T]: F:在仓库外创建AI私有配置凭据及有界临时工作卷 | R:code:ai/compose.yaml,code:ai/deploy.sh | A:--runtime；--project；--oj-url；--tag；--postgres-image | S:拒绝已有配置而不覆盖令牌；随机密钥文件0600；复用卷必须精确匹配512MiB tmpfs选项；只输出路径，不输出密钥
 

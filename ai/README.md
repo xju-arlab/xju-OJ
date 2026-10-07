@@ -67,6 +67,10 @@ python manage.py import_ai_practice /private/oj-practice.json --creator <已有�
 不要整个目录放入 `/public`。Docker 服务没有宿主公开端口；Codabench 不单独提供学生登录入口。
 首次导入后必须实测一次 Notebook 和一次正式评测，再组织真实考试。
 
+离线传输可用 `docker save/load`。加载后核对两端镜像 ID；Docker 归档不保留仓库 digest，
+私有 `compose.env` 可将 `AI_RABBIT_IMAGE`、`AI_MINIO_IMAGE` 设置为核对过的 `sha256:<镜像ID>`，
+避免 Compose 为恢复 digest 再访问不可达的仓库。默认仍使用上面固定版本的仓库 digest。
+
 ## 升级、备份与故障恢复
 
 1. 提交并推送源码，在服务器 `git pull --ff-only`，构建或加载绑定该 HEAD 的三个 AI 镜像。
