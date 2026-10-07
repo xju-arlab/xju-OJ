@@ -69,6 +69,7 @@ class Codabench:
     def run(self, job, heartbeat):
         remote_id = self.submit(job, heartbeat)
         deadline = time.monotonic() + 1200
+        scores_deadline = None
         while time.monotonic() < deadline:
             heartbeat(remote_id=remote_id)
             result = self.client.call("GET", "submissions/" + str(remote_id) + "/")
@@ -104,6 +105,18 @@ class Codabench:
                     if not math.isfinite(score):
                         raise RemoteError("Nonfinite score")
                     scores[key] = score
+                required = {job["judge"][key] for key in ("public_column", "private_column", "accuracy_column")
+                            if job["judge"].get(key)}
+                if required - scores.keys():
+                    # This upstream revision marks Finished in Run.start(), then
+                    # uploads score columns separately in run_wrapper(). A poll
+                    # can therefore observe no scores or only some columns.
+                    if scores_deadline is None:
+                        scores_deadline = min(deadline, time.monotonic() + 30)
+                    if time.monotonic() >= scores_deadline:
+                        raise RemoteError("Required score column is missing")
+                    time.sleep(3)
+                    continue
                 output = {"status": "SCORED", "remote_id": remote_id}
                 for setting, field in (("public_column", "public_score"), ("private_column", "private_score"),
                                        ("accuracy_column", "accuracy")):

@@ -158,12 +158,34 @@ class DispatchTests(unittest.TestCase):
         self.client.call.assert_not_called()
         self.client.put_zip.assert_not_called()
 
-    def test_nonfinite_missing_and_duplicate_scores_fail_closed(self):
-        for rows in ([{"column_key": "score", "score": "nan"}], [], [{"column_key": "score", "score": 1}] * 2):
+    def test_nonfinite_and_duplicate_scores_fail_closed(self):
+        for rows in ([{"column_key": "score", "score": "nan"}], [{"column_key": "score", "score": 1}] * 2):
             with self.subTest(rows=rows):
                 self.client.call.return_value = {"phase": 7, "status": "Finished", "scores": rows}
                 with self.assertRaises(RemoteError):
                     self.adapter.run({**self.job, "remote_id": 42}, self.heartbeat)
+
+    def test_finished_before_all_scores_arrive_is_polled_without_resubmission(self):
+        job = {**self.job, "remote_id": 42, "judge": {**self.job["judge"], "accuracy_column": "accuracy"}}
+        rows = [{"column_key": "score", "score": 0}, {"column_key": "accuracy", "score": 0.25}]
+        self.client.call.side_effect = [{"phase": 7, "status": "Finished", "scores": value}
+                                       for value in ([], rows[:1], rows)]
+        with patch("codabench.time.sleep"):
+            result = self.adapter.run(job, self.heartbeat)
+        self.assertEqual(result["public_score"], 0)
+        self.assertEqual(result["accuracy"], 0.25)
+        self.assertEqual([call.args[:2] for call in self.client.call.call_args_list], [("GET", "submissions/42/")] * 3)
+        self.client.put_zip.assert_not_called()
+
+    def test_permanently_missing_scores_fail_after_bounded_wait(self):
+        now = [0]
+        self.client.call.return_value = {"phase": 7, "status": "Finished", "scores": []}
+        with patch("codabench.time.monotonic", side_effect=lambda: now[0]), \
+                patch("codabench.time.sleep", side_effect=lambda seconds: now.__setitem__(0, now[0] + seconds)):
+            with self.assertRaisesRegex(RemoteError, "Required score column is missing"):
+                self.adapter.run({**self.job, "remote_id": 42}, self.heartbeat)
+        self.assertLessEqual(now[0], 30)
+        self.client.put_zip.assert_not_called()
 
     def test_zero_grade_and_trusted_failure_classification(self):
         self.client.call.return_value = {"phase": 7, "status": "Finished", "scores": [{"column_key": "score", "score": 0}]}

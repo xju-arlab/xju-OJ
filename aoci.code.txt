@@ -344,7 +344,7 @@ remote-oj-bridge.md[SN7S]: F:说明浏览器远程判题安装、持久事件确
 audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、代码和宿主问题修复及自动化验证范围 | R:code:docs/operations/acceptance-2026-10-07.md,code:.github/workflows/regression.yml | A:2026年10月审计记录 | S:索引覆盖不等于测试覆盖；线上结果另见验收记录；外部账号链路未实测，远程成绩仍由客户端上报
 release-and-recovery.md[SO7T]: F:规定统一发布、临时Git网络访问、宿主能力与排空重启及备份恢复 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:Git转发仅回环且代理按命令覆盖；可信入口按frontend实际来源；dump不含文件和Redis；有新写入不可直接回旧备份；手停unless-stopped须显式恢复
 acceptance-2026-10-07.md[SQ7T]: F:记录统一发布、备份恢复、HWE升级及真实20分钟比赛与补题验收证据 | R:code:docs/operations/audit-2026-10.md,code:deploy/ops/check-judge-host.py | A:2026年10月7日线上验收记录 | S:测试使用受控会话，外部登录邮件和第三方提交未实测；52项检查不代表全分支覆盖；测试账号已停用且对象隐藏，21条合成提交仍保留
-ai-acceptance-2026-10-07.md[SQ7T]: F:记录本地真实20分钟AI比赛、15人并发和Jupyter及Codabench验收证据 | R:code:ai/README.md,code:ai/tests/live_acceptance.py | A:2026年10月7日本地AI验收报告 | S:受控会话不证明外部登录邮件及第三方OJ；CPU数据不代表huawei1性能；GPU未启用；真实错误超时超内存和非法CSV均已验证，正式考试未创建
+ai-acceptance-2026-10-07.md[SQ7T]: F:记录本地20分钟AI比赛、15人并发及真实评测与发布竞态修复 | R:code:ai/README.md,code:ai/tests/live_acceptance.py,code:ai/tests/test_contracts.py | A:2026年10月7日本地AI验收报告 | S:受控会话不证明外部登录邮件第三方OJ；CPU测量不代表生产容量；GPU未启用；覆盖上游完成先于分数写入的有界等待，正式考试未创建
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/plans/feiyue-style-migration/===
 00-visual-audit-and-baseline.md[SU4T]: F:记录Feiyue视觉参考到OJ页面的映射及行为基线 | R:code:docs/plans/feiyue-style-migration/README.md | A:视觉审计计划 | S:保留判题、权限和接口行为；视觉参考冲突时优先业务可读性
@@ -808,7 +808,7 @@ EvaluationIcon.vue[EU4T]: F:统一映射AI等待、成功、失败及部分通�
 api.js[IN7T]: F:封装同源AI和后台请求、CSRF及活动任务状态集合 | R:code:backend/ai_studio/urls.py,code:backend/ai_studio/admin_urls.py | A:request；studioApi；activeStatuses | S:超时20秒且按JSON error判断业务失败；成绩写入不经此浏览器接口授权
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/===
-README.md[SO7S]: F:说明AI工作台的计算架构、五道练习、部署备份及验收边界 | R:code:ai/prepare.py,code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-acceptance-2026-10-07.md | A:AI部署、练习导入、验收与恢复步骤 | S:当前CPU评测且Notebook每次新建内核；H100容器无隔离能力不能直接执行学生代码；正式考试需单独配置
+README.md[SO7S]: F:说明AI工作台的计算架构、五道练习、部署备份及验收边界 | R:code:ai/prepare.py,code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-acceptance-2026-10-07.md | A:AI部署、练习导入、验收与恢复步骤 | S:CPU评测且每次运行新内核；共享令牌0600归属容器backend用户而非宿主用户；H100当前无隔离能力；正式考试单独配置
 build.sh[OV8T]: F:从固定Codabench修订及本仓库构建Notebook、站点和计算镜像 | R:code:ai/notebook/Dockerfile,code:ai/codabench/Dockerfile | A:镜像tag参数；AI_UPSTREAM_CACHE；BUILD_NETWORK | S:非dev构建要求干净HEAD；核验上游精确修订及无改动；三个镜像均标记OJ和上游修订，私有运行目录不进入构建上下文
 compose.yaml[OR9S]: F:编排私有Codabench、数据库对象存储队列及Notebook和评测代理 | R:code:ai/prepare.py,code:ai/deploy.sh,code:ai/compute/worker.py | A:AI_RUNTIME；三种AI镜像；control网络；外部workspace卷 | S:不发布宿主端口；只有可信计算与Notebook代理接触Docker；学生容器另行无网络运行；工作区为有界tmpfs，CPU评测串行；服务凭据外置且不传给学生
 deploy.sh[OV9T]: F:在干净源码和镜像溯源核验后排空备份并更新AI服务 | R:code:ai/compose.yaml,code:ai/compute/control.py,code:ai/codabench/bootstrap.py | A:私有runtime绝对路径参数 | S:排他锁且镜像必须匹配当前HEAD；先暂停排空OJ及Codabench，再备份数据库对象和配置；迁移初始化后预检并恢复接单；失败保留暂停和数据，不删除队列或卷；需先部署OJ迁移及共享令牌
@@ -821,11 +821,11 @@ secure_worker.py[RS9M]: F:约束Codabench计算容器、评测包解压和产物
 site_settings.py[FS8T]: F:配置只供内部桥接使用的Codabench站点及文件密钥 | R:code:ai/compose.yaml,code:ai/prepare.py | A:DJANGO_SETTINGS_MODULE；内部站点配置 | S:关闭DEBUG、公开注册登录及邮件；服务密钥从挂载文件读取；不承担OJ浏览器身份认证
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/compute/===
-codabench.py[IN9S]: F:把OJ不可变答卷交给Codabench并恢复不确定派发和归一化可信成绩 | R:code:ai/compute/transport.py,code:ai/compute/worker.py,code:backend/ai_studio/views.py | A:Codabench.preflight；evaluate；阶段及成绩解析 | S:POST前持久标记派发，断连后按UUID文件名恢复而不盲重发；远程ID固定；只接受配置阶段和有限数值，必要时读取唯一子任务分数；TLE和OOM依据受信任元数据
+codabench.py[IN9S]: F:把OJ答卷交给Codabench并恢复不确定派发和读取可信成绩 | R:code:ai/compute/transport.py,code:ai/compute/worker.py,code:backend/ai_studio/views.py | A:Codabench.find_submission；submit；run；submission_bundle | S:POST前持久标记派发，断连后按UUID文件名恢复而不盲重发；远程ID固定；验证阶段及有限唯一分数；上游先Finished后逐列写分，缺列继续轮询最多30秒，绝不补零；必要时取唯一子任务分数；TLE和OOM仅据可信元数据
 control.py[OW7T]: F:通过认证Worker接口暂停接收新任务、等待排空和恢复AI服务 | R:code:backend/ai_studio/views.py,code:ai/deploy.sh | A:pause；resume；status；--wait | S:排空超时失败而不清理队列；暂停只阻止新计算任务，草稿仍可保存
 notebook.py[RS9T]: F:在独立Docker容器中运行Jupyter答卷并提取受限结果 | R:code:ai/notebook/notebook_runner.py,code:ai/compute/worker.py | A:NotebookExecutor；镜像预检与任务执行 | S:UID65532、无网络、只读根、无凭据和socket；CPU内存进程及输出均有界；等待时续租；即使返回JSON也先检查OOM避免误报超时；最终只清理本任务容器
-transport.py[IN8T]: F:封装有界JSON请求及不携带服务认证的预签名对象上传 | R:code:ai/compute/codabench.py,code:ai/compute/worker.py | A:JSONClient；UploadClient；secret | S:拒绝重定向及URL内凭据；上传来源必须匹配允许的存储origin；响应限制8MiB；异常不泄露带令牌URL
-worker.py[AW9T]: F:从OJ认领Notebook或评测任务、续租并以栅栏令牌交付结果 | R:code:backend/ai_studio/views.py,code:ai/compute/notebook.py,code:ai/compute/codabench.py | A:--kind；--preflight；Worker循环 | S:每15秒续租，结果有限重试；只向外请求OJ，无学生可访问服务；评测不可回退宿主执行；失败消息受限且不打印答卷或服务凭据
+transport.py[IN8T]: F:封装有界JSON请求及不携带服务认证的预签名对象上传 | R:code:ai/compute/codabench.py,code:ai/compute/worker.py | A:Client.call；Client.put_zip；RemoteError；NoRedirect | S:拒绝重定向及URL内凭据；上传来源匹配允许origin；响应限制8MiB；异常不泄露带令牌URL
+worker.py[AW9T]: F:从OJ认领Notebook或评测任务、续租并以栅栏令牌交付结果 | R:code:backend/ai_studio/views.py,code:ai/compute/notebook.py,code:ai/compute/codabench.py | A:--once；--preflight；AI_WORKER_KINDS；AI_WORKER_NAME | S:计算期间续租，结果最多三次回写；只向外请求OJ且服务不对学生开放；不回退宿主执行；失败日志只记录异常类型，令牌从私有文件读取
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/notebook/===
 Dockerfile[OV8T]: F:构建固定Python及CPU版PyTorch的Jupyter运行与评测镜像 | R:code:ai/notebook/pyproject.toml,code:ai/notebook/uv.lock,code:ai/notebook/notebook_runner.py | A:Notebook镜像；python运行入口 | S:冻结依赖且以65532运行；禁用CUDA依赖；容器隔离和限额由可信启动器施加，镜像本身不替代沙箱边界

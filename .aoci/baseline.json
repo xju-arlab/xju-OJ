@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-07T22:34:15Z",
+  "updated_at": "2026-10-07T22:40:49Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -65,9 +65,9 @@
     },
     "ai/README.md": {
       "role": "index",
-      "sha256": "08e23f2494d165967a69cfb3668cdcd5b973b8471aa85b15b586b4a98a04fe07",
-      "size": 6932,
-      "normalized_sha256": "08e23f2494d165967a69cfb3668cdcd5b973b8471aa85b15b586b4a98a04fe07"
+      "sha256": "b5fcc20a9b12f087e245ef6495ffd226270072414270a91e3831e69b65f66b1f",
+      "size": 7077,
+      "normalized_sha256": "b5fcc20a9b12f087e245ef6495ffd226270072414270a91e3831e69b65f66b1f"
     },
     "ai/build.sh": {
       "role": "index",
@@ -107,9 +107,9 @@
     },
     "ai/compute/codabench.py": {
       "role": "index",
-      "sha256": "95f80e10c4d36325b6176c84999ff1fa47cf92b714cce5f9bcfcdc2abe044b74",
-      "size": 5865,
-      "normalized_sha256": "95f80e10c4d36325b6176c84999ff1fa47cf92b714cce5f9bcfcdc2abe044b74"
+      "sha256": "f966a2a03eb68445e14cf9ea0044dc36db618598998c97f4028cf8b3e2d927bf",
+      "size": 6672,
+      "normalized_sha256": "f966a2a03eb68445e14cf9ea0044dc36db618598998c97f4028cf8b3e2d927bf"
     },
     "ai/compute/control.py": {
       "role": "index",
@@ -197,9 +197,9 @@
     },
     "ai/tests/test_contracts.py": {
       "role": "observe",
-      "sha256": "c7d41f27a219c7884f65492366cf6749c0c2f70196a0315a95950bdea62047bd",
-      "size": 9523,
-      "normalized_sha256": "c7d41f27a219c7884f65492366cf6749c0c2f70196a0315a95950bdea62047bd"
+      "sha256": "a298447c029d8c7099f4c27bce322769c211e610983ebf63d1cf9c2c037e07e7",
+      "size": 10969,
+      "normalized_sha256": "a298447c029d8c7099f4c27bce322769c211e610983ebf63d1cf9c2c037e07e7"
     },
     "ai/tests/test_runtime.py": {
       "role": "observe",
@@ -209,9 +209,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "8b1affbdf26faee07dfde54f2bce24b075160b3af1a981aea5c6e08317901ace",
-      "size": 174880,
-      "normalized_sha256": "8b1affbdf26faee07dfde54f2bce24b075160b3af1a981aea5c6e08317901ace"
+      "sha256": "1e62fb2dbcd0aa4dedffed413ee5795a633b53372b489a683d0cfc87aaf7b11c",
+      "size": 175028,
+      "normalized_sha256": "1e62fb2dbcd0aa4dedffed413ee5795a633b53372b489a683d0cfc87aaf7b11c"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1936,9 +1936,9 @@
     },
     "docs/operations/ai-acceptance-2026-10-07.md": {
       "role": "index",
-      "sha256": "0983fc14766ef0d2a0752b949d809ddbbda329a4592c26c7b286ea13889636da",
-      "size": 3126,
-      "normalized_sha256": "0983fc14766ef0d2a0752b949d809ddbbda329a4592c26c7b286ea13889636da"
+      "sha256": "967f8fb0e26d26be0b29ca759fb7307ab0be12a2aad55ff170130adcc66d154e",
+      "size": 3371,
+      "normalized_sha256": "967f8fb0e26d26be0b29ca759fb7307ab0be12a2aad55ff170130adcc66d154e"
     },
     "docs/operations/audit-2026-10.md": {
       "role": "index",

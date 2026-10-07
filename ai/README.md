@@ -53,7 +53,8 @@ python3 ai/prepare.py \
 ```
 
 将私有运行目录 `secrets/oj_worker_token` 复制到 OJ 后端的
-`runtime/backend/config/ai-worker-token`，文件权限 0600、所有者 UID 1000。
+`runtime/backend/config/ai-worker-token`，文件权限 0600、所有者与后端容器内 `backend` 用户一致。
+用 `docker compose exec -T backend-api id backend` 核对实际 UID/GID，不使用宿主登录用户的 UID。
 两个位置必须是同一个值；不要放进 `.env`、提交记录或命令输出。
 
 ```sh
