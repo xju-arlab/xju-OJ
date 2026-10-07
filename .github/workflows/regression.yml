@@ -55,7 +55,7 @@ jobs:
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       OJ_ENV: dev
-      OJ_DATA_DIR: ${{ runner.temp }}/oj-test-data
+      OJ_DATA_DIR: ${{ github.workspace }}/../oj-test-data
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: '5432'
       POSTGRES_DB: oj_test
