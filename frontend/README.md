@@ -80,7 +80,7 @@ Vue 2、Vuex、Element UI/iView、CodeMirror 5、Simditor、Webpack/Babel 6 和 
 
 ## Browser Support
 
-Modern browsers and Internet Explorer 10+.
+Current Chrome, Firefox, Safari and Edge. Internet Explorer is not supported.
 
 ## LICENSE
 

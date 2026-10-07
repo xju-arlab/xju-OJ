@@ -1,4 +1,5 @@
 import ipaddress
+import logging
 
 from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
@@ -12,7 +13,7 @@ from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.captcha import Captcha
 from utils.throttling import TokenBucket
-from ..models import (RemoteSubmissionStatus, Submission,
+from ..models import (JudgeStatus, RemoteSubmissionStatus, Submission,
                       SubmissionJudgeMode)
 from ..remote import (RemoteSubmissionError, apply_remote_submission_event,
                       build_remote_task)
@@ -20,6 +21,8 @@ from ..serializers import (CreateSubmissionSerializer, SubmissionModelSerializer
                            RemoteSubmissionEventSerializer,
                            ShareSubmissionSerializer)
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class SubmissionAPI(APIView):
@@ -43,10 +46,12 @@ class SubmissionAPI(APIView):
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):
         contest = self.contest
-        # Ended contests accept practice submissions. The judge dispatcher
-        # excludes them from the official contest rank.
-        if contest.status != ContestStatus.CONTEST_ENDED and not request.user.is_contest_admin(contest):
-            user_ip = ipaddress.ip_address(request.session.get("ip"))
+        if contest.status == ContestStatus.CONTEST_ENDED:
+            # Ended password contests retain the existing public-practice
+            # policy. Registration, password and venue IP restrictions end.
+            return
+        if not request.user.is_contest_admin(contest):
+            user_ip = ipaddress.ip_address(request.ip)
             if contest.allowed_ip_ranges:
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
                     return self.error("Your IP is not allowed in this contest")
@@ -88,7 +93,7 @@ class SubmissionAPI(APIView):
                     language=data["language"],
                     code=data["code"],
                     problem_id=problem.id,
-                    ip=request.session["ip"],
+                    ip=request.ip,
                     contest_id=data.get("contest_id"),
                     judge_mode=SubmissionJudgeMode.REMOTE if is_remote else SubmissionJudgeMode.LOCAL,
                     remote_oj=problem.remote_oj if is_remote else None,
@@ -104,7 +109,7 @@ class SubmissionAPI(APIView):
         # JudgeDispatcher(submission.id, problem.id).judge()
         if remote_task is None:
             judge_task.send(submission.id, problem.id)
-        if hide_id:
+        if hide_id and remote_task is None:
             return self.success()
         else:
             response = {"submission_id": submission.id}
@@ -229,12 +234,52 @@ class SubmissionExistsAPI(APIView):
                                                       user_id=request.user.id).exists())
 
 
+class RemoteSubmissionRecoveryAPI(APIView):
+    @login_required
+    def get(self, request):
+        # Recovery belongs to the original submitter, including for admins.
+        submissions = Submission.objects.select_related("problem").filter(
+            user_id=request.user.id, judge_mode=SubmissionJudgeMode.REMOTE)
+        submission_id = request.GET.get("submission_id")
+        if submission_id:
+            submission = submissions.filter(id=submission_id).first()
+            if submission is None:
+                return self.error("Remote submission does not exist")
+            if submission.remote_status in RemoteSubmissionStatus.TERMINAL:
+                return self.success({"task": None, "submission": SubmissionModelSerializer(submission).data})
+            try:
+                task = build_remote_task(submission.problem, submission)
+            except RemoteSubmissionError as exc:
+                return self.error(str(exc))
+            return self.success({"task": task, "code": submission.code if not submission.remote_submission_id else ""})
+        # Only resume queries automatically. Login/verification and sending code
+        # require the user's explicit recovery action, avoiding duplicate runs.
+        pending = submissions.filter(result__in=[JudgeStatus.PENDING, JudgeStatus.JUDGING]).exclude(
+            remote_submission_id__isnull=True).exclude(remote_submission_id="").order_by("create_time")[:50]
+        tasks = []
+        for submission in pending:
+            try:
+                tasks.append(build_remote_task(submission.problem, submission))
+            except RemoteSubmissionError:
+                continue
+        return self.success({"user_id": request.user.id, "tasks": tasks})
+
+
 class RemoteSubmissionEventAPI(APIView):
+    def invalid_serializer(self, serializer):
+        response = super().invalid_serializer(serializer)
+        # Log field names, never credentials, source, or compiler output.
+        logger.warning("Remote event rejected: %s", response.data["error"])
+        return response
+
     @validate_serializer(RemoteSubmissionEventSerializer)
     @login_required
     def post(self, request):
         try:
             submission = apply_remote_submission_event(request.user, request.data)
         except RemoteSubmissionError as exc:
+            logger.warning("Remote event rejected: submission=%s provider=%s status=%s reason=%s",
+                           request.data.get("submission_id"), request.data.get("provider"),
+                           request.data.get("status"), str(exc)[:180])
             return self.error(str(exc))
         return self.success(SubmissionModelSerializer(submission).data)

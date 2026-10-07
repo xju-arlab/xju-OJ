@@ -20,41 +20,41 @@ class BasePermissionDecorator(object):
         return JSONResponse.response({"error": "permission-denied", "data": data})
 
     def __call__(self, *args, **kwargs):
-        self.request = args[1]
+        request = args[1]
 
-        if self.check_permission():
-            if self.request.user.is_disabled:
+        if self.check_permission(request):
+            if request.user.is_disabled:
                 return self.error("Your account is disabled")
             return self.func(*args, **kwargs)
         else:
             return self.error("Please login first")
 
-    def check_permission(self):
+    def check_permission(self, request):
         raise NotImplementedError()
 
 
 class login_required(BasePermissionDecorator):
-    def check_permission(self):
-        return self.request.user.is_authenticated
+    def check_permission(self, request):
+        return request.user.is_authenticated
 
 
 class super_admin_required(BasePermissionDecorator):
-    def check_permission(self):
-        user = self.request.user
+    def check_permission(self, request):
+        user = request.user
         return user.is_authenticated and user.is_super_admin()
 
 
 class admin_role_required(BasePermissionDecorator):
-    def check_permission(self):
-        user = self.request.user
+    def check_permission(self, request):
+        user = request.user
         return user.is_authenticated and user.is_admin_role()
 
 
 class problem_permission_required(admin_role_required):
-    def check_permission(self):
-        if not super(problem_permission_required, self).check_permission():
+    def check_permission(self, request):
+        if not super().check_permission(request):
             return False
-        if self.request.user.problem_permission == ProblemPermission.NONE:
+        if request.user.problem_permission == ProblemPermission.NONE:
             return False
         return True
 
@@ -117,11 +117,18 @@ def check_contest_permission(check_type="details"):
             if user.is_contest_admin(self.contest):
                 return func(*args, **kwargs)
 
+            # An ended contest is public practice material: its problems,
+            # submissions, rankings and announcements stay readable without
+            # registration or password, and its problems accept practice
+            # submissions that never affect the frozen ranking.
+            if self.contest.status == ContestStatus.CONTEST_ENDED:
+                return func(*args, **kwargs)
+
             registered = self.contest.is_registered(user)
 
             # The problem list remains available as a blurred registration
             # preview. Problem details and submissions require participation.
-            if check_type == "problems" and self.contest.status != ContestStatus.CONTEST_ENDED and not registered:
+            if check_type == "problems" and not registered:
                 return self.error("Please register for the contest first")
 
             if self.contest.contest_type == ContestType.PASSWORD_PROTECTED_CONTEST:

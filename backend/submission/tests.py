@@ -200,7 +200,7 @@ class SubmissionAPITest(SubmissionPrepare):
         self.assertEqual(submission.remote_status, RemoteSubmissionStatus.FINISHED)
         self.assertEqual(submission.remote_submission_id, "10001")
         self.assertEqual(submission.statistic_info["time_cost"], 31)
-        self.assertEqual(self.problem.submission_number, 1)
+        self.assertEqual(self.problem.submission_number, 2)  # Includes the pre-existing CE fixture.
         self.assertEqual(self.problem.accepted_number, 1)
         self.assertEqual(self.user.userprofile.submission_number, 1)
 
@@ -255,6 +255,7 @@ class SubmissionAPITest(SubmissionPrepare):
         self.assertSuccess(rank_response)
         self.assertEqual(rank_response.data["data"]["results"][0]["user"]["username"], self.user.username)
 
+        submission = Submission.objects.get(id=submission_id)
         for stale_status in (
                 RemoteSubmissionStatus.SUBMITTED,
                 RemoteSubmissionStatus.JUDGING,
@@ -263,7 +264,7 @@ class SubmissionAPITest(SubmissionPrepare):
                 "submission_id": submission_id,
                 "provider": RemoteOJ.CODEFORCES,
                 "status": stale_status,
-                "remote_submission_id": "10001",
+                "remote_submission_id": "contest-admin-10001",
                 "remote_url": "https://codeforces.com/contest/4/submission/10001",
                 "verdict": "OK" if stale_status == RemoteSubmissionStatus.FINISHED else "",
             })
@@ -275,6 +276,10 @@ class SubmissionAPITest(SubmissionPrepare):
         self.assertEqual(submission.remote_status, RemoteSubmissionStatus.FINISHED)
         self.assertEqual(self.problem.submission_number, 1)
         self.assertEqual(self.problem.accepted_number, 1)
+        self.assertEqual(self.user.userprofile.submission_number, 0)
+        rank.refresh_from_db()
+        self.assertEqual(rank.submission_number, 1)
+        self.assertEqual(rank.accepted_number, 1)
 
     def test_remote_submission_ignores_backward_progress_event(self, judge_task):
         self._configure_remote_problem()

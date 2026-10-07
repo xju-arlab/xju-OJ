@@ -18,7 +18,8 @@ const render = async (el, binding) => {
   const hljs = await getHighlighter()
   if (!el.isConnected) return
   Array.from(el.querySelectorAll('pre code')).forEach(target => {
-    if (binding.value) target.textContent = binding.value
+    if (binding.value !== undefined) target.textContent = binding.value ?? ''
+    delete target.dataset.highlighted
     hljs.highlightElement(target)
   })
 }

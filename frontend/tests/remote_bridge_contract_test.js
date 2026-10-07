@@ -30,8 +30,8 @@ function section (startMarker, endMarker) {
   return source.slice(start, end)
 }
 
-assert.match(source, /^\/\/ @version\s+1\.0\.1$/m)
-assert.match(frontendBridge, /MINIMUM_BRIDGE_VERSION = \[1, 0, 1\]/)
+assert.match(source, /^\/\/ @version\s+1\.1\.0$/m)
+assert.match(frontendBridge, /MINIMUM_BRIDGE_VERSION = \[1, 1, 0\]/)
 assert.match(frontendBridge, /export function requestRemoteBridgeStatus/)
 assert.match(frontendBridge, /export function subscribeRemoteBridgeReady/)
 assert.match(bridgeInstallPage, /@click="beginUserscriptActivation"/)

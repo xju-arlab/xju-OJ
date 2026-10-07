@@ -43,6 +43,43 @@ Supported browser-side adapters:
 - Nowcoder ACM/problem pages: session submit API, native risk-control fallback,
   and result polling.
 
+Version 1.1.0 persists pending result events per submission in userscript storage.
+An event is removed only after the backend acknowledges it successfully, including
+the JSON business status. Network failures and rejected acknowledgements retry
+with bounded backoff. Reopening an OJ tab resumes delivery; a shared browser lease
+limits duplicate polling from multiple tabs. Provider session tokens remain in
+the browser. The OJ tab must stay open for delivery to continue.
+
+The submission list distinguishes provider login, verification, active judging,
+and a result that has not synced recently. Submission details offer **Continue
+submission** or **Sync result** to the original submitter. `GET
+/api/remote_submission/recover` returns only that user's unfinished runs with a
+remote ID for automatic query recovery; the explicit `submission_id` form can
+also restore the stored code for a task that still needs login or verification.
+Recovery never submits code again for an existing remote ID. An interrupted
+provider POST with an unknown outcome is retained for checking against the
+provider's records, rather than automatically sending a duplicate submission.
+
+Optional invalid statistics (including NaN/null percentages from Nowcoder) do
+not reject a final verdict. Compiler messages are bounded and displayed in
+submission details. Luogu's overall unaccepted verdict is interpreted according
+to the problem rule: ACM uses a known failing testcase verdict, or wrong answer
+when no specific failure is available; OI retains positive partial scores.
+Zero-score unaccepted records are not labeled partially accepted.
+
+Old scripts may have deleted their local tasks before the backend received a
+final verdict. After upgrading to 1.1.0 and refreshing an OJ tab, the recovery API
+can rebuild result queries from remote IDs retained by the backend. Login or
+verification still requires the original user's provider session. It cannot
+reconstruct a remote ID lost before it ever reached the OJ or browser storage.
+
+To repair historical Luogu ACM partial-verdict labels, preview with
+`python manage.py normalize_remote_acm_verdicts`, then use `--apply`. The command
+saves a private JSON backup under the backend data directory's `backups/` before
+each problem's transaction. It normalizes failure labels and their matching
+histogram/profile entries, preserving accepted counts, ranks, source code, and
+submission timestamps. It does not guess verdicts for pending submissions.
+
 ## Admin problem import
 
 The admin problem list exposes **Import Remote Problem** for both the public
@@ -96,6 +133,10 @@ pnpm --dir frontend run test:routes
 pnpm --dir frontend run test:remote-bridge
 pnpm --dir frontend run build
 ```
+
+Backend regression coverage includes `submission.tests_remote_recovery`,
+`submission.tests`, and `submission.tests_contest_practice`. Run these against
+isolated test PostgreSQL/Redis instances; do not run tests on production data.
 
 Apply Django migrations during the normal deployment. Production deployment is
 still `./deploy.sh`; do not use the frontend development override in production.

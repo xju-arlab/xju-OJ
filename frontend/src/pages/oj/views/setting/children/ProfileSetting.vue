@@ -252,7 +252,7 @@
           return
         }
         this.loadingSaveBtn = true
-        const updateData = utils.filterEmptyValue(Object.assign({}, this.formProfile))
+        const updateData = {...this.formProfile}
         api.updateProfile(updateData).then(res => {
           this.$success('Success')
           this.$store.commit(types.CHANGE_PROFILE, {profile: res.data.data})

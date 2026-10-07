@@ -294,7 +294,10 @@ class IntegrationTest(base.BaseTestCase):
         config["args"] = ["../test_src/integration/gcc_random.c",
                           "-o", os.path.join(self.workspace, "gcc_random")]
         result = _judger.run(**config)
-        self.assertTrue(result["real_time"] >= 2000)
+        self.assertIn(result["result"], (_judger.RESULT_CPU_TIME_LIMIT_EXCEEDED,
+                                         _judger.RESULT_REAL_TIME_LIMIT_EXCEEDED))
+        self.assertTrue(result["cpu_time"] >= config["max_cpu_time"] or
+                        result["real_time"] >= config["max_real_time"])
 
     def test_cpp_meta(self):
         config = self.base_config
@@ -304,8 +307,10 @@ class IntegrationTest(base.BaseTestCase):
                           "-o", os.path.join(self.workspace, "cpp_meta")]
         result = _judger.run(**config)
         self.assertEqual(result["result"], _judger.RESULT_CPU_TIME_LIMIT_EXCEEDED)
-        self.assertTrue(result["cpu_time"] > 1500)
-        self.assertTrue(result["real_time"] >= 2000)
+        # The supervisor now measures the whole compiler process group and
+        # enforces the configured 1-second limit without waiting for 2 seconds.
+        self.assertGreaterEqual(result["cpu_time"], config["max_cpu_time"])
+        self.assertLess(result["real_time"], config["max_real_time"] + 1000)
 
     def test_output_size(self):
         config = self.base_config

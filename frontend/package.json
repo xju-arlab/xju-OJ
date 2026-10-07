@@ -11,6 +11,7 @@
     "build": "vite build",
     "test:routes": "node tests/e2e/route_contract_test.js",
     "test:auth-error": "node tests/auth_error_test.mjs",
+    "test:browser": "playwright test",
     "test:contest-submissions": "node tests/contest_submission_test.mjs",
     "test:contest-announcements": "node tests/contest_announcement_test.mjs",
     "test:remote-bridge": "node --check static/userscripts/xju-oj-remote-bridge.user.js && node tests/remote_bridge_contract_test.js && node tests/remote_bridge_runtime_test.js && node tests/remote_bridge_reliability_test.cjs && node tests/submission_status_test.mjs",
@@ -29,6 +30,7 @@
     "@lezer/highlight": "1.2.3",
     "axios": "1.13.6",
     "browser-detect": "0.2.28",
+    "dompurify": "3.4.16",
     "echarts": "6.1.0",
     "element-plus": "2.14.4",
     "highlight.js": "11.11.1",
@@ -49,6 +51,7 @@
     "vue-router": "5.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@vitejs/plugin-vue": "6.0.8",
     "vite": "8.2.1"
   },

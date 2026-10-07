@@ -83,7 +83,7 @@ class XSSHtml(HTMLParser):
             self.start.append(tag)
         attdict = {}
         for attr in attrs:
-            attdict[attr[0]] = attr[1]
+            attdict[attr[0]] = attr[1] or ""
 
         attdict = self._wash_attr(attdict, tag)
         if hasattr(self, "node_%s" % tag):

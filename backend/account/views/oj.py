@@ -5,6 +5,7 @@ from importlib import import_module
 import qrcode
 from django.conf import settings
 from django.contrib import auth
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -369,25 +370,27 @@ class SessionManagementAPI(APIView):
         current_session = request.session.session_key
         session_keys = request.user.session_keys
         result = []
-        modified = False
+        expired_keys = set()
         for key in session_keys[:]:
             session = session_store(key)
             # session does not exist or is expiry
-            if not session._session:
-                session_keys.remove(key)
-                modified = True
+            if not key or str(session.get("_auth_user_id")) != str(request.user.pk):
+                expired_keys.add(key)
                 continue
 
             s = {}
             if current_session == key:
                 s["current_session"] = True
-            s["ip"] = session["ip"]
-            s["user_agent"] = session["user_agent"]
-            s["last_activity"] = datetime2str(session["last_activity"])
+            s["ip"] = session.get("ip", "")
+            s["user_agent"] = session.get("user_agent", "")
+            s["last_activity"] = datetime2str(session.get("last_activity", now()))
             s["session_key"] = key
             result.append(s)
-        if modified:
-            request.user.save()
+        if expired_keys:
+            with transaction.atomic():
+                user = User.objects.select_for_update().get(pk=request.user.pk)
+                user.session_keys = [key for key in user.session_keys if key not in expired_keys]
+                user.save(update_fields=["session_keys"])
         return self.success(result)
 
     @login_required
@@ -395,13 +398,17 @@ class SessionManagementAPI(APIView):
         session_key = request.GET.get("session_key")
         if not session_key:
             return self.error("Parameter Error")
-        request.session.delete(session_key)
-        if session_key in request.user.session_keys:
-            request.user.session_keys.remove(session_key)
-            request.user.save()
-            return self.success("Succeeded")
-        else:
-            return self.error("Invalid session_key")
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            if session_key not in user.session_keys:
+                return self.error("Invalid session_key")
+            user.session_keys.remove(session_key)
+            user.save(update_fields=["session_keys"])
+            if session_key == request.session.session_key:
+                auth.logout(request)
+            else:
+                request.session.delete(session_key)
+        return self.success("Succeeded")
 
 
 class UserRankAPI(APIView):
@@ -420,19 +427,20 @@ class UserRankAPI(APIView):
 
 class ProfileProblemDisplayIDRefreshAPI(APIView):
     @login_required
+    @transaction.atomic
     def get(self, request):
-        profile = request.user.userprofile
+        profile = UserProfile.objects.select_for_update().get(user=request.user)
         acm_problems = profile.acm_problems_status.get("problems", {})
         oi_problems = profile.oi_problems_status.get("problems", {})
         ids = list(acm_problems.keys()) + list(oi_problems.keys())
         if not ids:
             return self.success()
-        display_ids = Problem.objects.filter(id__in=ids, visible=True).values_list("_id", flat=True)
-        id_map = dict(zip(ids, display_ids))
-        for k, v in acm_problems.items():
-            v["_id"] = id_map[k]
-        for k, v in oi_problems.items():
-            v["_id"] = id_map[k]
+        id_map = {str(pk): display_id for pk, display_id in
+                  Problem.objects.filter(id__in=ids, visible=True).values_list("id", "_id")}
+        for problems in (acm_problems, oi_problems):
+            for key, value in problems.items():
+                if key in id_map:
+                    value["_id"] = id_map[key]
         profile.save(update_fields=["acm_problems_status", "oi_problems_status"])
         return self.success()
 

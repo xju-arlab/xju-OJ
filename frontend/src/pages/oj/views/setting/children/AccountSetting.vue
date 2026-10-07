@@ -62,14 +62,14 @@
       const tfaCheck = [{required: true, trigger: 'change'}]
       const CheckAgainPassword = (rule, value, callback) => {
         if (value !== this.formPassword.new_password) {
-          callback(new Error('password does not match'))
+          return callback(new Error('password does not match'))
         }
         callback()
       }
       const CheckNewPassword = (rule, value, callback) => {
         if (this.formPassword.old_password !== '') {
           if (this.formPassword.old_password === this.formPassword.new_password) {
-            callback(new Error('The new password doesn\'t change'))
+            return callback(new Error('The new password doesn\'t change'))
           } else {
             // 对第二个密码框再次验证
             this.$refs.formPassword.validateField('again_password')
@@ -158,7 +158,8 @@
             this.$success('Change email successfully')
             this.$refs.formEmail.resetFields()
           }, res => {
-            if (res.data.data === 'tfa_required') {
+            this.loading.btnEmail = false
+            if (res?.data?.data === 'tfa_required') {
               this.visible.tfaRequired = true
             }
           })

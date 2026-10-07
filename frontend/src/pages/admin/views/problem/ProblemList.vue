@@ -346,7 +346,7 @@
         this.getProblemList(this.currentPage)
       },
       'keyword' () {
-        this.currentChange()
+        this.currentChange(1)
       }
     }
   }

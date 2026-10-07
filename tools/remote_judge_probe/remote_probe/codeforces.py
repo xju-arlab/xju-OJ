@@ -154,6 +154,9 @@ class CodeforcesProvider:
             available = ", ".join(f"{key}={value}" for key, value in form.languages.items())
             raise ProbeError(f"语言 ID {language_id} 不在当前题目可选列表中: {available}")
 
+        before = max((int(item.get("id", 0)) for item in self._api_submissions()), default=0)
+        started_at = int(time.time())
+        nonce_code = code.rstrip() + "\n" + (" " * (started_at % 97 + 1)) + "\n"
         data = dict(form.fields)
         data["programTypeId"] = str(language_id)
         files = None

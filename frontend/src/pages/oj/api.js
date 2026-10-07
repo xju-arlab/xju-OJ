@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '@/utils/apiError'
 import { ElMessage } from 'element-plus'
 import store from '@/store'
 import axios from 'axios'
@@ -28,6 +29,9 @@ export default {
     return ajax('login', 'post', {
       data
     })
+  },
+  legacyEmailLink (data) {
+    return ajax('auth/oidc/legacy-email-link', 'post', { data })
   },
   checkUsernameOrEmail (username, email) {
     return ajax('check_username_or_email', 'post', {
@@ -232,6 +236,9 @@ export default {
       data
     })
   },
+  recoverRemoteSubmission (submissionId) {
+    return ajax('remote_submission/recover', 'get', { params: { submission_id: submissionId } })
+  },
   getSubmissionList (offset, limit, params) {
     params.limit = limit
     params.offset = offset
@@ -261,8 +268,8 @@ export default {
     })
   },
   submissionRejudge (id) {
-    return ajax('admin/submission/rejudge', 'get', {
-      params: {
+    return ajax('admin/submission/rejudge', 'post', {
+      data: {
         id
       }
     })
@@ -320,11 +327,11 @@ function ajax (url, method, options) {
       data
     }).then(res => {
       // API正常返回(status=20x), 是否错误通过有无error判断
-      if (res.data.error !== null) {
-        ElMessage.error(res.data.data)
+      if (res.data?.error !== null) {
+        ElMessage.error(apiErrorMessage(res))
         reject(res)
         // 若后端返回为登录，则为session失效，应退出当前登录用户
-        if (res.data.data.startsWith('Please login')) {
+        if (apiErrorMessage(res).startsWith('Please login')) {
           store.dispatch('changeModalStatus', {'mode': 'login', 'visible': true})
         }
       } else {
@@ -336,7 +343,7 @@ function ajax (url, method, options) {
     }, res => {
       // API请求异常，一般为Server error 或 network error
       reject(res)
-      ElMessage.error(res.data.data)
+      ElMessage.error(apiErrorMessage(res))
     })
   })
 }

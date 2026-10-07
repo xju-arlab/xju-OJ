@@ -154,10 +154,10 @@
         let session = sessions[0]
         if (sessions.length > 1) {
           session = sessions.filter(s => !s.current_session).sort((a, b) => {
-            return a.last_activity < b.last_activity
+            return new Date(b.last_activity) - new Date(a.last_activity)
           })[0]
         }
-        this.session = session
+        this.session = session || {}
       }
     },
     computed: {

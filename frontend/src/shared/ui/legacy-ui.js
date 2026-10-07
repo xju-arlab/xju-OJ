@@ -16,7 +16,7 @@ const forward = (component, name, map = {}) => ({
     return () => h(component, {
       ...attrs,
       ...(attrs.value !== undefined && attrs.modelValue === undefined ? { modelValue: attrs.value } : {}),
-      'onUpdate:modelValue': value => { emit('update:modelValue', value); emit('input', value); emit('on-change', value) },
+      'onUpdate:modelValue': value => { emit('update:modelValue', value); emit('input', value) },
       onChange: value => emit('on-change', value),
       onCommand: value => emit(map.command || 'on-click', value),
       onSelect: value => emit(map.select || 'on-select', value),
@@ -341,10 +341,12 @@ export default {
     Object.entries(aliases).forEach(([name, component]) => app.component(name, component))
     const globals = app.config.globalProperties
     globals.$Message = { config: () => {}, error: ElMessage.error, info: ElMessage.info, success: ElMessage.success, warning: ElMessage.warning }
-    globals.$Modal = { confirm, success: options => ElMessageBox.alert(options.content || '', options.title || 'Success') }
+    const alert = options => ElMessageBox.alert(options.content || '', options.title || '')
+    globals.$Modal = { confirm, success: alert, info: alert, warning: alert, error: alert }
     globals.$Notice = ElNotification
     let loading
-    globals.$Loading = { start: () => { if (!loading) loading = ElLoading.service({ fullscreen: true }) }, finish: () => { if (loading) loading.close(); loading = null } }
+    const finishLoading = () => { if (loading) loading.close(); loading = null }
+    globals.$Loading = { start: () => { if (!loading) loading = ElLoading.service({ fullscreen: true }) }, finish: finishLoading, error: finishLoading }
     globals.$message = ElMessage
     globals.$confirm = (message, title, options) => ElMessageBox.confirm(message, title, options)
     if (i18n) globals.$t = (...args) => i18n.global.t(...args)

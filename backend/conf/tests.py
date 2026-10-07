@@ -36,6 +36,15 @@ class SMTPConfigTest(APITestCase):
                 "tls": True, "password": ""}
         resp = self.client.put(self.url, data=data)
         self.assertSuccess(resp)
+        self.assertEqual(SysOptions.smtp_config["password"], self.password)
+
+    def test_get_does_not_remove_cached_password(self):
+        self.test_create_smtp_config()
+        for _ in range(2):
+            response = self.client.get(self.url)
+            self.assertSuccess(response)
+            self.assertNotIn("password", response.data["data"])
+            self.assertEqual(SysOptions.smtp_config["password"], self.password)
 
     def test_edit_with_password(self):
         self.test_create_smtp_config()
@@ -100,9 +109,11 @@ class JudgeServerHeartbeatTest(APITestCase):
         self.test_new_heartbeat()
         data = self.data
         data["judger_version"] = "2.0.0"
+        data["cpu"] = 12.5
         resp = self.client.post(self.url, data=data, **self.headers)
         self.assertSuccess(resp)
         self.assertEqual(JudgeServer.objects.get(hostname=self.data["hostname"]).judger_version, data["judger_version"])
+        self.assertEqual(JudgeServer.objects.get(hostname=self.data["hostname"]).cpu_usage, 12.5)
 
 
 class JudgeServerAPITest(APITestCase):
@@ -145,12 +156,10 @@ class TestCasePruneAPITest(APITestCase):
         self.assertSuccess(resp)
 
     @mock.patch("conf.views.TestCasePruneAPI.delete_one")
-    @mock.patch("conf.views.os.listdir")
-    @mock.patch("conf.views.Problem")
-    def test_delete_test_case(self, mocked_problem, mocked_listdir, mocked_delete_one):
+    @mock.patch("conf.views.TestCasePruneAPI.get_orphan_ids")
+    def test_delete_test_case(self, mocked_orphans, mocked_delete_one):
         valid_id = "1172980672983b2b49820be3a741b109"
-        mocked_problem.return_value = [valid_id, ]
-        mocked_listdir.return_value = [valid_id, ".test", "aaa"]
+        mocked_orphans.return_value = [valid_id]
         resp = self.client.delete(self.url)
         self.assertSuccess(resp)
         mocked_delete_one.assert_called_once_with(valid_id)

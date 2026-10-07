@@ -4,8 +4,8 @@
   <p>400+ 题库、本地沙箱判题与牛客 / 洛谷 / Codeforces 远程判题，统一管理比赛、提交和个人做题记录。</p>
   <p>
     <a href="https://oj.icthub.top"><img alt="OJ status" src="https://img.shields.io/website?url=https%3A%2F%2Foj.icthub.top&up_message=online&down_message=offline&label=OJ"></a>
-    <a href="https://github.com/xjuIcthub/xju-OJ/actions/workflows/publish-release-images.yml"><img alt="Release images" src="https://github.com/xjuIcthub/xju-OJ/actions/workflows/publish-release-images.yml/badge.svg"></a>
-    <a href="https://github.com/xjuIcthub/xju-OJ/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/xjuIcthub/xju-OJ?logo=github"></a>
+    <a href="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml"><img alt="Release images" src="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml/badge.svg"></a>
+    <a href="https://github.com/xju-arlab/xju-OJ/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/xju-arlab/xju-OJ?logo=github"></a>
     <img alt="Vue 3.5.41" src="https://img.shields.io/badge/Vue-3.5.41-42b883?logo=vuedotjs&logoColor=white">
     <img alt="Django 5.2.17" src="https://img.shields.io/badge/Django-5.2.17-092E20?logo=django&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
@@ -26,6 +26,8 @@
 - **现代全栈架构**：Vue 3、Vite 8、Django 5.2、PostgreSQL 18、Redis 8，提供统一 Docker Compose 部署入口。
 - **安全账户体系**：支持 Authentik OIDC、会话管理、个人资料和独立管理后台。
 
+维护说明：[发布与恢复](docs/operations/release-and-recovery.md)、[2026-10 审计与回归范围](docs/operations/audit-2026-10.md)。
+
 ## 一键安装
 
 ### 环境要求
@@ -42,7 +44,7 @@ Docker 安装请使用 [Docker 官方 Ubuntu 文档](https://docs.docker.com/eng
 ### 克隆并部署
 
 ```bash
-git clone https://github.com/xjuIcthub/xju-OJ.git
+git clone https://github.com/xju-arlab/xju-OJ.git
 cd xju-OJ
 cp .env.example .env
 ./deploy.sh
@@ -115,6 +117,13 @@ DEPLOY_MODE=build
 主机 root 环境通过 SSH 管道传来的两行值，并原子写入 `.env` 与 0600 secret 文件。
 脚本会固定 issuer、callback、xju-OJ 专用 registration URL、`groups` scope，并关闭 OJ
 本地登录/注册。
+
+已有 Authentik 账号若未绑定邮箱，可先登录身份服务并打开
+`https://auth.icthub.top/if/flow/icthub-bind-email/`，通过一次性邮件链接验证新邮箱。
+已有 OJ 本地账号若没有邮箱，可在 OJ 登录窗口选择“旧 OJ 账号未绑定邮箱”，
+用原 OJ 密码、图形验证码和原有两步验证码确认身份，再登录已验证邮箱的
+Authentik 账号完成关联。关联成功后，OJ 将保存已验证的邮箱；此过程不会
+临时开放普通本地登录。原 OJ 账号若没有可用密码，需要管理员核实身份后处理。
 
 ## 域名与 HTTPS
 

@@ -52,6 +52,7 @@ _ALLOWED_TRANSITIONS = {
     },
     RemoteSubmissionStatus.VERIFICATION_REQUIRED: {
         RemoteSubmissionStatus.OPENING,
+        RemoteSubmissionStatus.AUTH_REQUIRED,
         RemoteSubmissionStatus.SUBMITTED,
         RemoteSubmissionStatus.JUDGING,
         RemoteSubmissionStatus.FINISHED,
@@ -162,6 +163,11 @@ def build_remote_task(problem, submission):
     return {
         "schema": REMOTE_TASK_SCHEMA,
         "submission_id": submission.id,
+        "user_id": submission.user_id,
+        "rule_type": problem.rule_type,
+        "remote_submission_id": submission.remote_submission_id,
+        "remote_status": submission.remote_status,
+        "remote_url": submission.remote_url,
         "provider": problem.remote_oj,
         "problem_id": problem.remote_problem_id,
         "language": submission.language,
@@ -201,7 +207,7 @@ def _event_data(data):
         key: data[key]
         for key in (
             "verdict", "message", "time_ms", "memory_bytes", "passed_tests",
-            "total_tests", "score", "verification_source",
+            "total_tests", "score", "verification_source", "failed_verdict",
         )
         if data.get(key) is not None
     }
@@ -211,7 +217,7 @@ def _event_data(data):
 def apply_remote_submission_event(user, data):
     try:
         submission = (
-            Submission.objects.select_for_update()
+            Submission.objects.select_for_update(of=("self",))
             .select_related("problem")
             .get(id=data["submission_id"], user_id=user.id)
         )
@@ -263,13 +269,27 @@ def apply_remote_submission_event(user, data):
     final_result = None
     if target == RemoteSubmissionStatus.FINISHED:
         final_result = map_remote_verdict(data.get("verdict"))
+        # Luogu's overall "unaccepted" also covers zero-score and ACM failures.
+        # Preserve a concrete failing testcase verdict when the bridge has it.
+        if final_result == JudgeStatus.PARTIALLY_ACCEPTED and (
+            submission.problem.rule_type == "ACM" or data.get("score") == 0
+        ):
+            try:
+                failure = map_remote_verdict(data.get("failed_verdict"))
+            except RemoteSubmissionError:
+                failure = JudgeStatus.WRONG_ANSWER
+            final_result = failure if failure in {
+                JudgeStatus.WRONG_ANSWER, JudgeStatus.COMPILE_ERROR,
+                JudgeStatus.CPU_TIME_LIMIT_EXCEEDED, JudgeStatus.REAL_TIME_LIMIT_EXCEEDED,
+                JudgeStatus.MEMORY_LIMIT_EXCEEDED, JudgeStatus.RUNTIME_ERROR,
+                JudgeStatus.SYSTEM_ERROR,
+            } else JudgeStatus.WRONG_ANSWER
     elif target == RemoteSubmissionStatus.FAILED:
         final_result = JudgeStatus.SYSTEM_ERROR
 
     dispatcher = None
     if final_result is not None:
         dispatcher = JudgeDispatcher(submission.id, submission.problem_id)
-        dispatcher.last_result = None
         submission.result = final_result
         submission.info = {"remote": submission.remote_data}
         statistic_info = dict(submission.statistic_info or {})
@@ -279,7 +299,9 @@ def apply_remote_submission_event(user, data):
             statistic_info["memory_cost"] = data["memory_bytes"]
         if data.get("score") is not None:
             statistic_info["score"] = data["score"]
-        if target == RemoteSubmissionStatus.FAILED:
+        elif submission.problem.rule_type == "OI":
+            statistic_info.setdefault("score", submission.problem.total_score if final_result == JudgeStatus.ACCEPTED else 0)
+        if final_result == JudgeStatus.COMPILE_ERROR or target == RemoteSubmissionStatus.FAILED:
             statistic_info["err_info"] = submission.remote_message or "Remote submission failed"
         submission.statistic_info = statistic_info
 

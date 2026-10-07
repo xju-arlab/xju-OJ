@@ -97,8 +97,8 @@ class InitSubmissionEnv(object):
     def __enter__(self):
         try:
             os.mkdir(self.work_dir)
-            os.chmod(self.work_dir, 0o770)
-            os.chown(self.work_dir, 0, COMPILER_GROUP_GID)
+            os.chmod(self.work_dir, 0o700)
+            os.chown(self.work_dir, 0, 0)
             if self.init_test_case_dir:
                 os.mkdir(self.test_case_dir)
                 # Inline expected outputs stay root-only. The native launcher
@@ -188,6 +188,10 @@ class JudgeServer:
                 # concurrently running submission before artifact handoff.
                 with open_root_lock(COMPILER_LOCK_PATH) as compiler_lock:
                     fcntl.flock(compiler_lock.fileno(), fcntl.LOCK_EX)
+                    # Pending workspaces stay root-only until every earlier
+                    # compiler has exited and its artifacts are sealed.
+                    os.chown(submission_dir, 0, COMPILER_GROUP_GID)
+                    os.chmod(submission_dir, 0o770)
                     exe_path = Compiler().compile(compile_config=compile_config,
                                                   src_path=src_path,
                                                   output_dir=submission_dir)
@@ -283,8 +287,8 @@ class JudgeServer:
 
             staging_dir = tempfile.mkdtemp(prefix=".compile-", dir=SPJ_EXE_DIR)
             try:
-                os.chown(staging_dir, 0, SPJ_GROUP_GID)
-                os.chmod(staging_dir, 0o770)
+                os.chown(staging_dir, 0, 0)
+                os.chmod(staging_dir, 0o700)
                 staged_src_path = os.path.join(staging_dir, compile_config["src_name"])
                 with open(staged_src_path, "x", encoding="utf-8") as source_file:
                     source_file.write(src)
@@ -294,6 +298,8 @@ class JudgeServer:
                 try:
                     with open_root_lock(COMPILER_LOCK_PATH) as compiler_lock:
                         fcntl.flock(compiler_lock.fileno(), fcntl.LOCK_EX)
+                        os.chown(staging_dir, 0, SPJ_GROUP_GID)
+                        os.chmod(staging_dir, 0o770)
                         staged_exe_path = Compiler().compile(
                             compile_config=compile_config,
                             src_path=staged_src_path,

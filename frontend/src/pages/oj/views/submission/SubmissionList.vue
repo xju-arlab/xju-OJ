@@ -43,6 +43,7 @@
   import utils from '@/utils/utils'
   import time from '@/utils/time'
   import Pagination from '@/pages/oj/components/Pagination'
+  import { submissionStatus } from '@oj/submissionStatus'
 
   const DISPLAY_JUDGE_STATUS = Object.keys(JUDGE_STATUS).reduce((result, status) => {
     if (status !== '9' && status !== '2') result[status] = JUDGE_STATUS[status]
@@ -97,9 +98,8 @@
             width: 132,
             align: 'center',
             render: (h, params) => {
-              const status = JUDGE_STATUS[String(params.row.result)] || JUDGE_STATUS['6']
-              const label = this.$t('m.' + status.name.replace(/ /g, '_'))
-              return h('span', { class: ['judge-status-badge', `is-${status.type || 'info'}`] }, label)
+              const status = submissionStatus(params.row, this.$t)
+              return h('span', { title: status.hint, class: ['judge-status-badge', `is-${status.type}`] }, status.label)
             }
           },
           {
@@ -186,13 +186,17 @@
         JUDGE_STATUS: DISPLAY_JUDGE_STATUS,
         rejudge_column: false,
         refreshTimer: null,
-        requestInFlight: false
+        requestInFlight: false,
+        requestGeneration: 0,
+        disposed: false
       }
     },
     mounted () {
       this.init()
     },
     beforeUnmount () {
+      this.disposed = true
+      this.requestGeneration += 1
       this.clearStatusRefresh()
     },
     methods: {
@@ -231,7 +235,9 @@
         this.refreshTimer = setTimeout(() => this.getSubmissions({ silent: true }), 2200)
       },
       getSubmissions ({ silent = false } = {}) {
-        if (this.requestInFlight) return
+        if (this.disposed || (silent && this.requestInFlight)) return
+        const generation = ++this.requestGeneration
+        this.clearStatusRefresh()
         let params = this.buildQuery()
         params.contest_id = this.contestID
         params.problem_id = this.problemID
@@ -240,6 +246,7 @@
         this.requestInFlight = true
         if (!silent) this.loadingTable = true
         api[func](offset, this.limit, params).then(res => {
+          if (this.disposed || generation !== this.requestGeneration) return
           let data = res.data.data
           for (let v of data.results) {
             v.loading = false
@@ -250,9 +257,10 @@
           this.total = data.total
           this.scheduleStatusRefresh(data.results)
         }).catch(() => {
+          if (this.disposed || generation !== this.requestGeneration) return
           this.loadingTable = false
           this.clearStatusRefresh()
-        }).finally(() => { this.requestInFlight = false })
+        }).finally(() => { if (generation === this.requestGeneration) this.requestInFlight = false })
       },
       // 改变route， 通过监听route变化请求数据，这样可以产生route history， 用户返回时就会保存之前的状态
       changeRoute () {
@@ -278,6 +286,7 @@
           align: 'center',
           width: 90,
           render: (h, params) => {
+            if (params.row.judge_mode === 'REMOTE') return null
             return h('Button', {
               props: {
                 type: 'primary',

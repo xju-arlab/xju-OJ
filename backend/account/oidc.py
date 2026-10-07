@@ -14,6 +14,7 @@ import requests
 from authlib.jose import JsonWebKey, jwt
 from authlib.jose.errors import BadSignatureError, DecodeError, JoseError
 from django.conf import settings
+from django.contrib import auth
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -22,14 +23,18 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
+from otpauth import OtpAuth
 
-from utils.api import APIView
+from utils.api import APIView, serializers, validate_serializer
+from utils.captcha import Captcha
 from .models import AdminType, ExternalIdentity, ProblemPermission, User, UserProfile
 
 logger = logging.getLogger(__name__)
 
 _PROVIDER = "authentik"
 _PENDING_SESSION_KEY = "authentik_oidc_pending"
+_LEGACY_LINK_ATTEMPT_LIMIT = 5
+_LEGACY_LINK_ATTEMPT_WINDOW = 15 * 60
 _DISCOVERY_TTL = 300
 _JWKS_TTL = 600
 _HTTP_TIMEOUT = (4, 12)
@@ -226,7 +231,7 @@ def _pending_states(request):
     return value if isinstance(value, dict) else {}
 
 
-def start(request, mode="login", next_path="/"):
+def start(request, mode="login", next_path="/", linked_user_id=None):
     if not enabled():
         raise OIDCError("oidc_disabled")
     client_id, redirect_uri = _require_config()
@@ -248,7 +253,10 @@ def start(request, mode="login", next_path="/"):
         "code_verifier": verifier,
         "mode": mode,
         "next": _safe_next(next_path, "/"),
-        "user_id": request.user.id if mode == "link" and request.user.is_authenticated else None,
+        "user_id": (
+            request.user.id if mode == "link" and request.user.is_authenticated
+            else linked_user_id if mode == "legacy_link" else None
+        ),
     }
     # Bound the session footprint and make old browser tabs expire first.
     for old_state in sorted(pending, key=lambda key: pending[key].get("created_at", 0))[:-4]:
@@ -482,7 +490,7 @@ def _account_id_from_claims(claims):
     return value
 
 
-def provision_or_get(claims, mode="login", linked_user_id=None):
+def provision_or_get(claims, mode="login", linked_user_id=None, legacy_link=False):
     issuer = _issuer()
     subject = str(claims["sub"])
     email = str(claims["email"]).strip().casefold()
@@ -501,6 +509,8 @@ def provision_or_get(claims, mode="login", linked_user_id=None):
                     user = identity.user
                     if mode == "link" and linked_user_id and user.id != linked_user_id:
                         raise OIDCError("identity_already_linked")
+                    if legacy_link:
+                        raise OIDCError("link_session_changed")
                     if user.is_disabled:
                         raise OIDCError("account_disabled")
                     UserProfile.objects.get_or_create(user=user)
@@ -524,12 +534,19 @@ def provision_or_get(claims, mode="login", linked_user_id=None):
                     user = User.objects.select_for_update().get(id=linked_user_id)
                     if user.is_disabled:
                         raise OIDCError("account_disabled")
+                    if legacy_link and (user.email or ExternalIdentity.objects.filter(user=user, provider=_PROVIDER).exists()):
+                        raise OIDCError("link_session_changed")
+                    if User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+                        raise OIDCError("account_claim_conflict")
                     UserProfile.objects.get_or_create(user=user)
                     if user.studio_account_id and user.studio_account_id != account_id:
                         raise OIDCError("account_claim_mismatch")
                     if not user.studio_account_id:
                         user.studio_account_id = account_id
                         user.save(update_fields=["studio_account_id"])
+                    if user.email != email:
+                        user.email = email
+                        user.save(update_fields=["email"])
                 else:
                     user = User.objects.select_for_update().filter(studio_account_id=account_id).first()
                     if user is not None:
@@ -580,6 +597,10 @@ def provision_or_get(claims, mode="login", linked_user_id=None):
                 and not identity.user.is_disabled
                 and identity.user.studio_account_id == account_id
             ):
+                if mode == "link" and identity.user_id != linked_user_id:
+                    raise OIDCError("identity_already_linked") from exc
+                if legacy_link:
+                    raise OIDCError("link_session_changed") from exc
                 return identity.user
             account_owner = User.objects.filter(studio_account_id=account_id).first()
             if account_owner is not None:
@@ -598,16 +619,22 @@ def complete(request, state, code):
     if pending.get("mode") == "link":
         if not request.user.is_authenticated or request.user.id != pending.get("user_id"):
             raise OIDCError("link_session_changed")
+    if pending.get("mode") == "legacy_link":
+        legacy_user = User.objects.filter(pk=pending.get("user_id"), is_disabled=False).first()
+        if (
+            request.user.is_authenticated or legacy_user is None or legacy_user.email
+            or ExternalIdentity.objects.filter(user=legacy_user, provider=_PROVIDER).exists()
+        ):
+            raise OIDCError("link_session_changed")
     metadata = discovery()
     token_data = _exchange_code(metadata, code, pending["code_verifier"])
     claims = verified_claims(token_data, metadata, pending["nonce"])
     user = provision_or_get(
         claims,
-        mode=pending.get("mode", "login"),
+        mode="link" if pending.get("mode") == "legacy_link" else pending.get("mode", "login"),
         linked_user_id=pending.get("user_id"),
+        legacy_link=pending.get("mode") == "legacy_link",
     )
-    from django.contrib import auth
-
     auth.login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return pending.get("next", "/")
 
@@ -635,6 +662,58 @@ def providers_data(request):
 class ProvidersAPI(APIView):
     def get(self, request):
         return self.success(providers_data(request))
+
+
+class LegacyEmailLinkSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=32)
+    password = serializers.CharField()
+    captcha = serializers.CharField()
+    tfa_code = serializers.CharField(required=False, allow_blank=True)
+
+
+class LegacyEmailLinkAPI(APIView):
+    """Let an unbound local account prove its password before OIDC linking.
+
+    This grants no OJ session. The normal OIDC callback must still verify a
+    mailbox-backed identity before the two accounts can be linked.
+    """
+
+    @validate_serializer(LegacyEmailLinkSerializer)
+    def post(self, request):
+        if not enabled() or request.user.is_authenticated:
+            return self.error("Legacy account binding is unavailable")
+        data = request.data
+        if not Captcha(request).check(data["captcha"]):
+            return self.error("Invalid captcha")
+        username = data["username"].strip()
+        remote_address = request.ip
+        bucket = hashlib.sha256(f"{username.casefold()}\0{remote_address}".encode("utf-8")).hexdigest()
+        throttle_key = f"xju-oj:legacy-email-link:{bucket}"
+        cache.add(throttle_key, 0, _LEGACY_LINK_ATTEMPT_WINDOW)
+        try:
+            attempts = cache.incr(throttle_key)
+        except ValueError:
+            # The key may expire between add and incr; retry initialization.
+            cache.add(throttle_key, 0, _LEGACY_LINK_ATTEMPT_WINDOW)
+            attempts = cache.incr(throttle_key)
+        if attempts > _LEGACY_LINK_ATTEMPT_LIMIT:
+            return self.error("Too many attempts; try again later")
+        user = auth.authenticate(username=username, password=data["password"])
+        eligible = (
+            user is not None and not user.is_disabled and not user.email
+            and not ExternalIdentity.objects.filter(user=user, provider=_PROVIDER).exists()
+        )
+        if eligible and user.two_factor_auth:
+            eligible = bool(data.get("tfa_code") and OtpAuth(user.tfa_token).valid_totp(data["tfa_code"]))
+        if not eligible:
+            return self.error("Invalid account credentials")
+        try:
+            request.session.cycle_key()
+            authorization_url = start(request, "legacy_link", "/", linked_user_id=user.id)
+        except OIDCError as exc:
+            return self.error(exc.code)
+        cache.delete(throttle_key)
+        return self.success({"authorization_url": authorization_url})
 
 
 @require_GET

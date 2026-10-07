@@ -94,7 +94,7 @@
     },
     async mounted () {
       this.getSessions()
-      if (!this.TFAOpened) {
+      if (!this.authentikManaged && !this.TFAOpened) {
         this.getAuthImg()
       }
       this.currentPlatform = await detectCurrentPlatform()

@@ -37,6 +37,7 @@
 
 <script>
 import markdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
 
@@ -61,6 +62,7 @@ function createTurndown () {
 function htmlToMarkdown (value, turndown) {
   let content = String(value || '')
   if (!/<[a-z][\s\S]*>/i.test(content)) return content
+  content = DOMPurify.sanitize(content)
   if (typeof document !== 'undefined' && content.includes('katex')) {
     const root = document.createElement('div')
     root.innerHTML = content
@@ -115,19 +117,20 @@ export default {
   mounted () {
     this.turndown = createTurndown()
     this.source = htmlToMarkdown(this.content, this.turndown)
-    this.previewHtml = renderer.render(this.source)
+    this.previewHtml = DOMPurify.sanitize(renderer.render(this.source))
     this.lastRenderedHtml = this.previewHtml
   },
   watch: {
     content (value) {
       if (!this.turndown || value === this.lastRenderedHtml) return
       this.source = htmlToMarkdown(value, this.turndown)
-      this.previewHtml = renderer.render(this.source)
+      this.previewHtml = DOMPurify.sanitize(renderer.render(this.source))
       this.lastRenderedHtml = this.previewHtml
     }
   },
   methods: {
     emitValue (html) {
+      html = DOMPurify.sanitize(html)
       this.lastRenderedHtml = html
       this.$emit('input', html)
       this.$emit('change', html)
@@ -135,7 +138,7 @@ export default {
       this.$emit('update:modelValue', html)
     },
     emitMarkdown () {
-      const html = renderer.render(this.source || '')
+      const html = DOMPurify.sanitize(renderer.render(this.source || ''))
       this.previewHtml = html
       this.emitValue(html)
     },
@@ -148,12 +151,12 @@ export default {
     },
     syncPreviewHtml () {
       const editor = this.$refs.previewEditor
-      if (editor) this.previewHtml = editor.innerHTML
+      if (editor) this.previewHtml = DOMPurify.sanitize(editor.innerHTML)
     },
     setMode (mode) {
       if (this.mode === 'preview') this.syncPreviewHtml()
       this.mode = mode
-      if (mode === 'preview') this.previewHtml = renderer.render(this.source || '')
+      if (mode === 'preview') this.previewHtml = DOMPurify.sanitize(renderer.render(this.source || ''))
       this.$nextTick(() => {
         if (mode === 'raw') this.$refs.rawEditor?.focus()
         else this.$refs.previewEditor?.focus()

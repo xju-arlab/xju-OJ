@@ -9,6 +9,26 @@
       <a class="sso-register" @click.stop="goAuthentikRegister">
         {{$t('m.Register_with_Authentik')}}
       </a>
+      <p class="legacy-entry">
+        <a href="https://auth.icthub.top/if/flow/icthub-bind-email/">旧 Authentik 账号未绑定邮箱？先验证邮箱</a>
+      </p>
+      <p class="legacy-entry">
+        <a @click.stop="toggleLegacyLink">旧 OJ 账号未绑定邮箱？关联统一账号</a>
+      </p>
+    </div>
+
+    <div v-if="authentikEnabled && showLegacyLink" class="legacy-link-card">
+      <p>输入旧 OJ 账号凭据。之后请登录已经验证邮箱的 Authentik 账号，完成关联。</p>
+      <Form ref="legacyLinkForm" :model="legacyLinkForm" :rules="legacyLinkRules">
+        <FormItem prop="username"><Input v-model="legacyLinkForm.username" placeholder="旧 OJ 用户名" size="large"/></FormItem>
+        <FormItem prop="password"><Input v-model="legacyLinkForm.password" type="password" placeholder="旧 OJ 密码" size="large"/></FormItem>
+        <FormItem><Input v-model="legacyLinkForm.tfa_code" placeholder="原有两步验证码（如已启用）" size="large"/></FormItem>
+        <FormItem prop="captcha" class="legacy-captcha">
+          <Input v-model="legacyLinkForm.captcha" placeholder="图形验证码" size="large"/>
+          <img :src="captchaSrc" alt="图形验证码，点击刷新" @click="getCaptchaSrc"/>
+        </FormItem>
+        <LegacyButton type="primary" long :loading="legacyLinkLoading" @click="startLegacyLink">验证旧账号并继续</LegacyButton>
+      </Form>
     </div>
 
     <div v-if="authentikEnabled && localLoginEnabled" class="auth-divider">
@@ -66,6 +86,14 @@
       return {
         tfaRequired: false,
         btnLoginLoading: false,
+        showLegacyLink: false,
+        legacyLinkLoading: false,
+        legacyLinkForm: { username: '', password: '', tfa_code: '', captcha: '' },
+        legacyLinkRules: {
+          username: [{required: true, trigger: 'blur'}],
+          password: [{required: true, trigger: 'blur'}],
+          captcha: [{required: true, trigger: 'blur'}]
+        },
         formLogin: {
           username: runtime.OJ_FRONTEND_DEV_MODE ? runtime.DEV_LOGIN_USERNAME : '',
           password: runtime.OJ_FRONTEND_DEV_MODE ? runtime.DEV_LOGIN_PASSWORD : '',
@@ -133,6 +161,23 @@
       goAuthentikRegister () {
         const url = this.authProviders.authentik && this.authProviders.authentik.register_url
         if (url) window.location.assign(url)
+      },
+      toggleLegacyLink () {
+        this.showLegacyLink = !this.showLegacyLink
+        if (this.showLegacyLink) this.getCaptchaSrc()
+      },
+      startLegacyLink () {
+        this.validateForm('legacyLinkForm').then(valid => {
+          if (!valid) return
+          this.legacyLinkLoading = true
+          api.legacyEmailLink(this.legacyLinkForm).then(res => {
+            window.location.assign(res.data.data.authorization_url)
+          }, () => {
+            this.legacyLinkForm.captcha = ''
+            this.getCaptchaSrc()
+            this.legacyLinkLoading = false
+          })
+        })
       }
     },
     computed: {
@@ -195,6 +240,38 @@
     color: var(--oj-accent);
     cursor: pointer;
     font-size: 13px;
+  }
+
+  .legacy-entry {
+    margin: 8px 0 0;
+    font-size: 12px;
+  }
+
+  .legacy-entry a {
+    color: var(--oj-accent);
+    cursor: pointer;
+  }
+
+  .legacy-link-card {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid var(--oj-border);
+    border-radius: var(--oj-radius-medium);
+    background: var(--oj-surface-muted);
+  }
+
+  .legacy-link-card p {
+    margin: 0 0 12px;
+    color: var(--oj-text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .legacy-captcha img {
+    width: 90px;
+    height: 30px;
+    margin-top: 6px;
+    cursor: pointer;
   }
 
   .auth-divider {

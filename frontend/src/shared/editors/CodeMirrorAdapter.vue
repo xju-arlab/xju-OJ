@@ -3,7 +3,7 @@
 import { EditorState, Compartment } from '@codemirror/state'
 import { bracketMatching, HighlightStyle, indentOnInput, indentUnit, syntaxHighlighting } from '@codemirror/language'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, snippetCompletion } from '@codemirror/autocomplete'
 import { cpp } from '@codemirror/lang-cpp'
 import { java } from '@codemirror/lang-java'
@@ -186,9 +186,9 @@ export default {
       state: EditorState.create({
         doc: this.content || '',
         extensions: [
-          lineNumbers(),
+          lineNumbers(), history(),
           bracketMatching(), closeBrackets(), indentOnInput(), indentUnit.of('    '), EditorState.tabSize.of(4),
-          keymap.of([...closeBracketsKeymap, ...completionKeymap, ...defaultKeymap, indentWithTab]),
+          keymap.of([...closeBracketsKeymap, ...completionKeymap, ...historyKeymap, ...defaultKeymap, indentWithTab]),
           this.languageSlot.of(languageFor(this.mode)),
           this.completionSlot.of(completionFor(this.mode)),
           this.editableSlot.of(EditorView.editable.of(!this.readOnly)),

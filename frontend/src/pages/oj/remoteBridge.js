@@ -4,7 +4,7 @@ const READY_EVENT = 'xju-oj:remote-bridge:ready'
 const PING_EVENT = 'xju-oj:remote-bridge:ping'
 const SUBMIT_EVENT = 'xju-oj:remote-bridge:submit'
 const BRIDGE_EVENT = 'xju-oj:remote-bridge:event'
-const MINIMUM_BRIDGE_VERSION = [1, 0, 1]
+const MINIMUM_BRIDGE_VERSION = [1, 1, 0]
 
 const EVENT_FIELDS = [
   'submission_id',
@@ -19,7 +19,8 @@ const EVENT_FIELDS = [
   'passed_tests',
   'total_tests',
   'score',
-  'verification_source'
+  'verification_source',
+  'failed_verdict'
 ]
 
 export function remoteBridgeVersion () {

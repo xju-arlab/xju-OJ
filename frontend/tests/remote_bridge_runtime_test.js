@@ -103,6 +103,8 @@ function taskFor (provider) {
   const common = {
     schema: 'xju-oj.remote-submit.v1',
     submission_id: `submission-${provider.toLowerCase()}`,
+    user_id: 1,
+    rule_type: 'ACM',
     provider,
     language: 'C++',
     created_at: new Date().toISOString()
@@ -142,7 +144,7 @@ async function waitFor (predicate) {
   assert.fail('userscript scenario did not finish')
 }
 
-async function runScenario (provider, mode = 'success') {
+async function runScenario (provider, mode = 'success', records = []) {
   const listeners = new Map()
   const valueListeners = new Map()
   const storage = new Map()
@@ -150,6 +152,7 @@ async function runScenario (provider, mode = 'success') {
   const openedTabs = []
   let codeforcesApiCalls = 0
   let luoguRecordRequestHeaders = null
+  let luoguRecordRequests = 0
   let activeBackendRequests = 0
   let maxActiveBackendRequests = 0
 
@@ -191,7 +194,8 @@ async function runScenario (provider, mode = 'success') {
       maxActiveBackendRequests = Math.max(maxActiveBackendRequests, activeBackendRequests)
       return new Promise(resolve => queueMicrotask(() => {
         activeBackendRequests -= 1
-        resolve({ ok: true })
+        const event = options && options.body ? JSON.parse(options.body) : null
+        resolve({ ok: true, json: async () => ({ error: null, data: event ? { id: event.submission_id, remote_status: event.status } : { user_id: 1, tasks: [] } }) })
       }))
     },
     focus () {}
@@ -245,6 +249,12 @@ async function runScenario (provider, mode = 'success') {
       }
       if (url.includes('/record/789')) {
         luoguRecordRequestHeaders = request.headers || {}
+        luoguRecordRequests += 1
+        if (records.length) {
+          return jsonResponse({
+            data: { record: records[Math.min(luoguRecordRequests - 1, records.length - 1)] }
+          })
+        }
         if (mode === 'auth') {
           return jsonResponse({ instance: 'auth', template: 'login', status: 200, data: {}, user: null })
         }
@@ -334,6 +344,7 @@ async function runScenario (provider, mode = 'success') {
     unsafeWindow: window,
     URL,
     TextEncoder,
+    AbortController,
     FormData: FakeFormData,
     File: FakeFile,
     DOMParser: makeDomParser(),
@@ -347,7 +358,7 @@ async function runScenario (provider, mode = 'success') {
       observe () {}
       disconnect () {}
     },
-    GM_info: { script: { version: '1.0.1' } },
+    GM_info: { script: { version: '1.1.0' } },
     GM_getValue: (key, fallback) => storage.has(key) ? storage.get(key) : fallback,
     GM_setValue: (key, value) => {
       const previous = storage.get(key)
@@ -387,7 +398,7 @@ async function runScenario (provider, mode = 'success') {
       ? 'AUTH_REQUIRED'
       : mode === 'connection' || mode === 'post-connection' ? 'OPENING' : 'VERIFICATION_REQUIRED'
   await waitFor(() => backendEvents.some(event => event.status === terminalStatus))
-  return { backendEvents, openedTabs, maxActiveBackendRequests, luoguRecordRequestHeaders }
+  return { backendEvents, openedTabs, maxActiveBackendRequests, luoguRecordRequestHeaders, luoguRecordRequests }
 }
 
 ;(async () => {
@@ -405,11 +416,7 @@ async function runScenario (provider, mode = 'success') {
       )
     }
     assert.equal(result.maxActiveBackendRequests, 1, `${provider} posted backend events concurrently`)
-    assert.ok(
-      result.backendEvents.findIndex(event => event.status === 'QUEUED') <
-        result.backendEvents.findIndex(event => event.status === 'OPENING'),
-      `${provider} posted OPENING before QUEUED`
-    )
+    assert.equal(result.backendEvents.at(-1).status, 'FINISHED', `${provider} did not deliver its final event`)
   }
 
   const auth = await runScenario('NOWCODER', 'auth')
@@ -434,6 +441,46 @@ async function runScenario (provider, mode = 'success') {
     luoguCompileError.backendEvents.find(event => event.status === 'FINISHED').verdict,
     'COMPILE_ERROR'
   )
+
+  const acceptedRecord = { id: 789, status: 12, score: 100, time: 5, memory: 432 }
+  for (const success of [true, undefined]) {
+    const compileResult = { success, message: 'Compilation completed with warnings' }
+    const compiling = await runScenario('LUOGU', 'success', [
+      { id: 789, status: 1, score: 0, detail: { compileResult } },
+      { ...acceptedRecord, detail: { compileResult } }
+    ])
+    assert.equal(compiling.luoguRecordRequests, 2, 'compiler output must not finish a pending record')
+    const finished = compiling.backendEvents.find(event => event.status === 'FINISHED')
+    assert.equal(finished.verdict, 'ACCEPTED')
+    assert.equal(finished.score, 100)
+    assert.equal(finished.time_ms, 5)
+    assert.equal(finished.memory_bytes, 432 * 1024)
+  }
+
+  for (const [status, verdict] of [[2, 'COMPILE_ERROR'], [4, 'MEMORY_LIMIT_EXCEEDED'], [5, 'TIME_LIMIT_EXCEEDED'], [6, 'WRONG_ANSWER'], [12, 'ACCEPTED'], [14, 'WRONG_ANSWER']]) {
+    const result = await runScenario('LUOGU', 'success', [{
+      id: 789,
+      status,
+      detail: { judgeResult: { subtasks: [{ testCases: [{ status: 12 }] }] } }
+    }])
+    assert.equal(result.backendEvents.find(event => event.status === 'FINISHED').verdict, verdict,
+      'the overall verdict must take precedence over incomplete testcase details')
+  }
+
+  const pendingCases = await runScenario('LUOGU', 'success', [
+    { id: 789, status: 1, detail: { judgeResult: { subtasks: [{ testCases: [{ status: 12 }] }] } } },
+    acceptedRecord
+  ])
+  assert.equal(pendingCases.luoguRecordRequests, 2, 'passed cases must not finish a judging record')
+
+  const genuineCompileError = await runScenario('LUOGU', 'success', [{
+    id: 789,
+    status: 2,
+    detail: { compileResult: { success: false, message: 'main.cpp: error: expected semicolon' } }
+  }])
+  const compileEvent = genuineCompileError.backendEvents.find(event => event.status === 'FINISHED')
+  assert.equal(compileEvent.verdict, 'COMPILE_ERROR')
+  assert.match(compileEvent.message, /expected semicolon/)
 
   const luoguDirectRecord = await runScenario('LUOGU', 'direct-record')
   assert.equal(luoguDirectRecord.openedTabs.length, 0)

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.utils.timezone import now
 from django.utils.deprecation import MiddlewareMixin
 
@@ -22,15 +22,24 @@ class APITokenAuthMiddleware(MiddlewareMixin):
 class SessionRecordMiddleware(MiddlewareMixin):
     def process_request(self, request):
         request.ip = request.META.get(settings.IP_HEADER, request.META.get("REMOTE_ADDR"))
-        if request.user.is_authenticated:
+        if request.user.is_authenticated and getattr(request, "auth_method", None) != "api_key":
             session = request.session
             session["user_agent"] = request.META.get("HTTP_USER_AGENT", "")
             session["ip"] = request.ip
             session["last_activity"] = now()
-            user_sessions = request.user.session_keys
-            if session.session_key not in user_sessions:
-                user_sessions.append(session.session_key)
-                request.user.save()
+            if session.session_key is None:
+                session.save()
+            if session.session_key not in request.user.session_keys:
+                # Authentication loaded this user before concurrent account
+                # changes. Only update the locked session list, never the
+                # stale password, disabled flag, or administrator role.
+                with transaction.atomic():
+                    user = User.objects.select_for_update().get(pk=request.user.pk)
+                    user.session_keys = [key for key in user.session_keys if key]
+                    if session.session_key not in user.session_keys:
+                        user.session_keys.append(session.session_key)
+                        user.save(update_fields=["session_keys"])
+                    request.user.session_keys = user.session_keys
 
 
 class AdminRoleRequiredMiddleware(MiddlewareMixin):

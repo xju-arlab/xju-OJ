@@ -103,7 +103,7 @@
                 <button type="button"
                         :class="['judge-status-badge', 'submission-status-link', `is-${submissionStatus.type}`]"
                         @click="handleRoute('/status/'+submissionId)">
-                  {{$t('m.' + submissionStatus.text.replace(/ /g, "_"))}}
+                  {{submissionStatus.label}}
                 </button>
               </template>
               <template v-else-if="this.contestID && !OIContestRealTimePermission">
@@ -141,6 +141,7 @@
       </section>
 
       <section class="recent-submission-card" aria-labelledby="recent-submissions-title">
+        <RemoteSubmissionNotice v-if="result.id" :submission="result" @updated="checkSubmissionStatus" />
         <button type="button" class="recent-submission-header" @click="handleRoute(submissionRoute)">
           <span id="recent-submissions-title" class="recent-submission-heading">
             <Icon type="navicon-round"></Icon>
@@ -202,10 +203,12 @@
   import CodeMirror from '@oj/components/CodeMirror.vue'
   import storage from '@/utils/storage'
   import {FormMixin} from '@oj/components/mixins'
-  import {JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey} from '@/utils/constants'
+  import {CONTEST_STATUS, buildProblemCodeKey} from '@/utils/constants'
   import api from '@oj/api'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import { dispatchRemoteSubmission, isRemoteBridgeInstalled, subscribeRemoteBridgeEvents } from '@oj/remoteBridge'
+  import { submissionStatus as presentSubmissionStatus } from '@oj/submissionStatus'
+  import RemoteSubmissionNotice from '@oj/components/RemoteSubmissionNotice.vue'
   import { applyDevelopmentProblemFixture, cloneFixtures, MOCK_PROBLEMS, MOCK_SUBMISSIONS } from '@oj/mocks/fixtures'
 
   const DEFAULT_PROBLEM_LANGUAGE = 'C++'
@@ -219,7 +222,7 @@
   export default {
     name: 'Problem',
     components: {
-      CodeMirror, ContestAnnouncementBanner
+      CodeMirror, ContestAnnouncementBanner, RemoteSubmissionNotice
     },
     mixins: [FormMixin],
     data () {
@@ -245,6 +248,9 @@
         remoteBridgeUnsubscribe: null,
         remoteNoticeStatus: '',
         problemLoaded: false,
+        pageGeneration: 0,
+        disposed: false,
+        refreshStatus: null,
         recentSubmissions: [],
         result: {
           result: 9
@@ -300,16 +306,19 @@
         this.persistProblemCode()
       },
       init (route = this.$route) {
+        const generation = ++this.pageGeneration
         this.$Loading.start()
         this.problemLoaded = false
         this.contestID = route.params.contestID
         this.problemID = route.params.problemID
         let func = route.name === 'problem-details' ? 'getProblem' : 'getContestProblem'
         api[func](this.problemID, this.contestID).then(res => {
+          if (this.disposed || generation !== this.pageGeneration) return
           const problem = applyDevelopmentProblemFixture(res.data.data)
           if (problem) this.applyProblem(problem)
           else this.$Loading.error()
         }).catch(() => {
+          if (this.disposed || generation !== this.pageGeneration) return
           const fallback = MOCK_PROBLEMS.find(problem => String(problem._id) === String(this.problemID))
           if (fallback) {
             this.applyProblem(cloneFixtures([fallback])[0])
@@ -319,11 +328,14 @@
         })
       },
       applyProblem (problem) {
+        const generation = this.pageGeneration
         this.$Loading.finish()
         this.changeDomTitle({title: problem.title})
         api.submissionExists(problem.id).then(res => {
+          if (this.disposed || generation !== this.pageGeneration) return
           this.submissionExists = res.data.data
         }).catch(() => {
+          if (this.disposed || generation !== this.pageGeneration) return
           this.submissionExists = false
         })
         const fixture = MOCK_PROBLEMS.find(item => String(item._id) === String(problem._id))
@@ -367,6 +379,7 @@
         this.theme = newTheme
       },
       loadRecentSubmissions (problemID) {
+        const generation = this.pageGeneration
         const params = { problem_id: problemID }
         const method = this.contestID ? 'getContestSubmissionList' : 'getSubmissionList'
         if (this.contestID) {
@@ -374,12 +387,14 @@
           params.myself = '1'
         }
         api[method](0, 5, params).then(res => {
+          if (this.disposed || generation !== this.pageGeneration) return
           const data = res.data.data || {}
           const results = Array.isArray(data.results) ? data.results : []
           this.recentSubmissions = results.length
             ? results.slice().sort((a, b) => new Date(b.create_time) - new Date(a.create_time)).slice(0, 5)
             : this.mockSubmissions(problemID)
         }).catch(() => {
+          if (this.disposed || generation !== this.pageGeneration) return
           this.recentSubmissions = this.mockSubmissions(problemID)
         })
       },
@@ -391,13 +406,10 @@
         return cloneFixtures(visibleSubmissions)
       },
       submissionStatusLabel (submission) {
-        const status = JUDGE_STATUS[String(submission.result)] || {}
-        const statusName = status.name || 'Pending'
-        return this.$t(`m.${statusName.replace(/ /g, '_')}`)
+        return presentSubmissionStatus(submission, this.$t).label
       },
       submissionStatusClass (submission) {
-        const status = JUDGE_STATUS[String(submission.result)] || {}
-        return `is-${status.type || 'info'}`
+        return `is-${presentSubmissionStatus(submission, this.$t).type}`
       },
       formatSubmissionTime (value) {
         if (!value) return ''
@@ -435,18 +447,20 @@
         })
       },
       checkSubmissionStatus () {
+        const generation = this.pageGeneration
+        const id = this.submissionId
         // 使用setTimeout避免一些问题
         if (this.refreshStatus) {
           // 如果之前的提交状态检查还没有停止,则停止,否则将会失去timeout的引用造成无限请求
           clearTimeout(this.refreshStatus)
         }
         const checkStatus = () => {
-          let id = this.submissionId
+          if (this.disposed || generation !== this.pageGeneration || id !== this.submissionId) return
           api.getSubmission(id).then(res => {
+            if (this.disposed || generation !== this.pageGeneration || id !== this.submissionId) return
             const result = res.data.data || {}
-            const statisticInfo = result.statistic_info || {}
             const isPending = ['6', '7', '9'].includes(String(result.result))
-            if (!isPending || Object.keys(statisticInfo).length !== 0) {
+            if (!isPending) {
               clearTimeout(this.refreshStatus)
               if (Number(result.result) === 0) {
                 this.showAcceptedCelebration().then(() => this.finishSubmissionStatus(result, id))
@@ -458,6 +472,7 @@
               this.refreshStatus = setTimeout(checkStatus, 2000)
             }
           }, res => {
+            if (this.disposed || generation !== this.pageGeneration) return
             this.submitting = false
             this.submitted = false
             clearTimeout(this.refreshStatus)
@@ -466,6 +481,7 @@
         this.refreshStatus = setTimeout(checkStatus, 2000)
       },
       submitCode () {
+        const generation = this.pageGeneration
         if (this.code.trim() === '') {
           this.$error(this.$t('m.Code_can_not_be_empty'))
           return
@@ -493,14 +509,16 @@
           data.captcha = this.captchaCode
         }
         const submitFunc = (data, detailsVisible) => {
+          if (this.disposed || generation !== this.pageGeneration) return
           this.statusVisible = true
           api.submitCode(data).then(res => {
             const responseData = res.data.data || {}
-            this.submissionId = responseData.submission_id
-            this.loadRecentSubmissions(this.problemID)
             if (responseData.remote_task) {
               dispatchRemoteSubmission(responseData.remote_task, data.code)
             }
+            if (this.disposed || generation !== this.pageGeneration) return
+            this.submissionId = responseData.submission_id
+            this.loadRecentSubmissions(this.problemID)
             // 定时检查状态
             this.submitting = false
             this.submissionExists = true
@@ -514,8 +532,9 @@
             this.submitted = true
             this.checkSubmissionStatus()
           }, res => {
+            if (this.disposed || generation !== this.pageGeneration) return
             this.getCaptchaSrc()
-            if (res.data.data.startsWith('Captcha is required')) {
+            if (typeof res?.data?.data === 'string' && res.data.data.startsWith('Captcha is required')) {
               this.captchaRequired = true
             }
             this.submitting = false
@@ -575,6 +594,7 @@
         if (resolve) resolve()
       },
       finishSubmissionStatus (result, submissionId) {
+        if (this.disposed) return
         if (String(submissionId) !== String(this.submissionId)) return
         this.result = result
         this.submitting = false
@@ -592,18 +612,14 @@
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       contestEnded () {
-        return this.contestStatus === CONTEST_STATUS.ENDED
+        return Boolean(this.contestID) && this.contestStatus === CONTEST_STATUS.ENDED
       },
       publicProblemTags () {
         if (this.contestID) return []
         return (this.problem.tags || []).map(tag => typeof tag === 'string' ? tag : tag.name).filter(Boolean)
       },
       submissionStatus () {
-        const status = JUDGE_STATUS[this.result.result] || JUDGE_STATUS['6']
-        return {
-          text: status.name,
-          type: status.type || 'info'
-        }
+        return presentSubmissionStatus(this.result, this.$t)
       },
       submissionRoute () {
         if (this.contestID) {
@@ -614,6 +630,8 @@
       }
     },
     beforeRouteLeave (to, from) {
+      this.pageGeneration += 1
+      this.submissionId = ''
       // 防止切换组件后仍然不断请求
       clearTimeout(this.refreshStatus)
       clearTimeout(this.acceptedCelebrationTimer)
@@ -623,10 +641,20 @@
     },
     beforeRouteUpdate (to, from) {
       this.persistProblemCode(from.params.problemID, from.params.contestID || null)
+      clearTimeout(this.refreshStatus)
+      this.submissionId = ''
+      this.submitted = this.submitting = this.statusVisible = false
+      this.recentSubmissions = []
+      this.hideAcceptedCelebration()
+      this.completeAcceptedCelebration()
       this.loadProblemCode(to.params.problemID, to.params.contestID)
       this.init(to)
     },
     beforeUnmount () {
+      this.disposed = true
+      this.pageGeneration += 1
+      this.completeAcceptedCelebration()
+      this.$Loading.finish()
       clearTimeout(this.refreshStatus)
       clearTimeout(this.acceptedCelebrationTimer)
       this.persistProblemCode()

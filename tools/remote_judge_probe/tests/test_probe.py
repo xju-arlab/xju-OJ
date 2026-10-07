@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from remote_probe.codeforces import SubmitFormParser, parse_problem_id as parse_cf_problem
-from remote_probe.common import RemoteSubmission, load_cookie_bundle, read_source
+from remote_probe.codeforces import CodeforcesProvider, SubmitFormParser, parse_problem_id as parse_cf_problem
+from remote_probe.common import ProbeError, RemoteSubmission, load_cookie_bundle, read_source, write_private_json
 from remote_probe.luogu import (
     LuoguOpenPlatformProvider,
     QuotaExceeded,
@@ -35,6 +35,20 @@ def json_response(data: dict, status_code: int = 200) -> Mock:
 
 
 class CommonTests(unittest.TestCase):
+    def test_private_json_replaces_existing_file_with_private_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "session.json"
+            path.write_text("old")
+            path.chmod(0o644)
+            write_private_json(path, {"test": "synthetic"})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(path.read_text()), {"test": "synthetic"})
+            link = Path(directory) / "link.json"
+            link.symlink_to(path)
+            with self.assertRaises((ProbeError, ValueError, OSError)):
+                write_private_json(link, {"test": "changed"})
+            self.assertEqual(json.loads(path.read_text()), {"test": "synthetic"})
+
     def test_cookie_json_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "cookies.json"
@@ -59,6 +73,20 @@ class CommonTests(unittest.TestCase):
 
 
 class CodeforcesTests(unittest.TestCase):
+    def test_requests_submission_initializes_source_and_tracks_new_run(self):
+        provider = CodeforcesProvider("synthetic")
+        provider.session = Mock()
+        provider.session.get.return_value = Mock(
+            status_code=200, url="https://codeforces.com/problemset/problem/4/A",
+            text='<form class="submitForm"><textarea name="source"></textarea><input name="programTypeId"></form>',
+        )
+        provider._api_submissions = Mock(return_value=[{"id": 42}])
+        provider._wait_for_new_run = Mock(return_value="new-run")
+        self.assertEqual(provider.submit_requests("4A", "54", "int main(){}"), "new-run")
+        body = provider.session.post.call_args.kwargs["data"]
+        self.assertTrue(body["source"].startswith("int main(){}\n"))
+        self.assertEqual(provider._wait_for_new_run.call_args.args[:3], (42, 4, "A"))
+
     def test_problem_ids(self) -> None:
         self.assertEqual(parse_cf_problem("4A"), (4, "A"))
         self.assertEqual(

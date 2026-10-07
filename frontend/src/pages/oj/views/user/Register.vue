@@ -80,7 +80,7 @@
       const CheckUsernameNotExist = (rule, value, callback) => {
         api.checkUsernameOrEmail(value, undefined).then(res => {
           if (res.data.data.username === true) {
-            callback(new Error(this.$t('m.The_username_already_exists')))
+            return callback(new Error(this.$t('m.The_username_already_exists')))
           } else {
             callback()
           }
@@ -89,7 +89,7 @@
       const CheckEmailNotExist = (rule, value, callback) => {
         api.checkUsernameOrEmail(undefined, value).then(res => {
           if (res.data.data.email === true) {
-            callback(new Error(this.$t('m.The_email_already_exists')))
+            return callback(new Error(this.$t('m.The_email_already_exists')))
           } else {
             callback()
           }
@@ -105,7 +105,7 @@
 
       const CheckAgainPassword = (rule, value, callback) => {
         if (value !== this.formRegister.password) {
-          callback(new Error(this.$t('m.password_does_not_match')))
+          return callback(new Error(this.$t('m.password_does_not_match')))
         }
         callback()
       }

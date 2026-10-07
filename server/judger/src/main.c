@@ -1,14 +1,53 @@
 #include "argtable3.h"
 #include "runner.h"
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 #define INT_PLACE_HOLDER "<n>"
 #define STR_PLACE_HOLDER "<str>"
 
 struct arg_lit *verb, *help, *version;
-struct arg_int *max_cpu_time, *max_real_time, *max_memory, *max_stack, *memory_limit_check_only,
-        *max_process_number, *max_output_size, *uid, *gid;
+struct arg_int *max_cpu_time, *max_real_time, *memory_limit_check_only,
+        *max_process_number, *uid, *gid;
+struct arg_str *max_memory, *max_stack, *max_output_size;
 struct arg_str *exe_path, *input_path, *output_path, *error_path, *cwd, *args, *env, *log_path, *seccomp_rule_name;
 struct arg_end *end;
+
+/* Resource fields are long in runner.h. Keep the existing binary prefixes and
+ * KB/MB/GB suffixes without narrowing to argtable's 32-bit arg_int. */
+static int parse_resource(struct arg_str *arg, long fallback, long *result) {
+    if (!arg->count) { *result = fallback; return 0; }
+    const char *start = arg->sval[0];
+    while (isspace((unsigned char)*start)) start++;
+    int negative = *start == '-';
+    if (*start == '-' || *start == '+') start++;
+    int base = 10;
+    if (start[0] == '0' && start[1]) {
+        int prefix = tolower((unsigned char)start[1]);
+        if (prefix == 'x') base = 16;
+        else if (prefix == 'o') base = 8;
+        else if (prefix == 'b') base = 2;
+        if (base != 10) start += 2;
+    }
+    if (!isalnum((unsigned char)*start)) return -1;
+    errno = 0;
+    char *tail;
+    long value = strtol(start, &tail, base), multiplier = 1;
+    if (errno == ERANGE || tail == start || value < 0) return -1;
+    if (strncasecmp(tail, "KB", 2) == 0) { multiplier = 1024L; tail += 2; }
+    else if (strncasecmp(tail, "MB", 2) == 0) { multiplier = 1048576L; tail += 2; }
+    else if (strncasecmp(tail, "GB", 2) == 0) { multiplier = 1073741824L; tail += 2; }
+    while (isspace((unsigned char)*tail)) tail++;
+    if (*tail || value > LONG_MAX / multiplier) return -1;
+    value *= multiplier;
+    if (negative && value != 1) return -1;
+    *result = negative ? UNLIMITED : value;
+    return 0;
+}
 
 int main(int argc, char *argv[]) {
     void *arg_table[] = {
@@ -16,11 +55,11 @@ int main(int argc, char *argv[]) {
             version = arg_litn(NULL, "version", 0, 1, "Display Version Info And Exit"),
             max_cpu_time = arg_intn(NULL, "max_cpu_time", INT_PLACE_HOLDER, 0, 1, "Max CPU Time (ms)"),
             max_real_time = arg_intn(NULL, "max_real_time", INT_PLACE_HOLDER, 0, 1, "Max Real Time (ms)"),
-            max_memory = arg_intn(NULL, "max_memory", INT_PLACE_HOLDER, 0, 1, "Max Memory (byte)"),
+            max_memory = arg_strn(NULL, "max_memory", INT_PLACE_HOLDER, 0, 1, "Max Memory (byte)"),
             memory_limit_check_only = arg_intn(NULL, "memory_limit_check_only", INT_PLACE_HOLDER, 0, 1, "only check memory usage, do not setrlimit (default False)"),
-            max_stack = arg_intn(NULL, "max_stack", INT_PLACE_HOLDER, 0, 1, "Max Stack (byte, default 16M)"),
+            max_stack = arg_strn(NULL, "max_stack", INT_PLACE_HOLDER, 0, 1, "Max Stack (byte, default 16M)"),
             max_process_number = arg_intn(NULL, "max_process_number", INT_PLACE_HOLDER, 0, 1, "Max Process Number"),
-            max_output_size = arg_intn(NULL, "max_output_size", INT_PLACE_HOLDER, 0, 1, "Max Output Size (byte)"),
+            max_output_size = arg_strn(NULL, "max_output_size", INT_PLACE_HOLDER, 0, 1, "Max Output Size (byte)"),
 
             exe_path = arg_str1(NULL, "exe_path", STR_PLACE_HOLDER, "Exe Path"),
             input_path = arg_strn(NULL, "input_path", STR_PLACE_HOLDER, 0, 1, "Input Path"),
@@ -28,8 +67,8 @@ int main(int argc, char *argv[]) {
             error_path = arg_strn(NULL, "error_path", STR_PLACE_HOLDER, 0, 1, "Error Path"),
             cwd = arg_strn(NULL, "cwd", STR_PLACE_HOLDER, 0, 1, "Working Directory"),
 
-            args = arg_strn(NULL, "args", STR_PLACE_HOLDER, 0, 255, "Arg"),
-            env = arg_strn(NULL, "env", STR_PLACE_HOLDER, 0, 255, "Env"),
+            args = arg_strn(NULL, "args", STR_PLACE_HOLDER, 0, ARGS_MAX_NUMBER - 2, "Arg"),
+            env = arg_strn(NULL, "env", STR_PLACE_HOLDER, 0, ENV_MAX_NUMBER - 1, "Env"),
 
             log_path = arg_strn(NULL, "log_path", STR_PLACE_HOLDER, 0, 1, "Log Path"),
             seccomp_rule_name = arg_strn(NULL, "seccomp_rule_name", STR_PLACE_HOLDER, 0, 1, "Seccomp Rule Name"),
@@ -64,7 +103,7 @@ int main(int argc, char *argv[]) {
         goto exit;
     }
 
-    struct config _config;
+    struct config _config = {0};
     struct result _result = {0, 0, 0, 0, 0, 0, 0};
 
     if (max_cpu_time->count > 0) {
@@ -79,10 +118,12 @@ int main(int argc, char *argv[]) {
         _config.max_real_time = UNLIMITED;
     }
 
-    if (max_memory->count > 0) {
-        _config.max_memory = (long) *max_memory->ival;
-    } else {
-        _config.max_memory = UNLIMITED;
+    if (parse_resource(max_memory, UNLIMITED, &_config.max_memory) ||
+            parse_resource(max_stack, 16L * 1024 * 1024, &_config.max_stack) ||
+            parse_resource(max_output_size, UNLIMITED, &_config.max_output_size)) {
+        fprintf(stderr, "Invalid resource limit: expected nonnegative bytes or -1, within LONG_MAX\n");
+        exitcode = 1;
+        goto exit;
     }
 
     if (memory_limit_check_only->count > 0) {
@@ -91,22 +132,10 @@ int main(int argc, char *argv[]) {
         _config.memory_limit_check_only = 0;
     }
 
-    if (max_stack->count > 0) {
-        _config.max_stack = (long) *max_stack->ival;
-    } else {
-        _config.max_stack = 16 * 1024 * 1024;
-    }
-
     if (max_process_number->count > 0) {
         _config.max_process_number = *max_process_number->ival;
     } else {
         _config.max_process_number = UNLIMITED;
-    }
-
-    if (max_output_size->count > 0) {
-        _config.max_output_size = (long) *max_output_size->ival;
-    } else {
-        _config.max_output_size = UNLIMITED;
     }
 
     _config.exe_path = (char *)*exe_path->sval;
@@ -114,17 +143,17 @@ int main(int argc, char *argv[]) {
     if (input_path->count > 0) {
         _config.input_path = (char *)input_path->sval[0];
     } else {
-        _config.input_path = "/dev/stdin";
+        _config.input_path = NULL;
     }
     if (output_path->count > 0) {
         _config.output_path = (char *)output_path->sval[0];
     } else {
-        _config.output_path = "/dev/stdout";
+        _config.output_path = NULL;
     }
     if (error_path->count > 0) {
         _config.error_path = (char *)error_path->sval[0];
     } else {
-        _config.error_path = "/dev/stderr";
+        _config.error_path = NULL;
     }
     if (cwd->count > 0) {
         _config.cwd = (char *)cwd->sval[0];

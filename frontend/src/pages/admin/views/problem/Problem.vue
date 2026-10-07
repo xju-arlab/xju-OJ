@@ -164,6 +164,7 @@
               <p>{{ problem.judge_mode === 'REMOTE' ? '远程题目使用来源平台的测试数据。' : '配置本地测试数据、输入输出模式与特殊判题。' }}</p>
             </div>
             <el-upload v-if="problem.judge_mode !== 'REMOTE'"
+                       :headers="csrfHeaders()"
                        action="/api/admin/test_case"
                        name="file"
                        :data="{spj: problem.spj}"
@@ -235,6 +236,9 @@
   </div>
 </template>
 <script>
+  import { h } from 'vue'
+  import { csrfHeaders } from '@/utils/csrf'
+  import { apiErrorMessage } from '@/utils/apiError'
   import Simditor from '../../components/Simditor'
   import CodeMirror from '../../components/CodeMirror'
   import api from '../../api'
@@ -253,6 +257,7 @@
           output_description: {required: true, message: '请输入输出描述', trigger: 'blur'}
         },
         loadingCompile: false,
+        compiledSpj: null,
         mode: '',
         contest: {},
         problem: {
@@ -293,7 +298,7 @@
         this.mode = 'add'
       }
       api.getLanguages().then(res => {
-        this.problem = this.reProblem = {
+        this.problem = {
           title: '',
           description: '',
           input_description: '',
@@ -348,6 +353,7 @@
             }
             data.spj_language = data.spj_language || 'C'
             data.source = this.normalizedSource(data)
+            this.compiledSpj = {code: data.spj_code, language: data.spj_language}
             this.problem = data
             this.testCaseUploaded = data.judge_mode === 'REMOTE' || Boolean(data.test_case_id)
             if (data.judge_mode === 'REMOTE') {
@@ -363,11 +369,11 @@
       })
     },
     watch: {
-      '$route' () {
-        this.$refs.form.resetFields()
-        this.problem = this.reProblem
+      'problem.spj_code' () {
+        if (this.compiledSpj && this.problem.spj_code !== this.compiledSpj.code) this.problem.spj_compile_ok = false
       },
       'problem.spj_language' (newVal) {
+        if (this.compiledSpj && newVal !== this.compiledSpj.language) this.problem.spj_compile_ok = false
         const language = (this.allLanguage.spj_languages || []).find(item => {
           return item.name === this.problem.spj_language
         })
@@ -375,6 +381,7 @@
       }
     },
     methods: {
+      csrfHeaders,
       remoteProviderLabel (provider) {
         return {
           NOWCODER: '牛客',
@@ -471,15 +478,18 @@
         api.compileSPJ(data).then(res => {
           this.loadingCompile = false
           this.problem.spj_compile_ok = true
+          this.compiledSpj = {code: data.spj_code, language: data.spj_language}
+          if (this.problem.spj_code !== data.spj_code || this.problem.spj_language !== data.spj_language) {
+            this.problem.spj_compile_ok = false
+          }
           this.error.spj = ''
         }, err => {
           this.loadingCompile = false
           this.problem.spj_compile_ok = false
-          const h = this.$createElement
           this.$msgbox({
             title: '编译错误',
             type: 'error',
-            message: h('pre', err.data.data),
+            message: h('pre', apiErrorMessage(err)),
             showCancelButton: false,
             closeOnClickModal: false,
             customClass: 'dialog-compile-error'

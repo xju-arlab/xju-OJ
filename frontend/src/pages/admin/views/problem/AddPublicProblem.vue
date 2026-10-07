@@ -66,7 +66,7 @@
       })
     },
     methods: {
-      getPublicProblem (page) {
+      getPublicProblem (page = 1) {
         this.loading = true
         let params = {
           keyword: this.keyword,

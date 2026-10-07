@@ -1,37 +1,24 @@
-const localStorage = window.localStorage
-
+// Storage can be denied by browser policy or contain an interrupted write.
+// Keep legacy OJ keys readable; leave unrelated application preferences alone.
 export default {
   name: 'storage',
-
-  /**
-   * save value(Object) to key
-   * @param {string} key 键
-   * @param {Object} value 值
-   */
   set (key, value) {
-    localStorage.setItem(key, JSON.stringify(value))
+    try { window.localStorage.setItem(key, JSON.stringify(value)); return true } catch { return false }
   },
-
-  /**
-   * get value(Object) by key
-   * @param {string} key 键
-   * @return {Object}
-   */
   get (key) {
-    return JSON.parse(localStorage.getItem(key)) || null
+    try { return JSON.parse(window.localStorage.getItem(key)) } catch { return null }
   },
-
-  /**
-   * remove key from localStorage
-   * @param {string} key 键
-   */
   remove (key) {
-    localStorage.removeItem(key)
+    try { window.localStorage.removeItem(key) } catch {}
   },
-  /**
-   * clear all
-   */
   clear () {
-    localStorage.clear()
+    try {
+      const storage = window.localStorage
+      for (const key of Object.keys(storage)) {
+        if (key === 'authed' || key === 'languages' || key === 'problemCode' || key.startsWith('problemCode_')) {
+          storage.removeItem(key)
+        }
+      }
+    } catch {}
   }
 }

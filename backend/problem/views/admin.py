@@ -20,7 +20,7 @@ from fps.parser import FPSHelper, FPSParser
 from judge.dispatcher import SPJCompiler
 from options.options import SysOptions
 from submission.models import Submission, JudgeStatus
-from utils.api import APIView, CSRFExemptAPIView, validate_serializer, APIError
+from utils.api import APIView, validate_serializer, APIError
 from utils.constants import Difficulty
 from utils.shortcuts import rand_str, natural_sort_key
 from utils.tasks import delete_files
@@ -174,7 +174,7 @@ class TestCaseZipProcessor(object):
                     return sorted(ret, key=natural_sort_key)
 
 
-class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
+class TestCaseAPI(APIView, TestCaseZipProcessor):
     request_parsers = ()
 
     def get(self, request):
@@ -744,7 +744,7 @@ class ExportProblemAPI(APIView):
         return resp
 
 
-class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
+class ImportProblemAPI(APIView, TestCaseZipProcessor):
     request_parsers = ()
 
     MAX_ARCHIVE_MEMBERS = 10_000
@@ -989,7 +989,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
         })
 
 
-class FPSProblemImport(CSRFExemptAPIView):
+class FPSProblemImport(APIView):
     request_parsers = ()
 
     def _create_problem(self, problem_data, creator):
@@ -1033,37 +1033,48 @@ class FPSProblemImport(CSRFExemptAPIView):
                                difficulty=Difficulty.MID,
                                test_case_id=problem_data["test_case_id"])
 
+    @problem_permission_required
     def post(self, request):
         form = UploadProblemForm(request.POST, request.FILES)
-        if form.is_valid():
-            file = form.cleaned_data["file"]
-            with tempfile.NamedTemporaryFile("wb") as tf:
-                for chunk in file.chunks(4096):
-                    tf.file.write(chunk)
-
-                tf.file.flush()
-                os.fsync(tf.file)
-
-                problems = FPSParser(tf.name).parse()
-        else:
+        if not form.is_valid():
             return self.error("Parse upload file error")
-
+        file = form.cleaned_data["file"]
+        from xml.etree.ElementTree import ParseError
+        try:
+            problems = FPSParser(string_data=file.read()).parse()
+        except (ValueError, ParseError):
+            return self.error("Invalid FPS document")
+        if not problems:
+            return self.error("FPS document has no problems")
+        for problem in problems:
+            serializer = FPSProblemSerializer(data=problem)
+            if not serializer.is_valid() or not problem["test_cases"]:
+                return self.error("Invalid FPS problem or missing test cases")
         helper = FPSHelper()
-        with transaction.atomic():
-            for _problem in problems:
-                test_case_id = rand_str()
-                test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
-                os.mkdir(test_case_dir)
-                score = []
-                for item in helper.save_test_case(_problem, test_case_dir)["test_cases"].values():
-                    score.append({"score": 0, "input_name": item["input_name"],
-                                  "output_name": item.get("output_name")})
-                problem_data = helper.save_image(_problem, settings.UPLOAD_DIR, settings.UPLOAD_PREFIX)
-                s = FPSProblemSerializer(data=problem_data)
-                if not s.is_valid():
-                    return self.error(f"Parse FPS file error: {s.errors}")
-                problem_data = s.data
-                problem_data["test_case_id"] = test_case_id
-                problem_data["test_case_score"] = score
-                self._create_problem(problem_data, request.user)
+        directories, images = [], []
+        try:
+            with transaction.atomic():
+                for problem in problems:
+                    test_case_id = rand_str()
+                    directory = os.path.join(settings.TEST_CASE_DIR, test_case_id)
+                    os.mkdir(directory, 0o710)
+                    directories.append(directory)
+                    info = helper.save_test_case(problem, directory)
+                    problem_data = helper.save_image(problem, settings.UPLOAD_DIR, settings.UPLOAD_PREFIX, images)
+                    serializer = FPSProblemSerializer(data=problem_data)
+                    if not serializer.is_valid():
+                        raise APIError("Invalid FPS problem after image processing")
+                    problem_data = dict(serializer.data)
+                    problem_data["test_case_id"] = test_case_id
+                    problem_data["test_case_score"] = [
+                        {"score": 0, "input_name": item["input_name"], "output_name": item.get("output_name")}
+                        for item in info["test_cases"].values()
+                    ]
+                    self._create_problem(problem_data, request.user)
+        except Exception:
+            for directory in directories:
+                shutil.rmtree(directory)
+            for image in images:
+                os.unlink(image)
+            raise
         return self.success({"import_count": len(problems)})

@@ -274,7 +274,7 @@
         loadingTable: false,
         loadingGenerate: false,
         // 当前页码
-        currentPage: 0,
+        currentPage: 1,
         selectedUsers: [],
         formGenerateUser: {
           prefix: '',

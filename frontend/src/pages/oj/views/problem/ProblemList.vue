@@ -197,7 +197,7 @@
       getProblemList () {
         let offset = (this.query.page - 1) * this.query.limit
         this.loadings.table = true
-        api.getProblemList(offset, this.limit, this.query).then(res => {
+        api.getProblemList(offset, this.query.limit, this.query).then(res => {
           this.loadings.table = false
           const payload = res.data.data || {}
           const results = payload.results || []
@@ -227,6 +227,7 @@
         })
       },
       getMockTags () {
+        if (!import.meta.env.DEV) return []
         return [
           { name: 'math' },
           { name: 'beginner' },

@@ -1,0 +1,131 @@
+name: Regression checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run lint:modern
+      - run: pnpm run test:routes
+      - run: pnpm run test:auth-error
+      - run: pnpm run test:contest-submissions
+      - run: pnpm run test:contest-announcements
+      - run: pnpm run test:remote-bridge
+      - run: pnpm run test:browser
+      - run: pnpm run build
+
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: oj_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: oj_test
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U oj_test" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:8.2.8-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      OJ_ENV: dev
+      OJ_DATA_DIR: ${{ runner.temp }}/oj-test-data
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: oj_test
+      POSTGRES_USER: oj_test
+      POSTGRES_PASSWORD: isolated-ci-only
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.5'
+          python-version: '3.10'
+      - run: uv sync --frozen --group test
+      - name: Prepare isolated runtime
+        run: |
+          mkdir -p "$OJ_DATA_DIR/config" "$OJ_DATA_DIR/test_case" "$OJ_DATA_DIR/log" "$OJ_DATA_DIR/public"
+          uv run python -c 'import os,secrets,pathlib; pathlib.Path(os.environ["OJ_DATA_DIR"], "config", "secret.key").write_text(secrets.token_hex(32))'
+      - run: uv run python manage.py test --noinput
+
+  deployment-and-judge-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python -m pip install requests==2.34.2
+      - run: sh -n deploy.sh
+      - run: python -m unittest discover -s deploy/tests -p '*_test.py'
+      - run: python -m unittest discover -s server/judge-server/tests -p 'test_*.py'
+      - run: python -m unittest discover -s server/judger/tests -p 'test_cli_limits.py'
+      - run: PYTHONPATH=tools/remote_judge_probe python -m unittest discover -s tools/remote_judge_probe/tests
+
+  judge-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          target: judge-server
+          tags: xju-oj-server:regression
+          load: true
+          cache-from: type=gha,scope=judge-regression
+          cache-to: type=gha,scope=judge-regression,mode=max
+      - name: Native sandbox regression
+        run: |
+          docker run --rm --network none --cap-drop ALL \
+            --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add KILL \
+            --security-opt no-new-privileges:true --entrypoint /bin/sh \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/server/judger/tests,dst=/audit-tests,readonly" \
+            xju-oj-server:regression -c 'cp -R /audit-tests /tmp/audit-tests
+          cd /tmp/audit-tests/Python_and_core
+          exec /app/.venv/bin/python test.py'
+      - name: Production language and SPJ regression
+        run: |
+          docker run --rm --network none --cap-drop ALL \
+            --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add KILL \
+            --security-opt no-new-privileges:true \
+            --env JUDGER_RUNTIME_TESTS=1 --env TOKEN=isolated-ci-only --env PYTHONPATH=/app \
+            --entrypoint /app/.venv/bin/python \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/server/judge-server/tests/test_runtime_integration.py,dst=/audit-runtime.py,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/backend/judge/languages.py,dst=/audit-languages.py,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/server/judge-server/examples/spj/coprime_composite.cpp,dst=/audit-spj.cpp,readonly" \
+            xju-oj-server:regression /audit-runtime.py

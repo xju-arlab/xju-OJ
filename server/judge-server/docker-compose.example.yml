@@ -1,8 +1,9 @@
 services:
   judge-server:
     build:
-      context: ../
-      dockerfile: Dockerfile
+      context: ../../
+      dockerfile: server/Dockerfile
+      target: judge-server
     read_only: true
     security_opt:
       - no-new-privileges:true

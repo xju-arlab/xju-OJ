@@ -3,7 +3,7 @@
 // @name:zh-CN   XJU-OJ 远程提交助手
 // @name:en      XJU-OJ Remote Submission Bridge
 // @namespace    https://oj.icthub.top/
-// @version      1.0.1
+// @version      1.1.0
 // @description  在用户自己的洛谷、牛客和 Codeforces 登录会话中转发 XJU-OJ 练习提交。
 // @description:en Forward XJU-OJ practice submissions through the user's own Luogu, Nowcoder, and Codeforces sessions.
 // @author       XJU-OJ
@@ -59,11 +59,23 @@
   const BACKEND_EVENT_FIELDS = [
     'submission_id', 'provider', 'status', 'remote_submission_id', 'remote_url',
     'verdict', 'message', 'time_ms', 'memory_bytes', 'passed_tests', 'total_tests',
-    'score', 'verification_source'
+    'score', 'verification_source', 'failed_verdict'
   ]
   const dispatchedBridgeEvents = new Set()
   const ojPollingSubmissions = new Set()
   const backendEventQueues = new Map()
+  const deliveryTimers = new Map()
+  const pollTimers = new Map()
+  const activePollLeases = new Map()
+  const startingSubmissions = new Set()
+  const deliveryAttempts = new Map()
+  const tabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const TERMINAL_STATUSES = new Set(['FINISHED', 'FAILED'])
+  const ACTION_STATUSES = new Set(['AUTH_REQUIRED', 'VERIFICATION_REQUIRED'])
+  const ownedSubmissionIds = new Set()
+  let currentOjUserId = null
+  let recovering = false
+  let recoveryTimer = null
   const PROVIDER_HOSTS = {
     LUOGU: new Set(['www.luogu.com.cn', 'luogu.com.cn']),
     NOWCODER: new Set(['ac.nowcoder.com', 'www.nowcoder.com', 'nowcoder.com']),
@@ -102,27 +114,129 @@
     return item ? decodeURIComponent(item.slice(prefix.length)) : ''
   }
 
-  function postBridgeEvent (event) {
+  function outboxKey (id) {
+    return `${STORAGE_PREFIX}:outbox:${id}`
+  }
+
+  function sanitizeBridgePayload (event) {
     const payload = {}
     for (const field of BACKEND_EVENT_FIELDS) {
       if (event[field] !== undefined && event[field] !== null) payload[field] = event[field]
     }
-    const csrf = cookieValue('csrftoken')
-    const headers = { 'Content-Type': 'application/json;charset=UTF-8' }
-    if (csrf) headers['X-CSRFToken'] = csrf
-    const submissionId = String(event.submission_id || '')
-    const previous = backendEventQueues.get(submissionId) || Promise.resolve()
-    const request = previous.catch(() => {}).then(() => window.fetch('/api/remote_submission/event', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers,
-      body: JSON.stringify(payload)
-    }))
-    backendEventQueues.set(submissionId, request)
-    request.finally(() => {
-      if (backendEventQueues.get(submissionId) === request) backendEventQueues.delete(submissionId)
-    }).catch(() => {})
+    for (const field of ['score', 'time_ms', 'memory_bytes', 'passed_tests', 'total_tests']) {
+      if (payload[field] === undefined) continue
+      const raw = payload[field]
+      const value = typeof raw === 'boolean' || String(raw).trim() === ''
+        ? NaN : Number(String(raw).trim().replace(/%$/, ''))
+      if (!Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER ||
+          (field !== 'score' && !Number.isSafeInteger(value))) delete payload[field]
+      else payload[field] = value
+    }
+    if (payload.message !== undefined) payload.message = String(payload.message).replace(/\0/g, '').slice(0, 2048)
+    return payload
+  }
+
+  async function ojRequest (url, options = {}) {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), 20000)
+    try {
+      const response = await window.fetch(url, { credentials: 'same-origin', ...options, signal: controller.signal })
+      if (!response.ok) throw new Error(`OJ HTTP ${response.status}`)
+      const payload = await response.json()
+      if (!payload || payload.error !== null) throw new Error(String((payload && payload.data) || 'OJ 未确认请求'))
+      return payload.data
+    } finally {
+      window.clearTimeout(timer)
+    }
+  }
+
+  // GM storage spans the OJ and provider origins. Leases prevent every open tab
+  // from polling the same run; an abandoned tab's lease expires automatically.
+  async function acquireLease (id, lane) {
+    const key = `${STORAGE_PREFIX}:lease:${lane}:${id}`
+    const previous = GM_getValue(key, null)
+    if (previous && previous.owner !== tabId && previous.expires > Date.now()) return null
+    GM_setValue(key, { owner: tabId, expires: Date.now() + 45000 })
+    await sleep(50)
+    if ((GM_getValue(key, {}) || {}).owner !== tabId) return null
+    return {
+      renew () {
+        if ((GM_getValue(key, {}) || {}).owner !== tabId) return false
+        GM_setValue(key, { owner: tabId, expires: Date.now() + 45000 })
+        return true
+      },
+      release () {
+        if ((GM_getValue(key, {}) || {}).owner === tabId) GM_deleteValue(key)
+      }
+    }
+  }
+
+  function queueBridgeEvent (event) {
+    if (!event || !event.submission_id || !PROVIDER_HOSTS[event.provider]) return
+    const key = outboxKey(event.submission_id)
+    const previous = GM_getValue(key, null)
+    if (previous && (TERMINAL_STATUSES.has(previous.status) || previous.timestamp > event.timestamp)) return
+    GM_setValue(key, event)
+  }
+
+  function scheduleDelivery (id, delay) {
+    if (deliveryTimers.has(id)) return
+    deliveryTimers.set(id, window.setTimeout(() => {
+      deliveryTimers.delete(id)
+      flushOutbox(id)
+    }, delay))
+  }
+
+  function flushOutbox (id) {
+    if (window.location.origin !== OJ_ORIGIN || backendEventQueues.has(id)) return backendEventQueues.get(id)
+    const event = GM_getValue(outboxKey(id), null)
+    if (!event || !currentOjUserId ||
+        (event.user_id ? String(event.user_id) !== String(currentOjUserId) : !ownedSubmissionIds.has(id))) return
+    const request = Promise.resolve().then(async () => {
+      const lease = await acquireLease(id, 'delivery')
+      if (!lease) { scheduleDelivery(id, 10000); return }
+      try {
+        const csrf = cookieValue('csrftoken')
+        const headers = { 'Content-Type': 'application/json;charset=UTF-8' }
+        if (csrf) headers['X-CSRFToken'] = csrf
+        const submission = await ojRequest('/api/remote_submission/event', {
+          method: 'POST', headers, body: JSON.stringify(sanitizeBridgePayload(event))
+        })
+        if (!submission || String(submission.id) !== String(id) ||
+            (TERMINAL_STATUSES.has(event.status) && !TERMINAL_STATUSES.has(submission.remote_status))) {
+          throw new Error('OJ 尚未确认最终结果')
+        }
+        deliveryAttempts.delete(id)
+        if (TERMINAL_STATUSES.has(submission.remote_status)) {
+          GM_deleteValue(outboxKey(id))
+          const task = GM_getValue(taskStorageKey(id), null)
+          if (task) discardTask(task, true)
+        } else if ((GM_getValue(outboxKey(id), {}) || {}).nonce === event.nonce) {
+          GM_deleteValue(outboxKey(id))
+        }
+      } catch (error) {
+        const attempt = (deliveryAttempts.get(id) || 0) + 1
+        deliveryAttempts.set(id, attempt)
+        window.dispatchEvent(new CustomEvent(BRIDGE_EVENT, { detail: {
+          schema: TASK_SCHEMA, submission_id: id, provider: event.provider, status: 'SYNC_PENDING',
+          message: `结果尚未同步到 OJ，任务已保留并将重试：${error.message}`
+        } }))
+        scheduleDelivery(id, Math.min(60000, 2000 * (2 ** Math.min(attempt - 1, 5))))
+      } finally {
+        lease.release()
+      }
+    }).finally(() => {
+      backendEventQueues.delete(id)
+      if (GM_getValue(outboxKey(id), null) && !deliveryTimers.has(id)) scheduleDelivery(id, 100)
+    })
+    backendEventQueues.set(id, request)
+    request.catch(() => {})
     return request
+  }
+
+  function postBridgeEvent (event) {
+    queueBridgeEvent(event)
+    return flushOutbox(event.submission_id)
   }
 
   function dispatchBridgeEvent (event) {
@@ -137,15 +251,25 @@
   }
 
   function publishBridgeEvent (task, status, details = {}) {
+    const stored = GM_getValue(taskStorageKey(task.submission_id), null)
+    if (stored && stored.terminal_event) return stored.terminal_event
     const event = {
       schema: TASK_SCHEMA,
       submission_id: task.submission_id,
       provider: task.provider,
+      user_id: task.user_id,
       status,
       timestamp: Date.now(),
       nonce: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      ...details
+      ...sanitizeBridgePayload(details)
     }
+    task.status = status
+    if (TERMINAL_STATUSES.has(status)) {
+      task.terminal_event = event
+      delete task.code
+    }
+    saveTask(task)
+    queueBridgeEvent(event)
     GM_setValue(EVENT_STORAGE_KEY, event)
     if (window.location.origin === OJ_ORIGIN) dispatchBridgeEvent(event)
     return event
@@ -175,8 +299,8 @@
     const code = detail && detail.code
     if (!task || task.schema !== TASK_SCHEMA) throw new Error('不支持的远程提交任务版本')
     if (!task.submission_id || !PROVIDER_HOSTS[task.provider]) throw new Error('远程提交任务字段不完整')
-    if (typeof code !== 'string' || !code.trim()) throw new Error('提交代码为空')
-    if (new TextEncoder().encode(code).byteLength > MAX_CODE_SIZE) throw new Error('提交代码超过 1 MiB')
+    if (!task.remote_submission_id && (typeof code !== 'string' || !code.trim())) throw new Error('提交代码为空')
+    if (code && new TextEncoder().encode(code).byteLength > MAX_CODE_SIZE) throw new Error('提交代码超过 1 MiB')
 
     let targetUrl
     try {
@@ -207,10 +331,15 @@
   }
 
   function loadProviderTask (provider) {
-    const taskId = taskIdFromHash() || GM_getValue(activeTaskStorageKey(provider), '')
+    // Luogu changes #xju-oj-remote=... into #submit for native verification.
+    // Keep the identity in this tab so another submission cannot replace it.
+    let boundId = ''
+    try { boundId = window.sessionStorage.getItem(`${STORAGE_PREFIX}:bound:${provider}`) || '' } catch (_) {}
+    const taskId = taskIdFromHash() || boundId || GM_getValue(activeTaskStorageKey(provider), '')
     if (!taskId) return null
     const task = GM_getValue(taskStorageKey(taskId), null)
     if (!task || task.provider !== provider || task.schema !== TASK_SCHEMA) return null
+    try { window.sessionStorage.setItem(`${STORAGE_PREFIX}:bound:${provider}`, taskId) } catch (_) {}
     return task
   }
 
@@ -222,9 +351,15 @@
     if (status !== 'AUTH_REQUIRED' && status !== 'VERIFICATION_REQUIRED') {
       throw new Error(`不允许为 ${status} 状态打开外部标签页`)
     }
+    if (!task.remote_submission_id && ['SUBMITTING', 'SUBMIT_UNCERTAIN'].includes((task.adapter_state || {}).phase)) {
+      task.adapter_state = { phase: 'NEEDS_ACTION' }
+    }
     const now = Date.now()
     const previous = task.action_tab || {}
-    if (previous.status === status && now - Number(previous.opened_at || 0) < 10000) return
+    if (previous.status === status && now - Number(previous.opened_at || 0) < 10000) {
+      publishBridgeEvent(task, status, { message, ...details })
+      return
+    }
     task.action_tab = { status, opened_at: now }
     saveTask(task)
     publishBridgeEvent(task, status, { message, ...details })
@@ -293,8 +428,9 @@
     }
   }
 
-  function discardTask (task) {
+  function discardTask (task, acknowledged = false) {
     clearActiveTask(task)
+    if (!acknowledged && GM_getValue(outboxKey(task.submission_id), null)) return
     GM_deleteValue(taskStorageKey(task.submission_id))
   }
 
@@ -303,7 +439,7 @@
   }
 
   function returnToOj (task) {
-    discardTask(task)
+    clearActiveTask(task)
     if (window.location.origin === OJ_ORIGIN) {
       window.focus()
       return
@@ -356,11 +492,11 @@
     return submissionMatch ? decodeURIComponent(submissionMatch[1]) : ''
   }
 
-  async function codeforcesSubmissions (handle) {
+  async function codeforcesSubmissions (handle, from = 1) {
     const url = new URL('/api/user.status', 'https://codeforces.com')
     url.searchParams.set('handle', handle)
-    url.searchParams.set('from', '1')
-    url.searchParams.set('count', '30')
+    url.searchParams.set('from', String(from))
+    url.searchParams.set('count', '100')
     const payload = await gmJsonRequest('GET', url.toString())
     if (payload.status !== 'OK' || !Array.isArray(payload.result)) {
       throw new Error(payload.comment || 'Codeforces API 请求失败')
@@ -369,6 +505,7 @@
   }
 
   function findCodeforcesRun (runs, task) {
+    if (task.remote_submission_id) return runs.find(run => String(run.id) === String(task.remote_submission_id))
     const providerData = task.provider_data || {}
     const contestId = Number(providerData.contest_id)
     const index = String(providerData.index || '').toUpperCase()
@@ -389,10 +526,10 @@
     let submittedEventSent = Boolean(task.remote_submission_id)
     let successfulPolls = 0
     let connectionFailures = 0
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline && pollingActive(task)) {
       let runs
       try {
-        runs = await codeforcesSubmissions(state.handle)
+        runs = await codeforcesSubmissions(state.handle, state.lookup_from || 1)
         successfulPolls += 1
       } catch (error) {
         if (isRemoteConnectionError(error)) connectionFailures += 1
@@ -424,6 +561,12 @@
       }
       const run = findCodeforcesRun(runs, task)
       if (!run) {
+        if (task.remote_submission_id && runs.length === 100 &&
+            Number(runs[runs.length - 1].id) > Number(task.remote_submission_id)) {
+          state.lookup_from = (state.lookup_from || 1) + 100
+          task.adapter_state = state
+          saveTask(task)
+        }
         await sleep(2200)
         continue
       }
@@ -468,6 +611,7 @@
       await sleep(2200)
     }
 
+    if (!pollingActive(task)) return
     if (task.remote_submission_id) {
       publishBridgeEvent(task, 'JUDGING', {
         remote_submission_id: task.remote_submission_id,
@@ -483,15 +627,9 @@
         window.setTimeout(() => pollCodeforcesRun(task), 4000)
       }
     } else if (state.connection_uncertain) {
-      task.adapter_state = {}
-      saveTask(task)
-      const message = 'Codeforces 未发现连接中断前的提交记录，已切换到原生页面重新提交'
-      if (window.location.origin === OJ_ORIGIN) {
-        openProviderRetryTab(task, message)
-      } else {
-        publishBridgeEvent(task, 'OPENING', { message })
-        window.setTimeout(() => bootCodeforcesTask(task), 4000)
-      }
+      publishBridgeEvent(task, 'OPENING', {
+        message: 'Codeforces 暂未找到提交记录，将继续查询；请核对原站记录，避免重复提交代码'
+      })
     } else {
       publishBridgeEvent(task, 'FAILED', {
         message: 'Codeforces 官方 API 中没有找到本次提交，请先检查账号提交记录再重试'
@@ -564,7 +702,9 @@
 
     const state = task.adapter_state || {}
     if (state.phase === 'AWAITING_ID' || state.phase === 'JUDGING') {
-      await pollCodeforcesRun(task)
+      task.status = 'JUDGING'
+      saveTask(task)
+      await resumeOjJudgingTask(task)
       return
     }
 
@@ -613,7 +753,7 @@
       else if (typeof form.requestSubmit === 'function') form.requestSubmit()
       else if (submitter) submitter.click()
       else form.submit()
-      window.setTimeout(() => pollCodeforcesRun(task), 1200)
+      window.setTimeout(() => resumeOjJudgingTask(task), 1200)
     } catch (error) {
       if (isRemoteConnectionError(error)) {
         publishBridgeEvent(task, 'OPENING', {
@@ -875,7 +1015,8 @@
 
   async function pollNowcoderRun (task) {
     const deadline = Date.now() + 120000
-    while (Date.now() < deadline) {
+    let refreshedToken = false
+    while (Date.now() < deadline && pollingActive(task)) {
       const state = task.adapter_state || {}
       try {
         const payload = await gmJsonRequest(
@@ -884,7 +1025,18 @@
           null,
           { Referer: state.referer || task.target_url.split('#')[0] }
         )
+        if (nowcoderVerificationRequired(payload)) {
+          const message = payload.msg || '请在牛客页面完成验证后继续查询结果'
+          if (window.location.origin === OJ_ORIGIN) openProviderActionTab(task, 'VERIFICATION_REQUIRED', message)
+          else publishBridgeEvent(task, 'VERIFICATION_REQUIRED', { message })
+          return
+        }
         if (nowcoderAuthRequired(payload)) {
+          if (!refreshedToken) {
+            refreshedToken = true
+            await refreshNowcoderQueryState(task)
+            continue
+          }
           const message = payload.msg || '牛客登录状态已失效'
           if (window.location.origin === OJ_ORIGIN) openProviderActionTab(task, 'AUTH_REQUIRED', message)
           else publishBridgeEvent(task, 'AUTH_REQUIRED', { message })
@@ -905,7 +1057,7 @@
             memory_bytes: Number(result.memoryConsumption || 0) * 1024,
             passed_tests: Number(result.rightCaseNum || 0),
             total_tests: Number(result.allCaseNum || 0),
-            score: Number(result.rightHundredRate || 0),
+            score: result.rightHundredRate,
             message: String(result.memo || result.judgeReplyDesc || ''),
             verification_source: 'nowcoder-session-api'
           })
@@ -913,15 +1065,26 @@
           return
         }
       } catch (error) {
-        if (nowcoderAuthRequired(error.payload)) {
+        if (nowcoderAuthRequired(error.payload) || error.status === 401 || String(error.message).includes('登录')) {
+          if (!refreshedToken) {
+            refreshedToken = true
+            try { await refreshNowcoderQueryState(task); continue } catch (_) {}
+          }
           const message = error.message || '牛客登录状态已失效'
           if (window.location.origin === OJ_ORIGIN) openProviderActionTab(task, 'AUTH_REQUIRED', message)
           else publishBridgeEvent(task, 'AUTH_REQUIRED', { message })
           return
         }
+        if (nowcoderVerificationRequired(error.payload) || error.status === 403) {
+          const message = '请在牛客页面完成验证后继续查询结果'
+          if (window.location.origin === OJ_ORIGIN) openProviderActionTab(task, 'VERIFICATION_REQUIRED', message)
+          else publishBridgeEvent(task, 'VERIFICATION_REQUIRED', { message })
+          return
+        }
       }
       await sleep(1200)
     }
+    if (!pollingActive(task)) return
     publishBridgeEvent(task, 'JUDGING', {
       remote_submission_id: String((task.adapter_state || {}).submission_id || ''),
       message: '牛客判题时间较长，请保留此标签页或稍后查看提交记录'
@@ -929,9 +1092,12 @@
   }
 
   function acceptNowcoderSubmission (task, submitBody, responsePayload) {
+    if (nowcoderAuthRequired(responsePayload) || nowcoderVerificationRequired(responsePayload) ||
+        (responsePayload.code !== undefined && ![0, '0'].includes(responsePayload.code))) return
     const result = responsePayload && responsePayload.data
     const submissionId = result && (result.id || result.submissionId)
     if (!submissionId) throw new Error(responsePayload.msg || '牛客没有返回提交 ID')
+    if (task.remote_submission_id || task.terminal_event) return
     task.remote_submission_id = String(submissionId)
     task.adapter_state = {
       phase: 'JUDGING',
@@ -957,6 +1123,20 @@
     handOffJudgingToOj()
   }
 
+  function nativeSubmissionTask (provider, requestPath, payload) {
+    const task = provider === 'NOWCODER' ? unsafeWindow.__xjuOjRemoteBridgeNowcoderTask
+      : unsafeWindow.__xjuOjRemoteBridgeLuoguTask
+    if (!task || task.remote_submission_id || task.terminal_event || typeof task.code !== 'string') return null
+    if (provider === 'NOWCODER') {
+      const expected = String((task.provider_data || {}).question_id || '')
+      if (!expected || String((payload || {}).questionId || '') !== expected) return null
+    } else {
+      const problemId = (task.provider_data || {}).problem_id || task.problem_id
+      if (requestPath !== `/fe/api/problem/submit/${encodeURIComponent(problemId)}`) return null
+    }
+    return task
+  }
+
   function installNowcoderXhrInterceptor (task) {
     const Xhr = unsafeWindow.XMLHttpRequest
     if (!Xhr) return
@@ -977,18 +1157,18 @@
       let outgoingBody = body
       if (requestPath.endsWith('/api/service/judge/submit')) {
         let submitBody = null
+        let activeTask = null
         try {
           submitBody = typeof body === 'string' ? JSON.parse(body) : body
-          if (submitBody && typeof submitBody === 'object' && !(submitBody instanceof FormData)) {
-            submitBody.content = task.code
-            submitBody.language = String(task.language_id)
-            submitBody.questionId = String((task.provider_data || {}).question_id || submitBody.questionId || '')
+          activeTask = nativeSubmissionTask('NOWCODER', requestPath, submitBody)
+          if (activeTask && submitBody && typeof submitBody === 'object' && !(submitBody instanceof FormData)) {
+            submitBody.content = activeTask.code
+            submitBody.language = String(activeTask.language_id)
             outgoingBody = typeof body === 'string' ? JSON.stringify(submitBody) : submitBody
           }
         } catch (error) {}
         this.addEventListener('load', () => {
           try {
-            const activeTask = unsafeWindow.__xjuOjRemoteBridgeNowcoderTask
             const responsePayload = JSON.parse(this.responseText || '{}')
             if (activeTask && submitBody && responsePayload && responsePayload.data) {
               acceptNowcoderSubmission(activeTask, submitBody, responsePayload)
@@ -1008,11 +1188,12 @@
         } catch (error) {}
         let outgoingInit = init
         let submitBody = null
+        let activeTask = null
         if (requestPath.endsWith('/api/service/judge/submit')) {
           try {
             submitBody = typeof init.body === 'string' ? JSON.parse(init.body) : init.body
-            if (submitBody && typeof submitBody === 'object' && !(submitBody instanceof FormData)) {
-              const activeTask = unsafeWindow.__xjuOjRemoteBridgeNowcoderTask
+            activeTask = nativeSubmissionTask('NOWCODER', requestPath, submitBody)
+            if (activeTask && submitBody && typeof submitBody === 'object' && !(submitBody instanceof FormData)) {
               submitBody.content = activeTask.code
               submitBody.language = String(activeTask.language_id)
               submitBody.questionId = String((activeTask.provider_data || {}).question_id || submitBody.questionId || '')
@@ -1023,7 +1204,6 @@
         const response = await originalFetch.call(this, input, outgoingInit)
         if (requestPath.endsWith('/api/service/judge/submit') && submitBody) {
           response.clone().json().then(payload => {
-            const activeTask = unsafeWindow.__xjuOjRemoteBridgeNowcoderTask
             if (activeTask && payload && payload.data) acceptNowcoderSubmission(activeTask, submitBody, payload)
           }).catch(() => {})
         }
@@ -1058,6 +1238,7 @@
   }
 
   async function requestNowcoderVerification (task, message) {
+    if (!task.remote_submission_id) { task.adapter_state = { phase: 'NEEDS_ACTION' }; saveTask(task) }
     if (window.location.origin === OJ_ORIGIN) {
       openProviderActionTab(
         task,
@@ -1089,12 +1270,12 @@
       remark: '',
       token
     }
-    const payload = await gmJsonRequest(
+    const payload = await sendProviderCode(task, () => gmJsonRequest(
       'POST',
       'https://victorinox.nowcoder.com/api/service/judge/submit',
       body,
       { Referer: referer, Origin: 'https://www.nowcoder.com' }
-    )
+    ))
     if (nowcoderVerificationRequired(payload)) {
       await requestNowcoderVerification(task, payload.msg)
       return false
@@ -1110,7 +1291,7 @@
   async function bootNowcoderTask (task) {
     const state = task.adapter_state || {}
     if (state.phase === 'JUDGING' && state.submission_id) {
-      await pollNowcoderRun(task)
+      await restoreRemoteQuery(task)
       return
     }
 
@@ -1145,6 +1326,7 @@
     try {
       await submitNowcoderDirect(task)
     } catch (error) {
+      if (error.submitUncertain) return
       const message = error.message || '牛客提交失败'
       if (nowcoderVerificationRequired(error.payload) || message.includes('验证') || message.includes('安全') || message.includes('风控')) {
         await requestNowcoderVerification(task, message)
@@ -1287,7 +1469,7 @@
   function acceptLuoguSubmission (task, submissionId) {
     const id = String(submissionId || '')
     if (!id) throw new Error('洛谷没有返回评测记录 ID')
-    if (task.remote_submission_id === id && (task.adapter_state || {}).phase === 'JUDGING') return
+    if (task.remote_submission_id || task.terminal_event) return
     task.remote_submission_id = id
     task.adapter_state = { phase: 'JUDGING', submission_id: id }
     delete task.code
@@ -1360,7 +1542,6 @@
     const judgeResult = detail.judgeResult || record.judgeResult
     if (compileResult && typeof compileResult === 'object') {
       if (compileResult.success === false) return 'COMPILE_ERROR'
-      if (!judgeResult && String(compileResult.message || '').trim()) return 'COMPILE_ERROR'
     }
     if (!judgeResult || typeof judgeResult !== 'object') return ''
 
@@ -1422,7 +1603,13 @@
     }
     const text = textValues.map(luoguScalar).find(value => value && !/^-?\d+$/.test(value)) || ''
     const normalized = text.toUpperCase().replace(/[\s-]+/g, '_')
-    const verdict = luoguDerivedVerdict(record) || LUOGU_STATUS[code] || LUOGU_VERDICT_ALIASES[normalized] ||
+    // The overall record status is authoritative. Compiler output may contain
+    // warnings or success messages while judging is still in progress.
+    const pending = code === 0 || code === 1 ||
+      (code === null && /WAIT|JUDGING|PENDING|QUEUE|COMPILING|RUNNING|评测中|判题中|等待|编译中|运行中/i.test(text))
+    if (pending) return { code, text, pending: true, verdict: '' }
+    const verdict = LUOGU_STATUS[code] || LUOGU_VERDICT_ALIASES[normalized] ||
+      (/部分正确|未通过/.test(text) ? 'PARTIALLY_ACCEPTED' : '') ||
       (/答案正确|通过/.test(text) ? 'ACCEPTED' : '') ||
       (/编译错误/.test(text) ? 'COMPILE_ERROR' : '') ||
       (/输出超限/.test(text) ? 'OUTPUT_LIMIT_EXCEEDED' : '') ||
@@ -1430,11 +1617,9 @@
       (/时间超限|运行超时|超时/.test(text) ? 'TIME_LIMIT_EXCEEDED' : '') ||
       (/答案错误/.test(text) ? 'WRONG_ANSWER' : '') ||
       (/运行错误/.test(text) ? 'RUNTIME_ERROR' : '') ||
-      (/部分正确|未通过/.test(text) ? 'PARTIALLY_ACCEPTED' : '') ||
-      (/系统错误|评测失败|未知错误/.test(text) ? 'SYSTEM_ERROR' : '')
-    const pending = !verdict && (code === 0 || code === 1 ||
-      /WAIT|JUDGING|PENDING|QUEUE|COMPILING|RUNNING|评测中|判题中|等待|编译中|运行中/i.test(text))
-    return { code, text, pending, verdict }
+      (/系统错误|评测失败|未知错误/.test(text) ? 'SYSTEM_ERROR' : '') ||
+      luoguDerivedVerdict(record)
+    return { code, text, pending: false, verdict }
   }
 
   function luoguLoginTemplate (payload) {
@@ -1446,7 +1631,7 @@
     const submissionId = String((task.adapter_state || {}).submission_id || task.remote_submission_id || '')
     if (!submissionId) return
     const deadline = Date.now() + 180000
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline && pollingActive(task)) {
       try {
         const payload = await gmJsonRequest(
           'GET',
@@ -1466,14 +1651,23 @@
           await sleep(1500)
           continue
         }
+        const compileResult = (record.detail || {}).compileResult || record.compileResult || {}
+        const compileMessage = status.verdict === 'COMPILE_ERROR'
+          ? String(compileResult.message || '').trim().slice(0, 2048)
+          : ''
+        const failure = luoguDerivedVerdict(record)
+        const isUnaccepted = status.verdict === 'PARTIALLY_ACCEPTED'
+        const verdict = isUnaccepted && (task.rule_type === 'ACM' || Number(record.score) === 0)
+          ? (failure && failure !== 'ACCEPTED' ? failure : 'WRONG_ANSWER') : status.verdict
         publishBridgeEvent(task, 'FINISHED', {
           remote_submission_id: submissionId,
           remote_url: `https://www.luogu.com.cn/record/${submissionId}`,
-          verdict: status.verdict,
+          verdict,
+          failed_verdict: failure !== 'ACCEPTED' ? failure : '',
           time_ms: Number(record.time || record.timeCost || 0),
           memory_bytes: Number(record.memory || record.memoryCost || 0) * 1024,
-          score: Number(record.score || 0),
-          message: status.text || status.verdict,
+          score: record.score,
+          message: compileMessage || status.text || status.verdict,
           verification_source: 'luogu-session-page'
         })
         returnToOj(task)
@@ -1505,14 +1699,12 @@
       }
       await sleep(1500)
     }
+    if (!pollingActive(task)) return
     publishBridgeEvent(task, 'JUDGING', {
       remote_submission_id: submissionId,
       remote_url: `https://www.luogu.com.cn/record/${submissionId}`,
       message: '洛谷判题时间较长，请保留此标签页或稍后查看评测记录'
     })
-    if (window.location.origin === OJ_ORIGIN) {
-      window.setTimeout(() => resumeOjJudgingTask(task), 5000)
-    }
   }
 
   function installLuoguXhrInterceptor (task) {
@@ -1532,7 +1724,7 @@
       try {
         requestPath = new URL(this.__xjuOjRemoteUrl, window.location.origin).pathname
       } catch (error) {}
-      const activeTask = unsafeWindow.__xjuOjRemoteBridgeLuoguTask
+      const activeTask = nativeSubmissionTask('LUOGU', requestPath)
       let outgoingBody = body
       if (activeTask && /^\/fe\/api\/problem\/submit\//.test(requestPath)) {
         try {
@@ -1563,10 +1755,10 @@
           requestPath = new URL(typeof input === 'string' ? input : input.url, window.location.origin).pathname
         } catch (error) {}
         let outgoingInit = init
+        const activeTask = nativeSubmissionTask('LUOGU', requestPath)
         if (/^\/fe\/api\/problem\/submit\//.test(requestPath)) {
           try {
             const payload = typeof init.body === 'string' ? JSON.parse(init.body) : init.body
-            const activeTask = unsafeWindow.__xjuOjRemoteBridgeLuoguTask
             if (activeTask && payload && typeof payload === 'object' && !(payload instanceof FormData)) {
               payload.lang = Number(activeTask.language_id)
               payload.code = activeTask.code
@@ -1578,7 +1770,6 @@
         const response = await originalFetch.call(this, input, outgoingInit)
         if (/^\/fe\/api\/problem\/submit\//.test(requestPath)) {
           response.clone().json().then(payload => {
-            const activeTask = unsafeWindow.__xjuOjRemoteBridgeLuoguTask
             const submissionId = luoguSubmissionId(payload)
             if (activeTask && submissionId) acceptLuoguSubmission(activeTask, submissionId)
           }).catch(() => {})
@@ -1613,6 +1804,7 @@
   }
 
   async function requestLuoguVerification (task, message, verificationSource = 'luogu-submit') {
+    if (!task.remote_submission_id) { task.adapter_state = { phase: 'NEEDS_ACTION' }; saveTask(task) }
     if (window.location.origin === OJ_ORIGIN) {
       openProviderActionTab(
         task,
@@ -1653,7 +1845,7 @@
 
     const csrf = root.querySelector('meta[name="csrf-token"]')
     if (!csrf || !csrf.getAttribute('content')) throw new Error('洛谷题目页缺少 CSRF 信息')
-    const response = await gmRawRequest(
+    const response = await sendProviderCode(task, () => gmRawRequest(
       'POST',
       `https://www.luogu.com.cn/fe/api/problem/submit/${encodeURIComponent(problemId)}`,
       JSON.stringify({
@@ -1669,7 +1861,7 @@
         Origin: 'https://www.luogu.com.cn',
         Referer: referer
       }
-    )
+    ))
     let payload
     try {
       payload = responseJson(response)
@@ -1705,7 +1897,7 @@
 
     const state = task.adapter_state || {}
     if (state.phase === 'JUDGING' && state.submission_id) {
-      await pollLuoguRecord(task)
+      await restoreRemoteQuery(task)
       return
     }
 
@@ -1728,6 +1920,7 @@
       publishBridgeEvent(task, 'OPENING', { message: '正在通过洛谷网页会话提交代码' })
       await submitLuoguDirect(task)
     } catch (error) {
+      if (error.submitUncertain) return
       const message = error.message || '洛谷提交失败'
       if (message.includes('登录')) {
         publishBridgeEvent(task, 'AUTH_REQUIRED', { message })
@@ -1739,20 +1932,171 @@
     }
   }
 
+  async function sendProviderCode (task, send) {
+    const lease = await acquireLease(task.submission_id, 'submit')
+    const stored = GM_getValue(taskStorageKey(task.submission_id), null)
+    if (!lease || (stored && (stored.remote_submission_id || stored.terminal_event ||
+        ['SUBMITTING', 'SUBMIT_UNCERTAIN'].includes((stored.adapter_state || {}).phase)))) {
+      if (lease) lease.release()
+      const error = new Error('这条提交已在处理中，请先核对远端记录')
+      error.submitUncertain = true
+      throw error
+    }
+    task.adapter_state = { phase: 'SUBMITTING', started_at: Date.now() }
+    saveTask(task)
+    try {
+      const response = await send()
+      if (response && response.status >= 500) {
+        const error = new Error('远端服务暂时不可用，提交状态待确认')
+        error.status = response.status
+        throw error
+      }
+      // Keep an uncertain marker until the caller records an ID or an explicit
+      // verification/rejection response, including across a tab closing here.
+      task.adapter_state.phase = 'SUBMIT_UNCERTAIN'
+      saveTask(task)
+      return response
+    } catch (error) {
+      if (isRemoteConnectionError(error) || error.status >= 500 ||
+          (error.response && error.response.status >= 200 && error.response.status < 300)) {
+        task.adapter_state.phase = 'SUBMIT_UNCERTAIN'
+        error.submitUncertain = true
+        publishBridgeEvent(task, 'OPENING', {
+          message: '提交时连接中断，远端可能已经接收代码。任务已保留，请先在原站核对记录，避免重复提交'
+        })
+      } else {
+        task.adapter_state = {}
+        saveTask(task)
+      }
+      throw error
+    } finally { lease.release() }
+  }
+
+  function pollingActive (task) {
+    if (window.location.origin === OJ_ORIGIN && String(task.user_id) !== String(currentOjUserId)) return false
+    const stored = GM_getValue(taskStorageKey(task.submission_id), null)
+    if (!stored || stored.terminal_event) return false
+    const lease = activePollLeases.get(task.submission_id)
+    return !lease || lease.renew()
+  }
+
+  function schedulePoll (task, delay = 5000) {
+    if (pollTimers.has(task.submission_id)) return
+    pollTimers.set(task.submission_id, window.setTimeout(() => {
+      pollTimers.delete(task.submission_id)
+      const stored = GM_getValue(taskStorageKey(task.submission_id), null)
+      if (stored) resumeOjJudgingTask(stored)
+    }, delay))
+  }
+
+  async function refreshNowcoderQueryState (task) {
+    const referer = task.target_url.split('#')[0]
+    const account = await nowcoderAccountContext(referer)
+    const previous = task.adapter_state || {}
+    if (previous.user_id && Number(previous.user_id) !== account.user_id) {
+      throw new Error('请登录原牛客账号以查询这条提交')
+    }
+    const token = await nowcoderAccessToken(referer)
+    task.adapter_state = {
+      ...previous, phase: 'JUDGING', submission_id: String(task.remote_submission_id || previous.submission_id),
+      user_id: account.user_id, app_id: account.app_id,
+      tag_id: Number((task.provider_data || {}).tag_id || previous.tag_id || 0), referer, token
+    }
+    saveTask(task)
+  }
+
   function resumeOjJudgingTask (task) {
     if (!task || ojPollingSubmissions.has(task.submission_id)) return Promise.resolve()
-    if ((task.adapter_state || {}).phase !== 'JUDGING' && task.provider !== 'CODEFORCES') {
-      return Promise.resolve()
-    }
+    if (task.terminal_event) { postBridgeEvent(task.terminal_event); return Promise.resolve() }
+    if (window.location.origin === OJ_ORIGIN && (!currentOjUserId ||
+        String(task.user_id) !== String(currentOjUserId))) return Promise.resolve()
+    if (ACTION_STATUSES.has(task.status)) return Promise.resolve()
+    if ((task.adapter_state || {}).phase !== 'JUDGING' &&
+        (task.adapter_state || {}).phase !== 'AWAITING_ID') return Promise.resolve()
+    if (ojPollingSubmissions.size >= 3) { schedulePoll(task, 10000); return Promise.resolve() }
     ojPollingSubmissions.add(task.submission_id)
-    const poller = task.provider === 'CODEFORCES'
-      ? pollCodeforcesRun(task)
-      : task.provider === 'NOWCODER'
-        ? pollNowcoderRun(task)
-        : task.provider === 'LUOGU'
-          ? pollLuoguRecord(task)
-          : Promise.resolve()
-    return Promise.resolve(poller).finally(() => ojPollingSubmissions.delete(task.submission_id))
+    let lease
+    return Promise.resolve().then(async () => {
+      lease = await acquireLease(task.submission_id, 'poll')
+      if (!lease || !pollingActive(task)) return
+      activePollLeases.set(task.submission_id, lease)
+      if (task.provider === 'NOWCODER') {
+        if (!(task.adapter_state || {}).token) await refreshNowcoderQueryState(task)
+        await pollNowcoderRun(task)
+      } else if (task.provider === 'LUOGU') await pollLuoguRecord(task)
+      else if (task.provider === 'CODEFORCES') {
+        if (!(task.adapter_state || {}).handle) {
+          const page = await gmRawRequest('GET', task.target_url.split('#')[0])
+          const root = new DOMParser().parseFromString(page.responseText || '', 'text/html')
+          if (codeforcesChallengeVisible(root, page.responseText || '')) {
+            openProviderActionTab(task, 'VERIFICATION_REQUIRED', '请在 Codeforces 页面完成验证后继续查询结果')
+            return
+          }
+          const handle = codeforcesHandle(root)
+          if (!handle) throw new Error('请登录原 Codeforces 账号以查询提交')
+          task.adapter_state.handle = handle
+          saveTask(task)
+        }
+        await pollCodeforcesRun(task)
+      }
+    }).catch(error => {
+      const message = error.message || '暂时无法查询远程结果，将自动重试'
+      if (message.includes('登录') || message.toLowerCase().includes('token')) {
+        publishBridgeEvent(task, 'AUTH_REQUIRED', { message })
+      } else if (task.remote_submission_id) {
+        publishBridgeEvent(task, 'JUDGING', { remote_submission_id: task.remote_submission_id, message })
+      }
+    }).finally(() => {
+      if (lease) lease.release()
+      activePollLeases.delete(task.submission_id)
+      ojPollingSubmissions.delete(task.submission_id)
+      const stored = GM_getValue(taskStorageKey(task.submission_id), null)
+      if (stored && !stored.terminal_event && !ACTION_STATUSES.has(stored.status)) schedulePoll(stored)
+    })
+  }
+
+  async function restoreRemoteQuery (task) {
+    task.status = 'JUDGING'
+    task.adapter_state = { ...(task.adapter_state || {}), phase: 'JUDGING', submission_id: String(task.remote_submission_id) }
+    saveTask(task)
+    await resumeOjJudgingTask(task)
+  }
+
+  async function recoverOjTasks () {
+    if (recovering || window.location.origin !== OJ_ORIGIN) return
+    recovering = true
+    try {
+      const data = await ojRequest('/api/remote_submission/recover')
+      if (!data || !data.user_id || !Array.isArray(data.tasks)) return
+      if (String(currentOjUserId) !== String(data.user_id)) ownedSubmissionIds.clear()
+      currentOjUserId = data.user_id
+      for (const fresh of data.tasks) {
+        ownedSubmissionIds.add(fresh.submission_id)
+        const previous = GM_getValue(taskStorageKey(fresh.submission_id), {}) || {}
+        const task = { ...previous, ...fresh }
+        saveTask(task)
+        if (task.terminal_event) postBridgeEvent(task.terminal_event)
+        else if (!ACTION_STATUSES.has(task.remote_status)) restoreRemoteQuery(task).catch(() => {})
+      }
+      const keys = typeof GM_listValues === 'function' ? GM_listValues() : []
+      for (const key of keys.filter(key => key.startsWith(`${STORAGE_PREFIX}:task:`))) {
+        const task = GM_getValue(key, null)
+        if (!task || String(task.user_id) !== String(currentOjUserId)) continue
+        ownedSubmissionIds.add(task.submission_id)
+        if (task.terminal_event) postBridgeEvent(task.terminal_event)
+        else resumeOjJudgingTask(task)
+      }
+      for (const key of keys.filter(key => key.startsWith(`${STORAGE_PREFIX}:outbox:`))) {
+        const event = GM_getValue(key, null)
+        if (event) flushOutbox(event.submission_id)
+      }
+    } catch (_) {
+      // Login and connectivity can recover later; persistent results stay put.
+    } finally {
+      recovering = false
+      window.clearTimeout(recoveryTimer)
+      recoveryTimer = window.setTimeout(recoverOjTasks, 60000)
+    }
   }
 
   async function runRemoteTaskFromOj (task) {
@@ -1786,12 +2130,42 @@
   }
 
   async function startRemoteTask (event) {
+    const id = event && event.detail && event.detail.task && event.detail.task.submission_id
+    if (!id || startingSubmissions.has(id)) return
+    startingSubmissions.add(id)
+    try {
+      await startRemoteTaskOnce(event)
+    } finally { startingSubmissions.delete(id) }
+  }
+
+  async function startRemoteTaskOnce (event) {
     let task
     try {
       task = normalizeTask(event && event.detail)
+      currentOjUserId = task.user_id || currentOjUserId
+      ownedSubmissionIds.add(task.submission_id)
+      const previous = GM_getValue(taskStorageKey(task.submission_id), null)
+      if (previous && previous.terminal_event) { postBridgeEvent(previous.terminal_event); return }
+      if ((previous && previous.remote_submission_id) || task.remote_submission_id) {
+        task = { ...(previous || {}), ...task,
+          remote_submission_id: task.remote_submission_id || previous.remote_submission_id,
+          adapter_state: (previous || {}).adapter_state }
+        await restoreRemoteQuery(task)
+        return
+      }
+      if (previous && (previous.adapter_state || {}).phase === 'AWAITING_ID') {
+        await resumeOjJudgingTask(previous)
+        return
+      }
+      if (previous && ['SUBMITTING', 'SUBMIT_UNCERTAIN'].includes((previous.adapter_state || {}).phase)) {
+        publishBridgeEvent(previous, 'OPENING', { message: '这条提交可能已被远端接收，请先在原站核对记录，避免重复提交代码' })
+        return
+      }
       GM_setValue(taskStorageKey(task.submission_id), task)
       GM_setValue(activeTaskStorageKey(task.provider), task.submission_id)
-      publishBridgeEvent(task, 'QUEUED', { message: '远程提交任务已交给浏览器脚本' })
+      publishBridgeEvent(task, task.remote_status && task.remote_status !== 'QUEUED' ? 'OPENING' : 'QUEUED', {
+        message: '远程提交任务已交给浏览器脚本'
+      })
     } catch (error) {
       const rawTask = event && event.detail && event.detail.task
       if (rawTask && rawTask.submission_id && rawTask.provider) {
@@ -1802,6 +2176,7 @@
     try {
       await runRemoteTaskFromOj(task)
     } catch (error) {
+      if (error.submitUncertain) return
       const response = error && error.response
       if (task.provider === 'CODEFORCES' && response) {
         const html = response.responseText || ''
@@ -1863,6 +2238,9 @@
       resumeOjJudgingTask(task)
     }
     window.addEventListener(SUBMIT_EVENT, startRemoteTask)
+    window.addEventListener('online', recoverOjTasks)
+    window.addEventListener('focus', recoverOjTasks)
+    recoverOjTasks()
     window.addEventListener(IMPORT_EVENT, startRemoteImport)
     GM_addValueChangeListener(EVENT_STORAGE_KEY, (_name, _oldValue, newValue) => {
       dispatchBridgeEvent(newValue)

@@ -2,13 +2,13 @@ import os
 from django.conf import settings
 from account.serializers import ImageUploadForm, FileUploadForm
 from utils.shortcuts import rand_str
-from utils.api import CSRFExemptAPIView
+from utils.api import APIView
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class SimditorImageUploadAPIView(CSRFExemptAPIView):
+class SimditorImageUploadAPIView(APIView):
     request_parsers = ()
 
     def post(self, request):
@@ -32,6 +32,7 @@ class SimditorImageUploadAPIView(CSRFExemptAPIView):
             with open(os.path.join(settings.UPLOAD_DIR, img_name), "wb") as imgFile:
                 for chunk in img:
                     imgFile.write(chunk)
+                os.fchmod(imgFile.fileno(), 0o644)
         except IOError as e:
             logger.error(e)
             return self.response({
@@ -44,7 +45,7 @@ class SimditorImageUploadAPIView(CSRFExemptAPIView):
             "file_path": f"{settings.UPLOAD_PREFIX}/{img_name}"})
 
 
-class SimditorFileUploadAPIView(CSRFExemptAPIView):
+class SimditorFileUploadAPIView(APIView):
     request_parsers = ()
 
     def post(self, request):
@@ -63,6 +64,7 @@ class SimditorFileUploadAPIView(CSRFExemptAPIView):
             with open(os.path.join(settings.UPLOAD_DIR, file_name), "wb") as f:
                 for chunk in file:
                     f.write(chunk)
+                os.fchmod(f.fileno(), 0o644)
         except IOError as e:
             logger.error(e)
             return self.response({

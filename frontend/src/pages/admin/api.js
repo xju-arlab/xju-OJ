@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '@/utils/apiError'
 import { ElMessage } from 'element-plus'
 import router from './router'
 import axios from 'axios'
@@ -334,11 +335,11 @@ function ajax (url, method, options) {
       data
     }).then(res => {
       // API正常返回(status=20x), 是否错误通过有无error判断
-      if (res.data.error !== null) {
-        ElMessage.error(res.data.data)
+      if (res.data?.error !== null) {
+        ElMessage.error(apiErrorMessage(res))
         reject(res)
         // // 若后端返回为登录，则为session失效，应退出当前登录用户
-        if (res.data.data.startsWith('Please login')) {
+        if (apiErrorMessage(res).startsWith('Please login')) {
           router.push({name: 'login'})
         }
       } else {
@@ -350,7 +351,7 @@ function ajax (url, method, options) {
     }, res => {
       // API请求异常，一般为Server error 或 network error
       reject(res)
-      ElMessage.error(res.data.data)
+      ElMessage.error(apiErrorMessage(res))
     })
   })
 }

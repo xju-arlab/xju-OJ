@@ -110,7 +110,7 @@ var_re = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)"
 allowed = {
     "COMPOSE_PROJECT_NAME", "APP_DOMAIN", "PUBLIC_BASE_URL", "CSRF_TRUSTED_ORIGINS", "DEPLOY_HEARTBEAT_SECONDS",
     "DEV_FRONTEND_HOST", "DEV_FRONTEND_PORT", "DEV_BACKEND_BIND_ADDRESS", "DEV_BACKEND_PORT",
-    "HTTP_BIND_ADDRESS", "HTTP_PORT", "DEPLOY_ROOT", "RUNTIME_ROOT",
+    "HTTP_BIND_ADDRESS", "HTTP_PORT", "DEPLOY_ROOT", "RUNTIME_ROOT", "TRUSTED_PROXY_CIDRS",
     "BACKUP_ROOT", "SECRET_ROOT", "DEPLOY_MODE", "SECRET_PROVISION_MODE",
     "GIT_COMMIT", "BUILD_VERSION", "BUILD_CREATED", "BUILD_TARGETS",
     "BUILD_NETWORK", "BUILD_HTTP_PROXY", "BUILD_HTTPS_PROXY", "BUILD_ALL_PROXY",
@@ -212,6 +212,11 @@ PY
 
 detected_commit=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || printf '%s' local)
 GIT_COMMIT=${GIT_COMMIT:-$detected_commit}
+if [ "$DEV_MODE" -eq 0 ] && [ "$DRY_RUN" -eq 0 ] && [ "$CONFIG_ONLY" -eq 0 ]; then
+    [ "$GIT_COMMIT" = "$detected_commit" ] || fail "GIT_COMMIT must identify the checked-out HEAD"
+    [ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ] || \
+        fail "production deployment requires a committed, clean worktree; commit/pull the intended release first"
+fi
 git_tag=$(printf '%.12s' "$GIT_COMMIT")
 BUILD_VERSION=${BUILD_VERSION:-phase3}
 if [ -z "${BUILD_CREATED:-}" ]; then
@@ -228,6 +233,15 @@ DEV_BACKEND_BIND_ADDRESS=${DEV_BACKEND_BIND_ADDRESS:-127.0.0.1}
 DEV_BACKEND_PORT=${DEV_BACKEND_PORT:-8000}
 HTTP_BIND_ADDRESS=${HTTP_BIND_ADDRESS:-127.0.0.1}
 HTTP_PORT=${HTTP_PORT:-18080}
+TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+export TRUSTED_PROXY_CIDRS
+python3 - "$TRUSTED_PROXY_CIDRS" <<'PY' || fail "TRUSTED_PROXY_CIDRS must contain numeric proxy addresses/CIDRs"
+import ipaddress, sys
+for value in sys.argv[1].split():
+    network = ipaddress.ip_network(value, strict=False)
+    if network.prefixlen == 0:
+        raise SystemExit("refusing to trust the entire Internet")
+PY
 DEPLOY_MODE=${DEPLOY_MODE:-build}
 SECRET_PROVISION_MODE=${SECRET_PROVISION_MODE:-prompt}
 DEPLOY_HEARTBEAT_SECONDS=${DEPLOY_HEARTBEAT_SECONDS:-60}
@@ -501,14 +515,12 @@ check_secret_set() {
     check_secret_file "$DJANGO_SECRET_KEY_FILE" "Django secret key" 32
     check_secret_file "$JUDGE_SERVER_TOKEN_FILE" "JudgeServer token" 32
     check_secret_file "$INITIAL_ADMIN_PASSWORD_FILE" "Initial administrator password" 12
-    secret_args="$POSTGRES_PASSWORD_FILE $DJANGO_SECRET_KEY_FILE $JUDGE_SERVER_TOKEN_FILE $INITIAL_ADMIN_PASSWORD_FILE"
+    set -- "$POSTGRES_PASSWORD_FILE" "$DJANGO_SECRET_KEY_FILE" "$JUDGE_SERVER_TOKEN_FILE" "$INITIAL_ADMIN_PASSWORD_FILE"
     if [ "$AUTHENTIK_OIDC_ENABLED" = true ]; then
         check_secret_file "$AUTHENTIK_OIDC_CLIENT_SECRET_FILE" "Authentik OIDC client secret" 16
-        secret_args="$secret_args $AUTHENTIK_OIDC_CLIENT_SECRET_FILE"
+        set -- "$@" "$AUTHENTIK_OIDC_CLIENT_SECRET_FILE"
     fi
-    # Word splitting is intentional: all paths have already been normalized and
-    # are restricted to operator-controlled absolute paths.
-    python3 - $secret_args <<'PY' || fail "secret files must not be hard-linked aliases"
+    python3 - "$@" <<'PY' || fail "secret files must not be hard-linked aliases"
 import os
 import sys
 
@@ -614,6 +626,12 @@ compose() {
 
 release_dir="$RUNTIME_ROOT/deployments"
 release_file="$release_dir/current.json"
+if [ "$DRY_RUN" -eq 0 ] && [ "$CONFIG_ONLY" -eq 0 ]; then
+    command -v flock >/dev/null 2>&1 || fail "flock is required"
+    mkdir -p "$release_dir"
+    exec 9>"$release_dir/.deploy.lock"
+    flock -n 9 || fail "another deployment is already using this runtime root"
+fi
 
 frontend_only_source_guard() {
     [ -f "$release_file" ] || fail "--frontend-only requires a previous successful release: $release_file"
@@ -637,12 +655,14 @@ except subprocess.CalledProcessError as exc:
 
 status = git("status", "--porcelain=v1", "-z", "--untracked-files=all")
 working = []
-for record in status.split("\0"):
+records = iter(status.split("\0"))
+for record in records:
     if not record:
         continue
     path = record[3:] if len(record) >= 3 else record
-    paths = path.split(" -> ") if " -> " in path else [path]
-    working.extend(paths)
+    working.append(path)
+    if "R" in record[:2] or "C" in record[:2]:
+        working.append(next(records))
 
 changed = committed + working
 outside = sorted({path for path in changed if not (path == "frontend" or path.startswith("frontend/"))})
@@ -655,12 +675,26 @@ PY
 
 release_source_commit() {
     [ -f "$release_file" ] || return 1
-    python3 - "$release_file" <<'PY'
+    python3 - "$release_file" "${1:-}" <<'PY'
 import json
+import subprocess
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as handle:
-    value = json.load(handle).get("source_commit", "")
+    release = json.load(handle)
+target = sys.argv[2].replace("-", "_")
+if target:
+    metadata = release.get("images", {}).get(target, {})
+    value = metadata.get("source_commit", "")
+    if not value and metadata.get("reference"):
+        try:
+            image = json.loads(subprocess.check_output(["docker", "image", "inspect", metadata["reference"]],
+                                                      stderr=subprocess.DEVNULL))[0]
+            value = (image["Config"].get("Labels") or {}).get("org.opencontainers.image.revision", "")
+        except (subprocess.CalledProcessError, KeyError, ValueError):
+            value = ""
+else:
+    value = release.get("source_commit", "")
 if value:
     print(value)
 else:
@@ -691,10 +725,11 @@ PY
 
 target_paths() {
     case "$1" in
-        frontend) printf '%s\n' frontend/ ;;
-        backend) printf '%s\n' backend/ ;;
-        postgres) printf '%s\n' deploy/images/postgres/ ;;
-        judge-toolchain|server) printf '%s\n' server/ ;;
+        frontend) printf '%s\n' frontend/ docker-bake.hcl ;;
+        backend) printf '%s\n' backend/ docker-bake.hcl ;;
+        postgres) printf '%s\n' deploy/images/postgres/ docker-bake.hcl .dockerignore ;;
+        judge-toolchain) printf '%s\n' server/Dockerfile docker-bake.hcl .dockerignore ;;
+        server) printf '%s\n' server/ docker-bake.hcl .dockerignore ;;
         *) return 1 ;;
     esac
 }
@@ -735,7 +770,7 @@ target_ref_is_auto() {
 }
 
 target_unchanged_since_release() {
-    previous_commit=$(release_source_commit 2>/dev/null || true)
+    previous_commit=$(release_source_commit "$1" 2>/dev/null || true)
     [ -n "$previous_commit" ] || return 1
     git -C "$ROOT" cat-file -e "$previous_commit^{commit}" >/dev/null 2>&1 || return 1
     target_path_list=$(target_paths "$1") || return 1
@@ -1192,14 +1227,48 @@ frontend_backend_ready() {
         "$http_url/api/website/" >/dev/null
 }
 
+http_response_smoke() (
+    smoke_url=$1
+    smoke_expected_status=$2
+    smoke_expected_content=$3
+    shift 3
+    smoke_body=$(mktemp "$attempt_dir/http-smoke.XXXXXX") || exit 1
+    trap 'rm -f "$smoke_body"' 0
+    trap 'exit 1' HUP INT TERM
+    # Check curl's exit status before inspecting content. Piping a large script
+    # into grep -q closes the download early and triggers spurious curl retries;
+    # it can also hide a truncated response containing the expected header.
+    smoke_status=$(curl --noproxy '*' --fail --silent --show-error \
+        --connect-timeout 10 --max-time 30 --retry-max-time 90 \
+        --retry 15 --retry-all-errors --retry-delay 1 \
+        --output "$smoke_body" --write-out '%{http_code}' "$@" "$smoke_url") || exit 1
+    if [ "$smoke_status" != "$smoke_expected_status" ]; then
+        printf 'HTTP smoke failed: %s returned %s, expected %s\n' \
+            "$smoke_url" "$smoke_status" "$smoke_expected_status" >&2
+        exit 1
+    fi
+    if [ -n "$smoke_expected_content" ] && ! grep -Fq -- "$smoke_expected_content" "$smoke_body"; then
+        printf 'HTTP smoke failed: required content missing from %s\n' "$smoke_url" >&2
+        exit 1
+    fi
+    if [ "$smoke_expected_content" = '"error"' ]; then
+        python3 - "$smoke_body" <<'PY' || exit 1
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as response:
+    body = json.load(response)
+if not isinstance(body, dict) or "error" not in body or body["error"] is not None:
+    raise SystemExit("HTTP smoke failed: API returned an error envelope")
+PY
+    fi
+)
+
 frontend_http_smoke() {
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 "$http_url/" >/dev/null
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 -I "$http_url/admin" | grep -q '301'
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 "$http_url/admin/" >/dev/null
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 "$http_url/api/website/" | grep -q '"error"'
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 "$http_url/runtime-config.js" | grep -q '__XJU_RUNTIME_CONFIG__'
-    curl --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 \
-        "$http_url$REMOTE_USERSCRIPT_URL_PATH" | grep -Fq '// ==UserScript=='
+    http_response_smoke "$http_url/" 200 '' || return 1
+    http_response_smoke "$http_url/admin" 301 '' --head || return 1
+    http_response_smoke "$http_url/admin/" 200 '' || return 1
+    http_response_smoke "$http_url/api/website/" 200 '"error"' || return 1
+    http_response_smoke "$http_url/runtime-config.js" 200 '__XJU_RUNTIME_CONFIG__' || return 1
+    http_response_smoke "$http_url$REMOTE_USERSCRIPT_URL_PATH" 200 '// ==UserScript=='
 }
 
 if [ "$FRONTEND_ONLY" -eq 1 ]; then
@@ -1212,6 +1281,14 @@ else
 
     if [ "$CONFIG_ONLY" -eq 0 ]; then
         run_step backend-bootstrap 'completed|passed' compose --profile init run --rm --no-deps backend-bootstrap
+        backup_before_migrate() {
+            database_backup="$BACKUP_ROOT/pre-migrate-$(date -u +%Y%m%dT%H%M%SZ)-$$.dump"
+            compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$database_backup.partial" || return 1
+            [ -s "$database_backup.partial" ] || return 1
+            mv "$database_backup.partial" "$database_backup"
+            printf '%s\n' "Database backup passed: $database_backup"
+        }
+        run_step database-backup 'passed' backup_before_migrate
         run_step backend-migrate 'Applying |No migrations to apply|Operations to perform|Running migrations:' compose --profile init run --rm --no-deps backend-migrate
 
         token_log="$attempt_dir/backend-configure-token.log"
@@ -1263,7 +1340,7 @@ print("Judge /ping passed")
     heartbeat_attempt=1
     while [ "$heartbeat_attempt" -le 20 ]; do
         if compose exec -T backend-api python manage.py shell -c \
-            'from conf.models import JudgeServer; raise SystemExit(0 if JudgeServer.objects.filter(is_disabled=False).exists() else 1)' >/dev/null 2>&1; then
+            'from datetime import timedelta; from django.utils import timezone; from conf.models import JudgeServer; raise SystemExit(0 if JudgeServer.objects.filter(is_disabled=False, last_heartbeat__gte=timezone.now()-timedelta(seconds=6)).exists() else 1)' >/dev/null 2>&1; then
             heartbeat_ok=1
             break
         fi
@@ -1305,6 +1382,9 @@ fi
 image_id() {
     docker image inspect --format '{{.Id}}' "$1"
 }
+image_revision() {
+    docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$1"
+}
 compose_hash=$(sha256sum "$COMPOSE_FILE" | awk '{print $1}')
 cat > "$attempt_dir/release.json" <<EOF
 {
@@ -1315,15 +1395,16 @@ cat > "$attempt_dir/release.json" <<EOF
     "frontend": "$FRONTEND_BASE_IMAGE"
   },
   "images": {
-    "postgres": {"reference": "$POSTGRES_IMAGE_REF", "image_id": "$(image_id "$POSTGRES_IMAGE_REF")"},
+    "postgres": {"reference": "$POSTGRES_IMAGE_REF", "image_id": "$(image_id "$POSTGRES_IMAGE_REF")", "source_commit": "$(image_revision "$POSTGRES_IMAGE_REF")"},
     "redis": {"reference": "$REDIS_IMAGE_REF", "image_id": "$(image_id "$REDIS_IMAGE_REF")"},
-    "frontend": {"reference": "$FRONTEND_IMAGE_REF", "image_id": "$(image_id "$FRONTEND_IMAGE_REF")"},
-    "backend": {"reference": "$BACKEND_IMAGE_REF", "image_id": "$(image_id "$BACKEND_IMAGE_REF")"},
-    "judge_toolchain": {"reference": "$JUDGE_TOOLCHAIN_IMAGE_REF", "runtime_loaded": false},
-    "server": {"reference": "$JUDGE_IMAGE_REF", "image_id": "$(image_id "$JUDGE_IMAGE_REF")"}
+    "frontend": {"reference": "$FRONTEND_IMAGE_REF", "image_id": "$(image_id "$FRONTEND_IMAGE_REF")", "source_commit": "$(image_revision "$FRONTEND_IMAGE_REF")"},
+    "backend": {"reference": "$BACKEND_IMAGE_REF", "image_id": "$(image_id "$BACKEND_IMAGE_REF")", "source_commit": "$(image_revision "$BACKEND_IMAGE_REF")"},
+    "judge_toolchain": {"reference": "$JUDGE_TOOLCHAIN_IMAGE_REF", "runtime_loaded": false, "source_commit": "$(image_revision "$JUDGE_TOOLCHAIN_IMAGE_REF" 2>/dev/null || true)"},
+    "server": {"reference": "$JUDGE_IMAGE_REF", "image_id": "$(image_id "$JUDGE_IMAGE_REF")", "source_commit": "$(image_revision "$JUDGE_IMAGE_REF")"}
   }
 }
 EOF
+python3 -m json.tool "$attempt_dir/release.json" >/dev/null || fail "invalid release metadata"
 mv "$attempt_dir/release.json" "$release_dir/current.json"
 cp "$release_dir/current.json" "$attempt_dir/release-success.json"
 

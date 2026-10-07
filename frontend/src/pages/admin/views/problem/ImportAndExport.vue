@@ -77,6 +77,7 @@
       <el-upload class="import-upload"
         ref="QDU"
         action="/api/admin/import_problem"
+        :headers="csrfHeaders()"
         name="file"
         accept=".zip,application/zip"
         :file-list="fileList1"
@@ -96,6 +97,7 @@
       <el-upload class="import-upload"
         ref="FPS"
         action="/api/admin/import_fps"
+        :headers="csrfHeaders()"
         name="file"
         :file-list="fileList2"
         :show-file-list="true"
@@ -113,6 +115,7 @@
 </template>
 <script>
   import api from '@admin/api'
+  import { csrfHeaders } from '@/utils/csrf'
   import utils from '@/utils/utils'
   import { collectCodeforcesProblemPage, supportsRemoteProblemImport } from '../../remoteBridge'
 
@@ -145,6 +148,7 @@
       this.getProblems()
     },
     methods: {
+      csrfHeaders,
       handleSelectionChange (val) {
         this.selected_problems = val
       },

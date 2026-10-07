@@ -4,8 +4,8 @@
   <p>A 400+ problem library, local sandbox judging, and browser-assisted remote judging for Nowcoder, Luogu, and Codeforces.</p>
   <p>
     <a href="https://oj.icthub.top"><img alt="OJ status" src="https://img.shields.io/website?url=https%3A%2F%2Foj.icthub.top&up_message=online&down_message=offline&label=OJ"></a>
-    <a href="https://github.com/xjuIcthub/xju-OJ/actions/workflows/publish-release-images.yml"><img alt="Release images" src="https://github.com/xjuIcthub/xju-OJ/actions/workflows/publish-release-images.yml/badge.svg"></a>
-    <a href="https://github.com/xjuIcthub/xju-OJ/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/xjuIcthub/xju-OJ?logo=github"></a>
+    <a href="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml"><img alt="Release images" src="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml/badge.svg"></a>
+    <a href="https://github.com/xju-arlab/xju-OJ/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/xju-arlab/xju-OJ?logo=github"></a>
     <img alt="Vue 3.5.41" src="https://img.shields.io/badge/Vue-3.5.41-42b883?logo=vuedotjs&logoColor=white">
     <img alt="Django 5.2.17" src="https://img.shields.io/badge/Django-5.2.17-092E20?logo=django&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
@@ -38,7 +38,7 @@ Requirements:
 Use the [official Docker Ubuntu installation guide](https://docs.docker.com/engine/install/ubuntu/).
 
 ```bash
-git clone https://github.com/xjuIcthub/xju-OJ.git
+git clone https://github.com/xju-arlab/xju-OJ.git
 cd xju-OJ
 cp .env.example .env
 ./deploy.sh

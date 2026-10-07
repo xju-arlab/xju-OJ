@@ -1,3 +1,4 @@
+import { apiErrorMessage } from './apiError'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import storage from '@/utils/storage'
@@ -45,38 +46,33 @@ function breakLongWords (value, length = 16) {
   return value.replace(re, '$1\n')
 }
 
-function downloadFile (url) {
-  return new Promise((resolve, reject) => {
-    axios.get(url, {responseType: 'blob'}).then(resp => {
-      let headers = resp.headers
-      if (headers['content-type'].indexOf('json') !== -1) {
-        let fr = new window.FileReader()
-        if (resp.data.error) {
-          ElMessage.error(resp.data.error)
-        } else {
-          ElMessage.error('Invalid file format')
-        }
-        fr.onload = (event) => {
-          let data = JSON.parse(event.target.result)
-          if (data.error) {
-            ElMessage.error(data.data)
-          } else {
-            ElMessage.error('Invalid file format')
-          }
-        }
-        let b = new window.Blob([resp.data], {type: 'application/json'})
-        fr.readAsText(b)
-        return
-      }
-      let link = document.createElement('a')
-      link.href = window.URL.createObjectURL(new window.Blob([resp.data], {type: headers['content-type']}))
-      link.download = (headers['content-disposition'] || '').split('filename=')[1]
+async function downloadFile (url) {
+  try {
+    const response = await axios.get(url, {responseType: 'blob'})
+    const type = response.headers['content-type'] || ''
+    if (type.includes('json')) {
+      let message = 'Invalid file format'
+      try {
+        const payload = JSON.parse(await response.data.text())
+        if (typeof payload.data === 'string') message = payload.data
+      } catch {}
+      throw new Error(message)
+    }
+    const link = document.createElement('a')
+    const objectURL = window.URL.createObjectURL(response.data)
+    try {
+      link.href = objectURL
+      link.download = ((response.headers['content-disposition'] || '').split('filename=')[1] || 'download').replace(/^"|"$/g, '')
       document.body.appendChild(link)
       link.click()
+    } finally {
       link.remove()
-      resolve()
-    }).catch(() => {})
-  })
+      window.setTimeout(() => window.URL.revokeObjectURL(objectURL), 1000)
+    }
+  } catch (error) {
+    ElMessage.error(apiErrorMessage(error))
+    throw error
+  }
 }
 
 function getLanguages () {
@@ -84,6 +80,7 @@ function getLanguages () {
     let languages = storage.get(STORAGE_KEY.languages)
     if (languages) {
       resolve(languages)
+      return
     }
     ojAPI.getLanguages().then(res => {
       let languages = res.data.data.languages

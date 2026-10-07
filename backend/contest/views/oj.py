@@ -185,7 +185,7 @@ class ContestRankAPI(APIView):
         if download_csv:
             data = serializer(qs, many=True, is_contest_admin=is_contest_admin).data
             contest_problems = Problem.objects.filter(contest=self.contest, visible=True).order_by("_id")
-            problem_ids = [item.id for item in contest_problems]
+            problem_columns = {str(item.id): index for index, item in enumerate(contest_problems)}
 
             f = io.BytesIO()
             workbook = xlsxwriter.Workbook(f)
@@ -203,7 +203,8 @@ class ContestRankAPI(APIView):
                     worksheet.write_string(index + 1, 2, item["user"]["real_name"] or "")
                     worksheet.write_string(index + 1, 3, str(item["total_score"]))
                     for k, v in item["submission_info"].items():
-                        worksheet.write_string(index + 1, 4 + problem_ids.index(int(k)), str(v))
+                        if str(k) in problem_columns:
+                            worksheet.write_string(index + 1, 4 + problem_columns[str(k)], str(v))
             else:
                 worksheet.write("D1", "AC")
                 worksheet.write("E1", "Total Submission")
@@ -219,7 +220,8 @@ class ContestRankAPI(APIView):
                     worksheet.write_string(index + 1, 4, str(item["submission_number"]))
                     worksheet.write_string(index + 1, 5, str(item["total_time"]))
                     for k, v in item["submission_info"].items():
-                        worksheet.write_string(index + 1, 6 + problem_ids.index(int(k)), str(v["is_ac"]))
+                        if str(k) in problem_columns:
+                            worksheet.write_string(index + 1, 6 + problem_columns[str(k)], str(v["is_ac"]))
 
             workbook.close()
             f.seek(0)

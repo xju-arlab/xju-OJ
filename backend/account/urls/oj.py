@@ -8,7 +8,7 @@ from ..views.oj import (ApplyResetPasswordAPI, ResetPasswordAPI,
                         ProfileProblemDisplayIDRefreshAPI, OpenAPIAppkeyAPI, SSOAPI)
 
 from utils.captcha.views import CaptchaAPIView
-from ..oidc import ProvidersAPI, oidc_callback, oidc_link, oidc_login, oidc_logout
+from ..oidc import LegacyEmailLinkAPI, ProvidersAPI, oidc_callback, oidc_link, oidc_login, oidc_logout
 
 urlpatterns = [
     re_path(r"^login/?$", UserLoginAPI.as_view(), name="user_login_api"),
@@ -33,5 +33,6 @@ urlpatterns = [
     re_path(r"^auth/oidc/login/?$", oidc_login, name="oidc_login"),
     re_path(r"^auth/oidc/callback/?$", oidc_callback, name="oidc_callback"),
     re_path(r"^auth/oidc/link/?$", oidc_link, name="oidc_link"),
+    re_path(r"^auth/oidc/legacy-email-link/?$", LegacyEmailLinkAPI.as_view(), name="oidc_legacy_email_link"),
     re_path(r"^auth/oidc/logout/?$", oidc_logout, name="oidc_logout"),
 ]

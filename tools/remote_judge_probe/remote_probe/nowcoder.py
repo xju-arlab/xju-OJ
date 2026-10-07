@@ -225,7 +225,7 @@ class NowcoderProvider:
                 timeout=20,
             )
         except requests.RequestException as exc:
-            raise ProbeError(f"牛客结果查询失败: {exc}") from exc
+            raise ProbeError("牛客结果查询失败，请检查网络后重试查询") from None
         data = response_json(response, "牛客判题结果接口")
         if data.get("code") not in {0, "0", None}:
             message = str(data.get("msg") or f"牛客查询失败，code={data.get('code')}")

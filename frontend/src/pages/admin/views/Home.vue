@@ -25,7 +25,7 @@
     <div class="content-app">
       <router-view v-slot="{ Component }">
         <transition name="fadeInUp" mode="out-in">
-          <component :is="Component"></component>
+          <component :is="Component" :key="$route.path"></component>
         </transition>
       </router-view>
       <div class="footer">

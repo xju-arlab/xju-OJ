@@ -38,7 +38,7 @@
             <div class="contest-main">
               <p class="title">
                 <a class="entry" @click.stop="goContest(contest)">{{contest.title}}</a>
-                <Icon v-if="contest.contest_type != 'Public'" type="ios-locked-outline" size="16"></Icon>
+                <Icon v-if="contest.contest_type != 'Public' && !isEnded(contest)" type="ios-locked-outline" size="16"></Icon>
               </p>
               <ul class="detail">
                 <li><Icon type="calendar" />{{ $filters.localtime(contest.start_time, 'YYYY-M-D HH:mm') }}</li>
@@ -154,6 +154,9 @@
         if (value === '1') return 'status-not-started'
         if (value === '-1') return 'status-ended'
         return 'status-underway'
+      },
+      isEnded (contest) {
+        return String(contest.status) === '-1'
       },
       ruleClass (rule) {
         return String(rule).toUpperCase() === 'OI' ? 'rule-oi' : 'rule-acm'

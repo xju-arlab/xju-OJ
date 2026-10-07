@@ -70,3 +70,6 @@ test.vue
 vendor-manifest.json
 vendor.dll*.js
 
+# Browser test output may contain local session data.
+test-results/
+playwright-report/

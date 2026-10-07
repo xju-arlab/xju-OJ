@@ -103,11 +103,11 @@ class ContestProblemAPI(APIView):
             if not request.user.is_contest_admin(self.contest):
                 if self.contest.status == ContestStatus.CONTEST_NOT_START:
                     return self.error("Contest has not started yet.")
-                if self.contest.status != ContestStatus.CONTEST_ENDED and not self.contest.is_registered(request.user):
-                    return self.error("Please register for the contest first")
-                if (self.contest.status != ContestStatus.CONTEST_ENDED
-                        and self.contest.password
-                        and not self.contest.is_registered(request.user)):
+                # Before the deadline a non-registered user cannot open the
+                # problem detail (the password gate is part of registration).
+                # Once the contest ends it becomes public practice material.
+                if self.contest.status != ContestStatus.CONTEST_ENDED and \
+                        not self.contest.is_registered(request.user):
                     return self.error("Please register for the contest first")
             try:
                 problem = Problem.objects.select_related("created_by").get(_id=problem_id,

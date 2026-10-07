@@ -13,8 +13,8 @@ class FPSParser(object):
     def __init__(self, fps_path=None, string_data=None):
         if fps_path:
             self._etree = ET.parse(fps_path).getroot()
-        elif string_data:
-            self._ertree = ET.fromstring(string_data).getroot()
+        elif string_data is not None:
+            self._etree = ET.fromstring(string_data)
         else:
             raise ValueError("You must tell me the file path or directly give me the data for the file")
         version = self._etree.attrib.get("version", "No Version")
@@ -85,38 +85,47 @@ class FPSParser(object):
             elif tag == "sample_input":
                 if not sample_start:
                     raise ValueError("Invalid xml, error 'sample_input' tag order")
-                problem["samples"].append({"input": item.text, "output": None})
+                problem["samples"].append({"input": item.text or "", "output": None})
                 sample_start = False
             elif tag == "sample_output":
                 if sample_start:
                     raise ValueError("Invalid xml, error 'sample_output' tag order")
-                problem["samples"][-1]["output"] = item.text
+                problem["samples"][-1]["output"] = item.text or ""
                 sample_start = True
             elif tag == "test_input":
                 if not test_case_start:
                     raise ValueError("Invalid xml, error 'test_input' tag order")
-                problem["test_cases"].append({"input": item.text, "output": None})
+                problem["test_cases"].append({"input": item.text or "", "output": None})
                 test_case_start = False
             elif tag == "test_output":
                 if test_case_start:
                     raise ValueError("Invalid xml, error 'test_output' tag order")
-                problem["test_cases"][-1]["output"] = item.text
+                problem["test_cases"][-1]["output"] = item.text or ""
                 test_case_start = True
 
+        if not sample_start or (not test_case_start and not problem["spj"]):
+            raise ValueError("Unpaired input/output in FPS document")
+        if problem["memory_limit"]["unit"] == "KB":
+            problem["memory_limit"]["value"] = (problem["memory_limit"]["value"] + 1023) // 1024
+            problem["memory_limit"]["unit"] = "MB"
         return problem
 
 
 class FPSHelper(object):
-    def save_image(self, problem, base_dir, base_url):
+    def save_image(self, problem, base_dir, base_url, created_files=None):
         _problem = copy.deepcopy(problem)
         for img in _problem["images"]:
             name = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(12))
             ext = os.path.splitext(img["src"])[1]
             file_name = name + ext
-            with open(os.path.join(base_dir, file_name), "wb") as f:
+            destination = os.path.join(base_dir, file_name)
+            with open(destination, "xb") as f:
+                if created_files is not None:
+                    created_files.append(destination)
                 f.write(img["blob"])
+                os.fchmod(f.fileno(), 0o644)
             for item in ["description", "input", "output"]:
-                _problem[item] = _problem[item].replace(img["src"], os.path.join(base_url, file_name))
+                _problem[item] = (_problem[item] or "").replace(img["src"], os.path.join(base_url, file_name))
         return _problem
 
     # {
@@ -134,15 +143,18 @@ class FPSHelper(object):
     def save_test_case(self, problem, base_dir):
         spj = problem.get("spj", {})
         test_cases = {}
+        if not problem["test_cases"]:
+            raise ValueError("FPS problem has no test cases")
         for index, item in enumerate(problem["test_cases"]):
-            input_content = item.get("input")
-            output_content = item.get("output")
-            if input_content:
-                with open(os.path.join(base_dir, str(index + 1) + ".in"), "w", encoding="utf-8") as f:
-                    f.write(input_content)
-            if output_content:
-                with open(os.path.join(base_dir, str(index + 1) + ".out"), "w", encoding="utf-8") as f:
+            input_content = (item.get("input") or "").encode("utf-8")
+            output_content = (item.get("output") or "").encode("utf-8")
+            with open(os.path.join(base_dir, str(index + 1) + ".in"), "wb") as f:
+                f.write(input_content)
+                os.fchmod(f.fileno(), 0o640)
+            if not spj:
+                with open(os.path.join(base_dir, str(index + 1) + ".out"), "wb") as f:
                     f.write(output_content)
+                    os.fchmod(f.fileno(), 0o640)
             if spj:
                 one_info = {
                     "input_size": len(input_content),
@@ -154,15 +166,16 @@ class FPSHelper(object):
                     "input_name": f"{index + 1}.in",
                     "output_size": len(output_content),
                     "output_name": f"{index + 1}.out",
-                    "stripped_output_md5": hashlib.md5(output_content.rstrip().encode("utf-8")).hexdigest()
+                    "stripped_output_md5": hashlib.md5(output_content.rstrip()).hexdigest()
                 }
-            test_cases[index] = one_info
+            test_cases[str(index + 1)] = one_info
         info = {
             "spj": True if spj else False,
             "test_cases": test_cases
         }
         with open(os.path.join(base_dir, "info"), "w", encoding="utf-8") as f:
             f.write(json.dumps(info, indent=4))
+            os.fchmod(f.fileno(), 0o640)
         return info
 
 

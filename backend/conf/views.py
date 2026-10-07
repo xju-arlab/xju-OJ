@@ -36,8 +36,7 @@ class SMTPAPI(APIView):
         smtp = SysOptions.smtp_config
         if not smtp:
             return self.success(None)
-        smtp.pop("password")
-        return self.success(smtp)
+        return self.success({key: value for key, value in smtp.items() if key != "password"})
 
     @super_admin_required
     @validate_serializer(CreateSMTPConfigSerializer)
@@ -48,11 +47,13 @@ class SMTPAPI(APIView):
     @super_admin_required
     @validate_serializer(EditSMTPConfigSerializer)
     def put(self, request):
-        smtp = SysOptions.smtp_config
+        smtp = dict(SysOptions.smtp_config or {})
+        if not smtp:
+            return self.error("Please setup SMTP config at first")
         data = request.data
         for item in ["server", "port", "email", "tls"]:
             smtp[item] = data[item]
-        if "password" in data:
+        if data.get("password"):
             smtp["password"] = data["password"]
         SysOptions.smtp_config = smtp
         return self.success()
@@ -146,7 +147,8 @@ class JudgeServerHeartbeatAPI(CSRFExemptAPIView):
             server.service_url = data["service_url"]
             server.ip = request.ip
             server.last_heartbeat = timezone.now()
-            server.save(update_fields=["judger_version", "cpu_core", "memory_usage", "service_url", "ip", "last_heartbeat"])
+            server.save(update_fields=["judger_version", "cpu_core", "memory_usage", "cpu_usage",
+                                       "service_url", "ip", "last_heartbeat"])
         except JudgeServer.DoesNotExist:
             JudgeServer.objects.create(hostname=data["hostname"],
                                        judger_version=data["judger_version"],
@@ -169,6 +171,10 @@ class LanguagesAPI(APIView):
 
 
 class TestCasePruneAPI(APIView):
+    # Uploaded random IDs and provisioned demo IDs are both supported. Only a
+    # single directory name is accepted; dot paths and separators are forbidden.
+    test_case_id_pattern = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
+
     @super_admin_required
     def get(self, request):
         """
@@ -178,34 +184,44 @@ class TestCasePruneAPI(APIView):
         dir_to_be_removed = self.get_orphan_ids()
 
         # return an iterator
-        for d in os.scandir(settings.TEST_CASE_DIR):
-            if d.name in dir_to_be_removed:
-                ret_data.append({"id": d.name, "create_time": d.stat().st_mtime})
+        with os.scandir(settings.TEST_CASE_DIR) as directories:
+            for d in directories:
+                if d.name in dir_to_be_removed and d.is_dir(follow_symlinks=False):
+                    ret_data.append({"id": d.name, "create_time": d.stat(follow_symlinks=False).st_mtime})
         return self.success(ret_data)
 
     @super_admin_required
     def delete(self, request):
         test_case_id = request.GET.get("id")
-        if test_case_id:
-            self.delete_one(test_case_id)
-            return self.success()
-        for id in self.get_orphan_ids():
-            self.delete_one(id)
+        try:
+            for candidate in [test_case_id] if test_case_id else self.get_orphan_ids():
+                self.delete_one(candidate)
+        except ValueError as exc:
+            return self.error(str(exc))
+        except OSError:
+            return self.error("Unable to remove test case directory")
         return self.success()
 
-    @staticmethod
-    def get_orphan_ids():
-        db_ids = Problem.objects.all().values_list("test_case_id", flat=True)
-        disk_ids = os.listdir(settings.TEST_CASE_DIR)
-        test_case_re = re.compile(r"^[a-zA-Z0-9]{32}$")
-        disk_ids = filter(lambda f: test_case_re.match(f), disk_ids)
-        return list(set(disk_ids) - set(db_ids))
+    @classmethod
+    def get_orphan_ids(cls):
+        db_ids = set(Problem.objects.values_list("test_case_id", flat=True))
+        with os.scandir(settings.TEST_CASE_DIR) as directories:
+            return sorted(d.name for d in directories
+                          if cls.test_case_id_pattern.fullmatch(d.name)
+                          and d.is_dir(follow_symlinks=False) and d.name not in db_ids)
 
-    @staticmethod
-    def delete_one(id):
-        test_case_dir = os.path.join(settings.TEST_CASE_DIR, id)
-        if os.path.isdir(test_case_dir):
-            shutil.rmtree(test_case_dir, ignore_errors=True)
+    @classmethod
+    def delete_one(cls, test_case_id):
+        if not cls.test_case_id_pattern.fullmatch(test_case_id):
+            raise ValueError("Invalid test case id")
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
+        if os.path.islink(test_case_dir) or not os.path.isdir(test_case_dir):
+            raise ValueError("Test case directory does not exist or is not a regular directory")
+        # Recheck even for IDs returned by the listing: copies of a problem can
+        # share test data, and the list shown in the browser may be stale.
+        if Problem.objects.filter(test_case_id=test_case_id).exists():
+            raise ValueError("Test case is still used by a problem")
+        shutil.rmtree(test_case_dir)
 
 
 class ReleaseNotesAPI(APIView):

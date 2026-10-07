@@ -4,11 +4,13 @@
       <div class="summary-status-row">
         <span class="summary-label">{{ $t('m.Status') }}</span>
         <span :class="['judge-status-badge', `is-${status.type}`]">
-          {{ $t('m.' + status.statusName.replace(/ /g, '_')) }}
+          {{ status.label }}
         </span>
       </div>
 
-      <pre v-if="isCE" class="compile-error-output">{{submission.statistic_info.err_info}}</pre>
+      <RemoteSubmissionNotice :submission="submission" @updated="getSubmission" />
+
+      <pre v-if="isCE" class="compile-error-output">{{submission.statistic_info.err_info || submission.remote_message}}</pre>
       <div v-else class="submission-metrics">
         <div class="submission-metric">
           <span>{{ $t('m.Time') }}</span>
@@ -79,11 +81,13 @@
   import {JUDGE_STATUS} from '@/utils/constants'
   import utils from '@/utils/utils'
   import Highlight from '@/pages/oj/components/Highlight'
+  import RemoteSubmissionNotice from '@oj/components/RemoteSubmissionNotice.vue'
+  import { isSubmissionPending, submissionStatus } from '@oj/submissionStatus'
 
   export default {
     name: 'submissionDetails',
     components: {
-      Highlight
+      Highlight, RemoteSubmissionNotice
     },
     data () {
       return {
@@ -133,7 +137,9 @@
         isConcat: false,
         loading: false,
         codeCopied: false,
-        copyResetTimer: null
+        copyResetTimer: null,
+        refreshTimer: null,
+        disposed: false
       }
     },
     mounted () {
@@ -141,9 +147,14 @@
     },
     methods: {
       getSubmission () {
+        if (this.loading || this.disposed) return
+        clearTimeout(this.refreshTimer)
+        const id = this.$route.params.id
         this.loading = true
-        api.getSubmission(this.$route.params.id).then(res => {
+        api.getSubmission(id).then(res => {
           this.loading = false
+          if (this.disposed) return
+          if (id !== this.$route.params.id) { this.getSubmission(); return }
           let data = res.data.data
           if (data.info && Array.isArray(data.info.data) && data.info.data.length && !this.isConcat) {
             // score exist means the submission is OI problem submission
@@ -176,8 +187,11 @@
             }
           }
           this.submission = data
+          if (isSubmissionPending(data)) this.refreshTimer = setTimeout(this.getSubmission, 3000)
         }, () => {
           this.loading = false
+          if (!this.disposed && id !== this.$route.params.id) { this.getSubmission(); return }
+          if (!this.disposed) this.refreshTimer = setTimeout(this.getSubmission, 10000)
         })
       },
       shareSubmission (shared) {
@@ -222,11 +236,7 @@
     },
     computed: {
       status () {
-        const status = JUDGE_STATUS[this.submission.result] || JUDGE_STATUS['6']
-        return {
-          type: status.type || 'info',
-          statusName: status.name
-        }
+        return submissionStatus(this.submission, this.$t)
       },
       testCaseRows () {
         return this.submission.info && Array.isArray(this.submission.info.data)
@@ -241,8 +251,11 @@
       }
     },
     beforeUnmount () {
+      this.disposed = true
+      clearTimeout(this.refreshTimer)
       clearTimeout(this.copyResetTimer)
-    }
+    },
+    watch: { '$route.params.id' () { this.getSubmission() } }
   }
 </script>
 

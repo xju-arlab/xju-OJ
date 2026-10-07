@@ -18,7 +18,7 @@
                 <div class="contest-title-badges">
                   <span :class="['contest-rule', ruleClass]">{{contest.rule_type || 'ACM'}}</span>
                   <span :class="['contest-status', statusClass]">{{statusLabel}}</span>
-                  <span v-if="contest.contest_type && contest.contest_type !== 'Public'" class="contest-private">
+                  <span v-if="contest.contest_type && contest.contest_type !== 'Public' && !contestEnded" class="contest-private">
                     <Icon type="ios-locked-outline" />
                     {{contestTypeLabel}}
                   </span>
@@ -178,6 +178,9 @@
       },
       isProblemRoute () {
         return this.routeName === 'contest-problem-details'
+      },
+      contestEnded () {
+        return this.contestStatus === CONTEST_STATUS.ENDED
       },
       tabs () {
         const common = { contestID: this.contestID }

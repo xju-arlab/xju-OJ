@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+import tempfile
 import warnings
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -201,21 +202,21 @@ def require_confirmed(confirmed: bool) -> None:
 
 
 def write_private_json(path: str, data: dict[str, Any]) -> Path:
-    output = Path(path).expanduser().resolve()
+    output = Path(path).expanduser().absolute()
+    if output.is_symlink():
+        raise ProbeError("凭据文件不能是符号链接")
     output.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    descriptor = os.open(output, flags, 0o600)
+    descriptor, temporary = tempfile.mkstemp(prefix=".credentials-", dir=output.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
-    except Exception:
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass
-        raise
-    os.chmod(output, 0o600)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, output)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
     return output
 
 

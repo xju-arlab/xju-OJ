@@ -21,11 +21,17 @@ class CacheProxy:
     def rpop(self, key):
         return self._redis().rpop(key)
 
+    def rpush(self, key, *values):
+        return self._redis().rpush(key, *values)
+
     def hget(self, key, field):
         return self._redis().hget(key, field)
 
     def hset(self, key, field, value):
         return self._redis().hset(key, field, value)
+
+    def eval(self, script, numkeys, *args):
+        return self._redis().eval(script, numkeys, *args)
 
     def redis_incr(self, key, count=1):
         """Increment a raw Redis key, creating it when absent."""

@@ -16,7 +16,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  NAMESPACE: xjuicthub
+  NAMESPACE: ${{ github.repository_owner }}
   TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.66.0@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e
 
 jobs:
