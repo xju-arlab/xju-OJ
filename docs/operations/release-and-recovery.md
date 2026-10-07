@@ -13,6 +13,26 @@ git pull --ff-only origin main
 
 每次全栈迁移前，数据库以 `pg_dump -Fc` 保存到私有 `BACKUP_ROOT`，成功后才执行迁移。失败留下 `.partial`，不会当作完整备份。数据库备份不包含题目测试文件、头像、Redis 和外部密钥；涉及数据迁移或恢复时还需独立保护这些资产。禁止 `docker compose down -v`，禁止清空判题队列。
 
+## GitHub 网络受限时
+
+2026-10-07 验收时，huawei1 原有 Git 代理 `127.0.0.1:10808` 没有监听，GitHub HTTPS 直连也超时。本次发布通过 SSH 转发运维工作站已有的本地 HTTP 代理完成拉取；代理可用性属于发布前置条件，不影响已运行的 OJ。
+
+如果工作站的 `127.0.0.1:10808` 确实提供可访问 GitHub 的 HTTP 代理，可在工作站保持以下独立连接：
+
+```sh
+ssh -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes \
+  -N -R 127.0.0.1:19480:127.0.0.1:10808 huawei1
+```
+
+在服务器的主检出目录中，仅为本次 Git 命令覆盖代理：
+
+```sh
+git -c http.proxy=http://127.0.0.1:19480 \
+  -c http.lowSpeedLimit=100 -c http.lowSpeedTime=20 pull --ff-only origin main
+```
+
+完成后在工作站按 Ctrl-C 关闭该独立连接。转发只监听服务器回环地址；不要把临时端口写入长期 Git 配置或业务容器环境。没有可用代理时应先恢复网络出口，保留当前服务，不用来源不明的镜像站替换仓库。
+
 ## 判题宿主机
 
 Java 和文件 IO 的写入隔离要求宿主支持 Landlock ABI 3 或更高版本。容器内核来自宿主，升级判题镜像不能补足旧内核能力。全栈部署和 `--dry-run` 在构建前运行 `deploy/ops/check-judge-host.py`；`--frontend-only` 与只解析配置的 `--config-only` 不执行此检查。

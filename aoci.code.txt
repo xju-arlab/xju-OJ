@@ -342,7 +342,7 @@ dev-frontend.md[SV6T]: F:说明Vite宿主运行与Docker后端协同的快速开
 problem-zip-import.md[SB6T]: F:定义单题、嵌套批量及旧目录题包格式与导入回滚边界 | R:code:backend/problem/views/admin.py | A:problem.json；testcase目录 | S:包内display_id忽略，公开编号由OJ分配；整批失败回滚数据库和本次文件
 remote-oj-bridge.md[SN7S]: F:说明浏览器远程判题安装、持久事件确认、恢复和验收流程 | R:code:frontend/static/userscripts/xju-oj-remote-bridge.user.js,code:backend/submission/remote.py | A:/remote-bridge；恢复API；normalize_remote_acm_verdicts | S:第三方凭据留浏览器；已知ID恢复只查询；客户端事件可伪造，不能独立证明正式排名成绩
 audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、代码和宿主问题修复及自动化验证范围 | R:code:docs/operations/acceptance-2026-10-07.md,code:.github/workflows/regression.yml | A:2026年10月审计记录 | S:索引覆盖不等于测试覆盖；线上结果另见验收记录；外部账号链路未实测，远程成绩仍由客户端上报
-release-and-recovery.md[SO7T]: F:规定统一发布、宿主能力与重启排空、代理信任及备份恢复步骤 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:可信代理取frontend实际来源；dump不含文件和Redis；有新写入不能直接回旧备份；手工停止的unless-stopped容器重启宿主后仍需显式启动
+release-and-recovery.md[SO7T]: F:规定统一发布、临时Git网络访问、宿主能力与排空重启及备份恢复 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:Git转发仅回环且代理按命令覆盖；可信入口按frontend实际来源；dump不含文件和Redis；有新写入不可直接回旧备份；手停unless-stopped须显式恢复
 acceptance-2026-10-07.md[SQ7T]: F:记录统一发布、备份恢复、HWE升级及真实20分钟比赛与补题验收证据 | R:code:docs/operations/audit-2026-10.md,code:deploy/ops/check-judge-host.py | A:2026年10月7日线上验收记录 | S:测试使用受控会话，外部登录邮件和第三方提交未实测；52项检查不代表全分支覆盖；测试账号已停用且对象隐藏，21条合成提交仍保留
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/plans/feiyue-style-migration/===

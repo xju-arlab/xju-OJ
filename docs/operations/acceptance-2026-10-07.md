@@ -7,6 +7,7 @@
 - `12c8060` 整合审计修复；`eebe48c` 修复 CI 的工作区上下文。
 - [GitHub 回归 37638090781](https://github.com/xju-arlab/xju-OJ/actions/runs/37638090781) 的 frontend、backend、deployment-and-judge-contracts、judge-runtime 全部通过。
 - huawei1 于 `2026-10-07T15:35:02Z` 完成应用发布；前端、API/Worker、JudgeServer 均来自 `eebe48c`。PostgreSQL、Redis 和语言工具链继续使用已记录的原版本。
+- 宿主检查及验收文档提交 `9314161` 于 `16:31:31Z` 发布，复用上述已验收的应用镜像；[该提交的四组 CI](https://github.com/xju-arlab/xju-OJ/actions/runs/37652511288) 全部通过。服务器拉取使用临时 SSH 代理；既有代理未运行及 GitHub 直连超时的处理步骤见[发布与恢复](release-and-recovery.md#github-网络受限时)，未修改全局 Git 代理配置。
 - 生产 Compose 服务的工作目录统一为 `/home/winbeau/xju-OJ`，项目名仍为 `xju-oj`。六个业务服务加独立 Caddy，API 与 Worker 是有意拆分的两个服务。
 - `xyqwq/xju-OJ` 的修复此前已由 `5546217` 合入，未重复合并。服务器旧改动保存在本地归档分支 `archive/huawei1-pre-audit-20261007`（`9920471`），没有推送私有运行资产。
 - 验收完成后移除了已无运行引用且工作树干净的 `/home/winbeau/xju-OJ-release13`，保留 `deploy/contest13-20260930` 分支和旧现场归档。生产只保留主目录检出。
