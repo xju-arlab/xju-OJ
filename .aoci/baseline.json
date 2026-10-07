@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-07T14:33:19Z",
+  "updated_at": "2026-10-07T16:29:17Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -53,21 +53,21 @@
     },
     "README.en.md": {
       "role": "index",
-      "sha256": "07b40f30e5b24bbd94201d8ef3b7faa31dae04b4c68cbfcdc90b19ab33981bfa",
-      "size": 5280,
-      "normalized_sha256": "07b40f30e5b24bbd94201d8ef3b7faa31dae04b4c68cbfcdc90b19ab33981bfa"
+      "sha256": "8a30188fa2b148b640523093a431c0a1858ef75cfbd319d6232de835c55276d7",
+      "size": 5776,
+      "normalized_sha256": "8a30188fa2b148b640523093a431c0a1858ef75cfbd319d6232de835c55276d7"
     },
     "README.md": {
       "role": "index",
-      "sha256": "56b13a2f174ef7d68173747dce23507635540cb994ce51aeb8a4ad8c2c732240",
-      "size": 8934,
-      "normalized_sha256": "56b13a2f174ef7d68173747dce23507635540cb994ce51aeb8a4ad8c2c732240"
+      "sha256": "c9b122084ce66d291d1d6ae2ee28f99de0db1854277644ec0c725d31e6c13f1d",
+      "size": 9279,
+      "normalized_sha256": "c9b122084ce66d291d1d6ae2ee28f99de0db1854277644ec0c725d31e6c13f1d"
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "8b4b4fceb72a25826a8a8833dc0db2552752a3574233d17b56381805e2e17f6a",
-      "size": 154117,
-      "normalized_sha256": "8b4b4fceb72a25826a8a8833dc0db2552752a3574233d17b56381805e2e17f6a"
+      "sha256": "6300b7061781bad95618ee3e8ad2bce7eb7122b98e2642a854d792be1f5d4b4c",
+      "size": 155253,
+      "normalized_sha256": "6300b7061781bad95618ee3e8ad2bce7eb7122b98e2642a854d792be1f5d4b4c"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1492,9 +1492,9 @@
     },
     "deploy.sh": {
       "role": "index",
-      "sha256": "43c8de91b283e1763cb64acebc338fed7947240d55ed3ea93bc87d0ca80ef859",
-      "size": 59892,
-      "normalized_sha256": "43c8de91b283e1763cb64acebc338fed7947240d55ed3ea93bc87d0ca80ef859"
+      "sha256": "17e617fe129f39c5f8bf3d03f508917f08faf1f14b404eb7c2ded9fab23b13d8",
+      "size": 60020,
+      "normalized_sha256": "17e617fe129f39c5f8bf3d03f508917f08faf1f14b404eb7c2ded9fab23b13d8"
     },
     "deploy/images/postgres/Dockerfile": {
       "role": "index",
@@ -1513,6 +1513,12 @@
       "sha256": "8e63a77895f8c84aefc230de777a63ace68751a48928c5389d668f98699f6886",
       "size": 2985,
       "normalized_sha256": "8e63a77895f8c84aefc230de777a63ace68751a48928c5389d668f98699f6886"
+    },
+    "deploy/ops/check-judge-host.py": {
+      "role": "index",
+      "sha256": "c0360b2d37b97405f3869b51dfab0fa20f22b42bb1295fbd1b1826305ab56214",
+      "size": 1512,
+      "normalized_sha256": "c0360b2d37b97405f3869b51dfab0fa20f22b42bb1295fbd1b1826305ab56214"
     },
     "deploy/ops/inventory.sh": {
       "role": "index",
@@ -1537,6 +1543,12 @@
       "sha256": "340503281de2e7a9e4b1aa894bbc61dc9abcb481d00b6265c461e15044aecfff",
       "size": 3960,
       "normalized_sha256": "340503281de2e7a9e4b1aa894bbc61dc9abcb481d00b6265c461e15044aecfff"
+    },
+    "deploy/tests/judge_host_test.py": {
+      "role": "observe",
+      "sha256": "06eec6a0a0241401f098dfb2f6a76944e5bfb38f70b192fd2016fb1979c3d0f4",
+      "size": 1984,
+      "normalized_sha256": "06eec6a0a0241401f098dfb2f6a76944e5bfb38f70b192fd2016fb1979c3d0f4"
     },
     "deploy/tests/runtime_config_test.py": {
       "role": "observe",
@@ -1706,11 +1718,17 @@
       "size": 7240,
       "normalized_sha256": "6cf65fa82e279c9ac04841d619e4876775d768229133b2c5d40a97922c3a7125"
     },
+    "docs/operations/acceptance-2026-10-07.md": {
+      "role": "index",
+      "sha256": "82079fe415ed14531ecdb37f2c05d9a5cfa0c5b641042b0b783a589eddf871c1",
+      "size": 7354,
+      "normalized_sha256": "82079fe415ed14531ecdb37f2c05d9a5cfa0c5b641042b0b783a589eddf871c1"
+    },
     "docs/operations/audit-2026-10.md": {
       "role": "index",
-      "sha256": "601a44ec1934d1f9bfb193344e7a451effa13b64373c396ba3a46447b714a72b",
-      "size": 5581,
-      "normalized_sha256": "601a44ec1934d1f9bfb193344e7a451effa13b64373c396ba3a46447b714a72b"
+      "sha256": "ce18273c9e86155d575fe0babd80399871fc29d4ecaddd943615d3583d2861a5",
+      "size": 5837,
+      "normalized_sha256": "ce18273c9e86155d575fe0babd80399871fc29d4ecaddd943615d3583d2861a5"
     },
     "docs/operations/demo-problems.md": {
       "role": "index",
@@ -1732,9 +1750,9 @@
     },
     "docs/operations/release-and-recovery.md": {
       "role": "index",
-      "sha256": "b18e29499b0204e2ec5279f8a3246f78af84cf22e808fb268cf2bc88e3f6fdae",
-      "size": 2287,
-      "normalized_sha256": "b18e29499b0204e2ec5279f8a3246f78af84cf22e808fb268cf2bc88e3f6fdae"
+      "sha256": "c79f29ad4fdbfc50b609a0627e53977b0405b9f1768de6dc4b285e19452d9a0b",
+      "size": 3501,
+      "normalized_sha256": "c79f29ad4fdbfc50b609a0627e53977b0405b9f1768de6dc4b285e19452d9a0b"
     },
     "docs/operations/remote-oj-bridge.md": {
       "role": "index",

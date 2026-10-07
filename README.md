@@ -26,13 +26,14 @@
 - **现代全栈架构**：Vue 3、Vite 8、Django 5.2、PostgreSQL 18、Redis 8，提供统一 Docker Compose 部署入口。
 - **安全账户体系**：支持 Authentik OIDC、会话管理、个人资料和独立管理后台。
 
-维护说明：[发布与恢复](docs/operations/release-and-recovery.md)、[2026-10 审计与回归范围](docs/operations/audit-2026-10.md)。
+维护说明：[发布与恢复](docs/operations/release-and-recovery.md)、[2026-10 审计与回归范围](docs/operations/audit-2026-10.md)、[线上 20 分钟测试赛验收](docs/operations/acceptance-2026-10-07.md)。
 
 ## 一键安装
 
 ### 环境要求
 
 - Ubuntu 22.04 或更新版本，`linux/amd64`
+- 宿主内核必须启用 Landlock ABI 3 或更高版本，供 Java 和文件 IO 沙箱使用。Ubuntu 22.04 默认的 5.15 内核不满足要求，需安装官方 HWE 6.8 内核并重启；`./deploy.sh --dry-run` 会在构建和服务变更前检查实际能力。
 - Docker Engine
 - Docker Compose v2
 - Docker Buildx

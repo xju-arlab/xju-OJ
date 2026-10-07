@@ -877,6 +877,10 @@ fi
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 docker info >/dev/null 2>&1 || fail "docker daemon is unavailable"
 
+if [ "$FRONTEND_ONLY" -eq 0 ]; then
+    python3 "$ROOT/deploy/ops/check-judge-host.py" || fail "judge host is incompatible"
+fi
+
 if [ "$DRY_RUN" -eq 1 ]; then
     case "$DEPLOY_MODE" in
         build) docker buildx version >/dev/null 2>&1 || fail "docker buildx is required for build mode" ;;

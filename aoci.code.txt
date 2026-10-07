@@ -6,11 +6,11 @@
 .gitattributes[FV3T]: F:为导入的三个上游源码树保留历史空白检查兼容性 | R:- | A:backend/**；frontend/**；server/** | S:这里只关闭空白告警，不执行换行转换
 .gitignore[FS6T]: F:排除环境配置、凭据、评测数据、运行资产和机器绑定的MCP配置 | R:code:.env.example | A:Git ignore patterns | S:忽略.env及其变体但保留.env.example；已跟踪文件仍须独立审查
 AGENTS.md[SG7S]: F:规定前端开发桥、提交校验与AOCI认知和维护合同 | R:code:compose.dev.yaml,code:deploy.sh | A:./deploy.sh --dev frontend；AOCI MCP工作流 | S:生产不得加载开发覆盖；压缩恢复必须重新完整交付索引；语义只能由模型依据源码创作
-README.en.md[SG5S]: F:英文介绍产品能力、部署配置及保留数据的日常运维方法 | R:code:.env.example,code:deploy.sh | A:安装与运维文档 | S:默认仅监听回环；升级需拉取后执行部署，不能只更新源码
-README.md[SG6M]: F:说明安装、OIDC关联、前端独立发布和审计恢复入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md | A:部署操作文档 | S:frontend-only要求既有完整发布且无非前端变更；旧账号关联仍要求原密码及验证码，不开放普通本地登录
+README.en.md[SG5S]: F:英文说明产品能力、宿主要求、部署配置和日常运维入口 | R:code:.env.example,code:deploy.sh | A:安装与运维文档 | S:默认监听回环；拉取源码后须执行部署；Java和文件IO要求宿主Landlock ABI3以上，Ubuntu22.04默认内核不足
+README.md[SG6M]: F:说明宿主要求、部署、OIDC关联、前端独立发布及审计验收入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md | A:部署操作文档 | S:仅前端发布要求既有完整发布且变更限frontend；旧账号关联需原密码及验证码；Java和文件IO需宿主ABI3以上，22.04默认内核不足
 compose.dev.yaml[OR7T]: F:为宿主Vite开放仅回环可用的后端端口和开发CSRF来源 | R:code:deploy.sh,code:backend/oj/production_settings.py | A:backend-api开发覆盖 | S:仅由--dev frontend加载；直接Compose调用可绕过部署脚本对绑定地址的校验
 compose.yaml[OR9M]: F:编排数据库缓存、API与Worker、判题、前端网关及初始化服务 | R:code:deploy.sh,code:backend/deploy/entrypoint.sh,code:server/judge-server/server/entrypoint.sh | A:Compose服务；init profile；外部secret；RUNTIME_ROOT；TRUSTED_PROXY_CIDRS | S:生产只有frontend发布端口；项目名决定网络与令牌卷身份；判题只读rootfs且保留必要降权能力；令牌卷仅首次初始化；Worker健康不等于队列消费
-deploy.sh[OV9L]: F:验证配置和源码，选择组件镜像并备份迁移、发布及验证运行服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按各镜像真实修订复用；迁移前私有pg_dump成功才继续；所有HTTP、Worker、近期心跳通过才更新发布指针；备份不含运行文件和Redis
+deploy.sh[OV9L]: F:验证源码配置与宿主能力，复用或构建组件镜像并备份迁移发布和验证服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl,code:deploy/ops/check-judge-host.py | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按镜像真实修订复用；全栈及开发构建前检查Landlock，frontend-only与config-only跳过；私有pg_dump成功才迁移，备份不含文件和Redis；HTTP、Worker与新鲜心跳均通过才更新发布指针
 docker-bake.hcl[OV8S]: F:声明前端基础与应用、后端、判题工具链及服务和数据库构建目标 | R:code:frontend/Dockerfile,code:backend/Dockerfile,code:server/Dockerfile | A:GIT_SHA；IMAGE_REGISTRY；CACHE_REGISTRY；BUILD_NETWORK；Buildx targets | S:默认仅linux/amd64；前后端子目录构建而判题和Postgres使用根上下文；GIT_SHA负责标签与OCI修订号但不校验工作树
 docker-compose.yml[OR4T]: F:保留旧Redis4、Postgres10和一体后端的部署定义 | R:code:compose.yaml | A:旧docker-compose入口 | S:会公开80和443端口并使用旧数据目录；当前生产入口明确使用compose.yaml，不可混用
 
@@ -266,7 +266,7 @@ oj.py[EB5T]: F:挂载提交创建详情、列表、远程事件与恢复接口 |
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/submission/views/===
 admin.py[AW7T]: F:将公开本地终态提交置为待判并在事务提交后投递重判 | R:code:backend/judge/tasks.py,code:backend/submission/models.py | A:SubmissionRejudgeAPI.post | S:仅超级管理员；拒绝比赛、远程及已在判的提交；Worker认领前保留旧详情；GET不写入
-oj.py[EB9M]: F:创建及查看提交、执行比赛门禁并提供远程事件和本人任务恢复 | R:code:backend/submission/remote.py,code:backend/account/decorators.py,code:backend/utils/throttling.py | A:SubmissionAPI；SubmissionListAPI；ContestSubmissionListAPI；RemoteSubmissionEventAPI；RemoteSubmissionRecoveryAPI；SubmissionExistsAPI | S:赛后取消报名密码IP限制，官方与练习列表分开；IP来自可信入口；非实时OI远程提交仍返回任务；恢复已知ID不重发源码；数据库与broker仍无事务发件箱
+oj.py[EB9M]: F:创建及查看提交、执行比赛门禁并提供远程事件和本人任务恢复 | R:code:backend/submission/remote.py,code:backend/account/decorators.py,code:backend/utils/throttling.py | A:SubmissionAPI；SubmissionListAPI；ContestSubmissionListAPI；RemoteSubmissionEventAPI；RemoteSubmissionRecoveryAPI；SubmissionExistsAPI | S:赛后取消报名密码IP限制；比赛历史合并正式和练习记录，myself筛选本人且开始后隐藏赛前提交；IP来自可信入口；非实时OI远程提交仍返回任务；恢复已知ID不重发源码；数据库与broker无事务发件箱
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/utils/api/===
 __init__.py[LG3T]: F:统一导出自定义API基类与序列化工具 | R:code:backend/utils/api/api.py,code:backend/utils/api/_serializers.py | A:utils.api导出 | S:-
@@ -307,6 +307,7 @@ Dockerfile[OV6T]: F:封装固定digest的Redis8.2.8运行镜像并核验版本 |
 backup-fixture.sh[OD7T]: F:导出Postgres全局及数据库、Redis快照和公开与测试文件形成恢复演练备份 | R:code:compose.yaml | A:ENV_FILE；BACKUP_ROOT；fixture目录 | S:需要保护备份中的个人及评测数据；数据库和文件快照不是同一事务点；直接source环境文件，与deploy.sh安全解析规则不同；固定容器临时路径不支持并发
 inventory.sh[OO6T]: F:记录运行文件规模、数据库版本迁移和Redis队列身份及校验摘要 | R:code:compose.yaml | A:ENV_FILE；BACKUP_ROOT；inventory目录 | S:无法访问文件时明确标记unavailable；直接source环境文件；不输出运行密钥但生成的路径及元数据应保留在私有备份目录
 seed-demo-problems.py[OD7L]: F:校验或创建两个公开验收示例题及固定测试数据 | R:code:backend/problem/models.py,code:docs/operations/demo-problems.md | A:DEMO_PROBLEMS_MODE；SEED_DEMO_PROBLEMS_CREATOR；manage.py shell | S:默认check零业务写入；apply只创建缺失对象，现有不匹配立即失败；异常删除本次创建目录；示例测试ID含连字符，清理逻辑不能假定全部为十六进制ID
+check-judge-host.py[OR8T]: F:探测Linux宿主Landlock能力并拒绝不满足Java和文件IO沙箱要求的部署 | R:code:deploy.sh,code:server/judger/src/filesystem.c | A:probe_landlock_abi；main；退出码0或1 | S:只读查询无需root且仅支持x86_64和aarch64；ABI低于3或探测被拒均失败；不会自动升级内核或关闭隔离
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/contracts/===
 api-compatibility.md[SG6S]: F:记录单仓库迁移前的前后端API、上传包装和持久化身份约束 | R:code:backend/oj/urls.py,code:frontend/src/pages/oj/api.js | A:历史API兼容清单 | S:包含旧源码路径和阶段零事实，不能据此推断新增远程判题、报名和OIDC的当前契约
@@ -340,8 +341,9 @@ demo-problems.md[SB5T]: F:说明两道标准与SPJ验收题的测试设计和幂
 dev-frontend.md[SV6T]: F:说明Vite宿主运行与Docker后端协同的快速开发流程 | R:code:deploy.sh,code:compose.dev.yaml | A:./deploy.sh --dev frontend | S:仅回环桥接且生产不加载覆盖；Ctrl-C只停止Vite；OIDC回调仍取部署配置
 problem-zip-import.md[SB6T]: F:定义单题、嵌套批量及旧目录题包格式与导入回滚边界 | R:code:backend/problem/views/admin.py | A:problem.json；testcase目录 | S:包内display_id忽略，公开编号由OJ分配；整批失败回滚数据库和本次文件
 remote-oj-bridge.md[SN7S]: F:说明浏览器远程判题安装、持久事件确认、恢复和验收流程 | R:code:frontend/static/userscripts/xju-oj-remote-bridge.user.js,code:backend/submission/remote.py | A:/remote-bridge；恢复API；normalize_remote_acm_verdicts | S:第三方凭据留浏览器；已知ID恢复只查询；客户端事件可伪造，不能独立证明正式排名成绩
-audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、审计修复范围和验证边界 | R:code:docs/operations/release-and-recovery.md,code:.github/workflows/regression.yml | A:2026年10月审计记录 | S:索引覆盖不是测试覆盖；线上20分钟比赛结果须另记；外部身份邮件和客户端远程成绩均有未验证边界
-release-and-recovery.md[SO7T]: F:规定主分支统一发布、代理信任、数据库备份与回退步骤 | R:code:deploy.sh,code:.env.example | A:生产发布和恢复操作 | S:按frontend实际来源设可信代理；dump不含文件与Redis；数据库有新写入后不能直接回旧备份
+audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、代码和宿主问题修复及自动化验证范围 | R:code:docs/operations/acceptance-2026-10-07.md,code:.github/workflows/regression.yml | A:2026年10月审计记录 | S:索引覆盖不等于测试覆盖；线上结果另见验收记录；外部账号链路未实测，远程成绩仍由客户端上报
+release-and-recovery.md[SO7T]: F:规定统一发布、宿主能力与重启排空、代理信任及备份恢复步骤 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:可信代理取frontend实际来源；dump不含文件和Redis；有新写入不能直接回旧备份；手工停止的unless-stopped容器重启宿主后仍需显式启动
+acceptance-2026-10-07.md[SQ7T]: F:记录统一发布、备份恢复、HWE升级及真实20分钟比赛与补题验收证据 | R:code:docs/operations/audit-2026-10.md,code:deploy/ops/check-judge-host.py | A:2026年10月7日线上验收记录 | S:测试使用受控会话，外部登录邮件和第三方提交未实测；52项检查不代表全分支覆盖；测试账号已停用且对象隐藏，21条合成提交仍保留
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/plans/feiyue-style-migration/===
 00-visual-audit-and-baseline.md[SU4T]: F:记录Feiyue视觉参考到OJ页面的映射及行为基线 | R:code:docs/plans/feiyue-style-migration/README.md | A:视觉审计计划 | S:保留判题、权限和接口行为；视觉参考冲突时优先业务可读性

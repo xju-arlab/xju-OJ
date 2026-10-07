@@ -13,6 +13,14 @@ git pull --ff-only origin main
 
 每次全栈迁移前，数据库以 `pg_dump -Fc` 保存到私有 `BACKUP_ROOT`，成功后才执行迁移。失败留下 `.partial`，不会当作完整备份。数据库备份不包含题目测试文件、头像、Redis 和外部密钥；涉及数据迁移或恢复时还需独立保护这些资产。禁止 `docker compose down -v`，禁止清空判题队列。
 
+## 判题宿主机
+
+Java 和文件 IO 的写入隔离要求宿主支持 Landlock ABI 3 或更高版本。容器内核来自宿主，升级判题镜像不能补足旧内核能力。全栈部署和 `--dry-run` 在构建前运行 `deploy/ops/check-judge-host.py`；`--frontend-only` 与只解析配置的 `--config-only` 不执行此检查。
+
+Ubuntu 22.04 默认的 5.15 内核只有 ABI 1。可安装官方 `linux-image-generic-hwe-22.04`，保留旧内核并在维护窗口重启，再运行能力检查和真实判题测试。不要降低 ABI 要求或关闭沙箱来绕过失败。依据：[Linux Landlock 文档](https://docs.kernel.org/userspace-api/landlock.html)、[Ubuntu HWE 生命周期](https://ubuntu.com/kernel/lifecycle)。
+
+替换 JudgeServer 或重启宿主前，先停止接受新的提交，再让 Worker 完成已有任务；确认执行中本地提交及判题节点 `task_number` 为零，并保留待判和 broker 队列。不要在仍有任务时停止判题容器。停止服务前记录其重启策略；`unless-stopped` 容器被手工停止后不会因宿主重启自动恢复，需要显式启动。重启后检查 API、Worker 实际消费、判题新鲜心跳和一次真实提交。
+
 ## TLS 入口与客户端 IP
 
 frontend 默认不信任客户端传来的转发头。若 Caddy 等 TLS 入口在前面，设置 `TRUSTED_PROXY_CIDRS` 为 **frontend 实际看到的入口源地址**，例如宿主入口通过 Docker 发布端口连接时的专用桥网关 `/32`。不填写整段公共地址或 `0.0.0.0/0`。直连 frontend 时保持为空。

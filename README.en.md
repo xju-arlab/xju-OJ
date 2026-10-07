@@ -26,11 +26,14 @@
 - **Modern full stack** built with Vue 3, Vite 8, Django 5.2, PostgreSQL 18, and Redis 8.
 - **Secure identity integration** with Authentik OIDC, session management, user profiles, and a separate admin console.
 
+Operations records: [release and recovery](docs/operations/release-and-recovery.md), [October audit](docs/operations/audit-2026-10.md), and [live 20-minute contest acceptance](docs/operations/acceptance-2026-10-07.md) (Chinese).
+
 ## Quick install
 
 Requirements:
 
 - Ubuntu 22.04 or newer on `linux/amd64`
+- The host kernel must provide Landlock ABI 3 or newer for Java and File IO judging. Ubuntu 22.04's default 5.15 kernel is insufficient; install the official HWE 6.8 kernel and reboot. `./deploy.sh --dry-run` checks this capability before builds or service changes.
 - Docker Engine, Docker Compose v2, and Docker Buildx
 - Git, Python 3, and curl
 - At least 20 GB of available disk space is recommended
