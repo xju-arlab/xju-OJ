@@ -11,9 +11,30 @@
             </div>
           </header>
           <nav class="studio-tabs small" aria-label="题目资料"><button v-for="tab in infoTabs" :key="tab.id" :class="{ active: infoTab === tab.id }" @click="infoTab = tab.id">{{ tab.name }}</button></nav>
-          <div v-if="infoTab === 'description'" class="studio-prose"><h2>任务目标</h2><p>{{ problem.objective }}</p><h2>实现要求</h2><ol><li v-for="item in problem.requirements" :key="item">{{ item }}</li></ol><h2>接口约定</h2><pre>{{ problem.signature }}</pre><template v-if="problem.inputSpec"><h2>输入</h2><p class="studio-io-description">{{ problem.inputSpec }}</p></template><template v-if="problem.outputSpec"><h2>输出</h2><p class="studio-io-description">{{ problem.outputSpec }}</p></template><div class="studio-callout"><Lightbulb :size="17" /><p>先阅读框架与公开样例。运行全部用于调试；提交评测会保存本次答卷并计入评测记录。</p></div></div>
-          <div v-else-if="infoTab === 'data'" class="studio-prose"><h2>数据说明</h2><p>{{ problem.data }}</p><div v-for="name in problem.files" :key="name" class="studio-file-row"><FileCode :size="20" /><strong>{{ name }}</strong><a class="studio-text-button" :href="dataUrl(name)">下载</a></div><div class="studio-file-row"><FileCode :size="20" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook">下载</button></div></div>
-          <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><p>{{ problem.evaluation }}</p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
+          <div v-if="infoTab === 'description'" class="studio-prose">
+            <h2>任务目标</h2>
+            <p><StatementText :text="problem.objective" /></p>
+            <h2>实现要求</h2>
+            <ol><li v-for="item in problem.requirements" :key="item"><StatementText :text="item" /></li></ol>
+            <h2>接口约定</h2>
+            <pre class="studio-signature"><code>{{ problem.signature }}</code></pre>
+            <template v-if="problem.inputSpec">
+              <h2>输入</h2>
+              <div class="studio-io-description"><p v-for="(line, index) in statementLines(problem.inputSpec)" :key="index"><StatementText :text="line" /></p></div>
+            </template>
+            <template v-if="problem.outputSpec">
+              <h2>输出</h2>
+              <div class="studio-io-description"><p v-for="(line, index) in statementLines(problem.outputSpec)" :key="index"><StatementText :text="line" /></p></div>
+            </template>
+          </div>
+          <div v-else-if="infoTab === 'data'" class="studio-prose">
+            <h2>数据说明</h2><p><StatementText :text="problem.data" /></p>
+            <div class="studio-files">
+              <div v-for="name in problem.files" :key="name" class="studio-file-row"><FileCode :size="18" /><strong>{{ name }}</strong><a class="studio-text-button" :href="dataUrl(name)"><Download :size="14" />下载</a></div>
+              <div class="studio-file-row"><NotebookPen :size="18" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook"><Download :size="14" />下载</button></div>
+            </div>
+          </div>
+          <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><p><StatementText :text="problem.evaluation" /></p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
           <ProblemRanking v-else :problem-id="problem.id" :contest-id="contestId" :authenticated="authenticated" />
           <div class="studio-problem-pagination"><router-link v-if="previous" :to="problemRoute(previous.id)"><ArrowLeft :size="14" />上一题</router-link><span v-else></span><router-link v-if="next" :to="problemRoute(next.id)">下一题<ArrowRight :size="14" /></router-link></div>
         </section>
@@ -28,7 +49,11 @@
               <div class="studio-cell-input"><span class="studio-cell-prompt">[{{ cellStatus(index) === 'RUNNING' ? '*' : outputs[index]?.execution_count ?? ' ' }}]</span><CodeMirror :ref="editor => { cellEditors[index] = editor }" :model-value="code" mode="text/x-python" @update:model-value="value => updateCell(index, value)" /></div>
               <div v-if="hasOutput(index)" class="studio-cell-output"><pre>{{ outputs[index].text }}</pre><img v-for="(png, imageIndex) in outputs[index].png" :key="imageIndex" :src="'data:image/png;base64,' + png" alt="单元格输出图表" /></div>
             </article>
-            <div v-if="problem.type === 'challenge'" class="studio-notebook-notice"><FileCode :size="15" /><label>预测结果 CSV <input type="file" accept=".csv,text/csv" @change="readPredictions" /></label><span>{{ predictionName }}</span><button v-if="predictions" class="studio-text-button" @click="download('predictions.csv', predictions, 'text/csv')">下载</button></div><p v-if="error" role="alert" class="studio-error">{{ error }}</p><button v-if="oldBackup" class="studio-text-button" @click="exportBackup">导出旧的本机备份</button>
+            <div v-if="problem.type === 'challenge'" class="studio-notebook-notice">
+              <div class="studio-prediction-heading"><FileCode :size="16" /><strong>预测结果 CSV</strong><label class="studio-button compact studio-file-picker">选择文件<input type="file" accept=".csv,text/csv" aria-label="上传预测结果 CSV" @change="readPredictions" /></label></div>
+              <div v-if="predictionName" class="studio-prediction-file"><span>{{ predictionName }}</span><button v-if="predictions" class="studio-text-button" @click="download('predictions.csv', predictions, 'text/csv')"><Download :size="14" />下载</button></div>
+              <p v-else>上传预测文件，或运行代码生成 predictions.csv。</p>
+            </div><p v-if="error" role="alert" class="studio-error">{{ error }}</p><button v-if="oldBackup" class="studio-text-button" @click="exportBackup">导出旧的本机备份</button>
           </div>
           <div class="studio-notebook-status"><span class="studio-run-state" aria-live="polite">{{ runState ? runLabel : 'Notebook · ' + cells.length + ' 个代码单元格' }}</span><span :class="['studio-kernel', { 'is-busy': running }]"><span></span>Python 3 · {{ running ? '忙碌' : '空闲' }}</span><span>Shift+Enter 运行并前进</span></div>
           <div class="studio-submit-dock">
@@ -45,7 +70,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, ArrowRight, Check, Download, FileCode, Lightbulb, LoaderCircle, NotebookPen, Play, RotateCcw, Save, Send, X } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Check, Download, FileCode, LoaderCircle, NotebookPen, Play, RotateCcw, Save, Send, X } from 'lucide-vue-next'
 import CodeMirror from '@/shared/editors/CodeMirrorAdapter.vue'
 import store from '@/store'
 import storage from '@/utils/storage'
@@ -53,6 +78,7 @@ import { categoryFor, notebookFor, download, formatDate } from './studio'
 import { studioApi, activeStatuses } from './api'
 import EvaluationStatus from './EvaluationStatus.vue'
 import ProblemRanking from './ProblemRanking.vue'
+import StatementText from './StatementText.vue'
 import './studio.less'
 
 const route = useRoute()
@@ -80,6 +106,7 @@ const oldBackup = ref(null)
 const infoTab = ref('description'); const showReset = ref(false); const snapshot = ref(null)
 const infoTabs = [{ id: 'description', name: '题目' }, { id: 'data', name: '数据与框架' }, { id: 'evaluation', name: '评测' }, { id: 'ranking', name: '排行' }]
 const cellTitles = ['准备环境', '完成你的实现', '公开样例']
+const statementLines = value => value.split(/\n+/).filter(line => line.trim())
 const previous = ref(null); const next = ref(null)
 const dataUrl = name => '/api/ai/file?' + new URLSearchParams({ problem_id: problem.value.id, contest_id: contestId.value, name })
 const problemRoute = id => ({ name: 'ai-problem', params: { problemID: id }, query: contestId.value ? { contest: contestId.value } : {} })

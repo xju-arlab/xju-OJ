@@ -800,14 +800,15 @@ normalize_remote_acm_verdicts.py[OD7T]: F:预览或备份后修正历史洛谷AC
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/ai/===
 AIContest.vue[EU7M]: F:以共用OJ比赛样式展示真实AI比赛、报名门禁、题目状态和成绩榜 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/styles/contest-detail.less,code:frontend/src/styles/contest-problems.less | A:/ai-studio/contest/:contestID；概览、题目和成绩页签 | S:题目链接携带contest隔离草稿；密码报名及赛后权限来自后端；私榜显式公布前不显示；每10秒轮询并丢弃迟到响应；富文本用DOMPurify清洗
-AIProblem.vue[EU8M]: F:并排展示AI题面输入输出与排行并提供共享Notebook逐格运行和评测提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/ProblemRanking.vue,code:frontend/src/shared/editors/CodeMirrorAdapter.vue | A:运行全部；单格按钮；Shift+Enter；保存、导出和提交 | S:草稿按用户题目比赛隔离且CAS冲突保留备份；会话存储恢复内核任务，显示真实进度和执行计数；快捷键捕获避免编辑器插入换行；旧路由回复丢弃；输出仅文本PNG；评分由后端决定
+AIProblem.vue[EU8M]: F:以OJ排版展示AI题面输入输出与排行并提供Notebook逐格运行和CSV评测提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/StatementText.vue,code:frontend/src/pages/oj/views/ai/ProblemRanking.vue | A:运行全部；单格按钮；Shift+Enter；保存、导出和提交 | S:草稿按用户题目比赛隔离且CAS冲突留备份；会话恢复内核任务，显示真实进度计数；快捷键捕获避免换行；旧路由回复丢弃；题面纯文本高亮且不改导出原文，运行输出仅文本PNG；评分由后端决定
 AIStudio.vue[EU7S]: F:以双栏展示真实AI比赛题库、成功题目集锦和最近提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:frontend/src/pages/oj/views/ai/EvaluationIcon.vue | A:section；AI首页、比赛及个人提交路由 | S:最近记录按提交时间倒序含失败和进行中；成功集锦由完整历史按题去重；每10秒轮询；分页筛选从后端获取，导出属于本人答卷
 EvaluationStatus.vue[EU6T]: F:用OJ胶囊展示逻辑和模型结果及公私榜得分与模型准确率 | R:code:frontend/src/styles/judge-status.less | A:record；inline；data-status；aria-label | S:零分有效，缺分不补零；只有privatePublished才显示私榜；Accuracy置胶囊前且inline保持状态靠右；未知状态明确待确认
 studio.js[LU5T]: F:统一AI题型文案、北京时间及带接口和输入输出说明的Notebook导出 | R:code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:categories；categoryFor；formatDate；notebookFor；download | S:导出仅含题目文字与当前代码，不含执行结果或内核变量；对象URL延迟释放；未知日期显示待定
-studio.less[FU5S]: F:定义AI首页双栏、深色题面及Notebook逐格运行反馈的响应式外观 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/App.vue | A:ai-studio；studio-workspace；studio-cell；studio-spin；studio-io-description | S:Notebook顶部偏移绑定56px导航；窄屏分隔线改横线；状态靠右且长标题省略；运行旋转支持减少动态效果；正文用OJ字体和深色令牌
+studio.less[FU5S]: F:用OJ设计令牌统一AI首页双栏、题面分节与代码标记及Notebook和文件控件外观 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:ai-studio；studio-workspace；studio-prose；studio-cell；studio-file-picker | S:Notebook偏移绑定56px导航；窄屏纵向排版；状态靠右，长标题省略；动画尊重减少动态效果；透明文件输入保留键盘焦点
 EvaluationIcon.vue[EU4T]: F:统一映射AI等待、成功、失败及部分通过的轻量状态图标 | R:code:frontend/src/pages/oj/views/ai/AIStudio.vue | A:status；evaluation-icon | S:黄色等待旋转支持减少动态效果；图标隐藏于无障碍树，须配文字状态
 api.js[IN7T]: F:封装同源AI和后台请求、CSRF及活动任务状态集合 | R:code:backend/ai_studio/urls.py,code:backend/ai_studio/admin_urls.py | A:request；studioApi；activeStatuses | S:超时20秒且按JSON error判断业务失败；成绩写入不经此浏览器接口授权
 ProblemRanking.vue[EU7T]: F:分页展示当前AI题目的真实练习或比赛排行及评测状态 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:backend/ai_studio/services.py | A:problemId；contestId；authenticated；刷新与分页 | S:登录后请求绑定题目比赛，旧响应丢弃；后端决定最高或最后分及私榜门禁；有效零分显示而缺分显示破折号；不暴露答卷
+StatementText.vue[EU5T]: F:将AI题面中的文件名、API、数据类型和张量形状渲染为行内代码 | R:code:frontend/src/pages/oj/views/ai/AIProblem.vue,code:frontend/src/pages/oj/views/ai/studio.less | A:text属性 | S:所有片段使用Vue文本插值，不解释HTML或Markdown；反引号仅控制展示，不改源文本
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/===
 README.md[SO7S]: F:说明AI题型、共享Notebook、题目排行及部署备份和验收流程 | R:code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-notebook-2026-10-08.md | A:AI部署、导入和恢复步骤 | S:默认仅保留3个1GiB内核且空闲10分钟回收；题面刷新不改判分版本；令牌归容器backend用户；H100未启用，正式考试须另配
@@ -837,7 +838,7 @@ uv.lock[FV7L]: F:锁定Notebook和评测环境的依赖图、来源及分发摘�
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/practice/===
 ingestion.py[KA8T]: F:在无参考标签的容器中执行逻辑和模型答卷并输出供独立评分的产物 | R:code:ai/practice/scoring.py,code:ai/practice/problems.py | A:Codabench ingestion程序；线性参数、Softmax和XOR预测产物 | S:执行学生代码但不挂载评分参考；训练结果与源码约束信息交独立scorer检查；模型定义必须经过真实训练更新
-problems.py[FA7M]: F:生成五道深度学习练习的接口形状说明、框架参考解与合成数据 | R:code:ai/codabench/bootstrap.py,code:ai/practice/ingestion.py,code:ai/practice/scoring.py | A:generate；IO_SPECS；Notebook和CSV框架 | S:新增输入输出文字不改变随机数据和判分契约；隐藏数据与种子留私有资产，参考解不进入公开清单；五题为练习而非保密考试
+problems.py[FA7S]: F:生成五道深度学习练习的精简接口形状说明、代码框架参考解和合成数据 | R:code:ai/codabench/bootstrap.py,code:ai/practice/ingestion.py,code:ai/practice/scoring.py | A:generate；IO_SPECS；Notebook和CSV框架 | S:题面精简不改变数据和评分；隐藏标签种子留私有资产，参考解不公开；五题是练习而非保密考试
 scoring.py[KA8T]: F:独立检查实现约束及模型输出并计算测试分、准确率和公私榜指标 | R:code:ai/practice/ingestion.py,code:ai/practice/problems.py | A:Codabench scores产物；MSE、Accuracy、RMSE及LogLoss | S:不执行学生源码；AST课程约束不构成防作弊证明；预测CSV严格校验列、ID顺序、有限值和概率；隐藏数据按40/60分公私榜；合法零分仍有效
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/ai_studio/===

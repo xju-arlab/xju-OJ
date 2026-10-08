@@ -243,6 +243,27 @@ test('a hidden contest problem leaderboard stays hidden', async ({ page }) => {
   await expect(page.locator('.studio-problem-ranking table')).toHaveCount(0)
 })
 
+test('statement notation stays text and styled CSV upload preserves the submitted file', async ({ page }) => {
+  const previous = problems[3].inputSpec
+  const unsafe = '<img src=x onerror="window.statementInjected=true">'
+  problems[3].inputSpec = 'train.csv：float32 张量 [N, 2]\n' + unsafe
+  try {
+    await page.goto('/ai-studio/problem/AI004')
+    const input = page.locator('.studio-io-description').first()
+    await expect(input.locator('p')).toHaveCount(2)
+    await expect(input.locator('code')).toContainText(['train.csv', 'float32', '[N, 2]'])
+    await expect(input).toContainText(unsafe)
+    await expect(input.locator('img')).toHaveCount(0)
+    expect(await page.evaluate(() => window.statementInjected)).toBeUndefined()
+    const csv = 'id,next_power_kwh\n' + Array.from({ length: 160 }, (_, i) => `${i + 761},2.5\n`).join('')
+    await page.getByLabel('上传预测结果 CSV').setInputFiles({ name: 'predictions.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+    await expect(page.locator('.studio-prediction-file')).toContainText('predictions.csv')
+    await page.getByRole('button', { name: '提交评测', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    expect(state.writes.filter(r => r.path === '/api/ai/jobs').at(-1).body.predictions).toBe(csv)
+  } finally { problems[3].inputSpec = previous }
+})
+
 test('mobile page fits and retains AI navigation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/ai-studio')
