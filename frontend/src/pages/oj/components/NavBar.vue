@@ -12,6 +12,10 @@
         <Submenu name="about" @mouseenter="prefetchRoutes(['/about', '/faq', '/remote-bridge'])"><template #title><Icon type="information-circled" />{{$t('m.About')}}</template><Menu-item name="/about">{{$t('m.Judger')}}</Menu-item><Menu-item name="/faq">{{$t('m.FAQ')}}</Menu-item><Menu-item name="/remote-bridge">{{$t('m.Remote_Bridge')}}</Menu-item></Submenu>
       </Menu>
       <div class="nav-actions">
+        <div v-if="showNotebookMode" class="notebook-mode-control">
+          <label for="notebook-only-switch">ipynb<span class="notebook-mode-caption"> 纯享</span></label>
+          <el-switch id="notebook-only-switch" size="small" :model-value="notebookOnly" aria-label="Notebook 纯享模式" :title="notebookOnly ? '恢复题目与 Notebook 分栏' : '仅显示 Notebook'" @update:model-value="$emit('update:notebookOnly', $event)" />
+        </div>
         <div class="nav-search"><Input v-model="searchKeyword" :placeholder="$t('m.Search_Problems')" @on-enter="handleSearch"><template #prefix><Icon type="search" /></template></Input></div>
         <template v-if="!isAuthenticated">
           <LegacyButton type="ghost" ref="loginBtn" :loading="devLoginLoading" @click="handleBtnClick('login')">{{$t('m.Login')}}</LegacyButton>
@@ -38,6 +42,8 @@ import UserAvatar from '@/shared/ui/UserAvatar.vue'
 const prefetchedRoutes = new Set()
 
 export default {
+  props: { showNotebookMode: Boolean, notebookOnly: Boolean },
+  emits: ['update:notebookOnly'],
   components: { login, register, UserAvatar }, data () { return { searchKeyword: '', devLoginLoading: false } }, mounted () { this.getProfile() },
   methods: {
     ...mapActions(['getProfile', 'changeModalStatus']),
@@ -97,6 +103,9 @@ export default {
 .logo { display: inline-flex; align-items: center; gap: 9px; margin: 0 20px 0 0; height: 56px; font-size: 17px; font-weight: 700; color: var(--color-text); white-space: nowrap; }
 .brand-mark { display: inline-grid; width: 30px; height: 30px; place-items: center; border-radius: var(--radius-sm); background: var(--color-text); color: #fff; font-size: 11px; letter-spacing: .06em; }
 .nav-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: 12px; }
+.notebook-mode-control { display: inline-flex; align-items: center; flex: none; gap: 8px; margin-right: 12px; color: var(--color-text-muted); font-size: 12px; white-space: nowrap; }
+.notebook-mode-control label { cursor: pointer; }
+.notebook-mode-control :deep(.el-switch) { --el-switch-on-color: var(--color-link); }
 .nav-search { width: 210px; }
 .drop-menu-title { display: inline-flex; align-items: center; gap: 7px; color: var(--color-text); }
 .user-avatar { font-size: 12px; }
@@ -118,6 +127,7 @@ export default {
 @media (max-width: 760px) { .nav-inner { padding: 0 14px; } .brand-name { display: none; } .nav-actions { margin-left: 6px; } .nav-search { width: 140px; } .nav-actions > .el-button { padding: 0 8px; } }
 @media (max-width: 640px) { :deep(.oj-menu > .el-menu-item:nth-of-type(4)) { display: none; } .nav-search { width: 120px; } }
 @media (max-width: 520px) { .nav-search { display: none; } :deep(.oj-menu > .el-menu-item:nth-of-type(3)) { display: none; } }
+@media (max-width: 760px) { .notebook-mode-control { gap: 6px; margin-right: 4px; }.notebook-mode-caption { display: none; } }
 @media (max-width: 420px) { .nav-actions > .el-button:last-child { display: none; } }
 @media (max-width: 360px) { .logo { display: none; } }
 @media (max-width: 640px) { :deep(.oj-menu > .ai-nav-item) { display: inline-flex !important; } }

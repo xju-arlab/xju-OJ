@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-08T05:04:08Z",
+  "updated_at": "2026-10-08T05:46:04Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -239,9 +239,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ea007f96c57323e0ee0976380877f85497e7d32abc60a0375a37c94c32452c4e",
-      "size": 181584,
-      "normalized_sha256": "ea007f96c57323e0ee0976380877f85497e7d32abc60a0375a37c94c32452c4e"
+      "sha256": "4ae802723c831dba2bab0c0f934a5dc4df27a172c5dd3263772a2e4127ac703f",
+      "size": 181839,
+      "normalized_sha256": "4ae802723c831dba2bab0c0f934a5dc4df27a172c5dd3263772a2e4127ac703f"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -2853,9 +2853,9 @@
     },
     "frontend/src/pages/oj/App.vue": {
       "role": "index",
-      "sha256": "0ef70c8e7faddb32eb18a5caf4728b895dd913d8568bfcf4d7d1baa7e7364341",
-      "size": 2287,
-      "normalized_sha256": "0ef70c8e7faddb32eb18a5caf4728b895dd913d8568bfcf4d7d1baa7e7364341"
+      "sha256": "0a66724d55378ae919775387c4813a71bb84794cd4ee6cd471ceca05ad0fdd59",
+      "size": 2572,
+      "normalized_sha256": "0a66724d55378ae919775387c4813a71bb84794cd4ee6cd471ceca05ad0fdd59"
     },
     "frontend/src/pages/oj/api.js": {
       "role": "index",
@@ -2889,9 +2889,9 @@
     },
     "frontend/src/pages/oj/components/NavBar.vue": {
       "role": "index",
-      "sha256": "274912a720b9a74c05afe374581f9ff0f0f85f1c6f1b30b4d0b64e5cb4719c9b",
-      "size": 10195,
-      "normalized_sha256": "274912a720b9a74c05afe374581f9ff0f0f85f1c6f1b30b4d0b64e5cb4719c9b"
+      "sha256": "36b1c469f6de13e32cb319cc1b11b04533dc5f4d59dadc8a2741a55824d3cb3b",
+      "size": 11194,
+      "normalized_sha256": "36b1c469f6de13e32cb319cc1b11b04533dc5f4d59dadc8a2741a55824d3cb3b"
     },
     "frontend/src/pages/oj/components/Pagination.vue": {
       "role": "index",
@@ -3069,9 +3069,9 @@
     },
     "frontend/src/pages/oj/views/ai/studio.less": {
       "role": "index",
-      "sha256": "5380743bc8ef000aaf959f380c8645436497df2b755c5d63de7b72e185fe21ee",
-      "size": 22912,
-      "normalized_sha256": "5380743bc8ef000aaf959f380c8645436497df2b755c5d63de7b72e185fe21ee"
+      "sha256": "0d09d0cc6282c9fb096a2aa835038b1da85eb70826d4fbc0f3a9e364339089c6",
+      "size": 23389,
+      "normalized_sha256": "0d09d0cc6282c9fb096a2aa835038b1da85eb70826d4fbc0f3a9e364339089c6"
     },
     "frontend/src/pages/oj/views/contest/ContestDetail.vue": {
       "role": "index",

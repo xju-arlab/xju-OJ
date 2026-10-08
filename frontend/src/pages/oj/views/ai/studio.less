@@ -147,3 +147,13 @@
 .studio-cell-output { padding: 10px 16px 10px 44px; border-top: 1px solid var(--color-border); }
 .studio-cell-output pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 var(--font-mono); }
 .studio-cell-output img { display: block; max-width: 100%; margin-top: 8px; }
+
+// Keep the existing editors and kernel UI mounted while changing the layout.
+.content-app.notebook-only {
+  max-width: none; padding: 56px 0 0;
+  .ai-problem-page { margin-top: 0; }
+  .studio-workspace { display: block; }
+  .studio-statement, > .footer { display: none; }
+  .studio-notebook { position: sticky; top: 56px; height: calc(100dvh - 56px); border-radius: 0; border-inline: 0; border-bottom: 0; box-shadow: none; }
+  .studio-notebook-scroll { max-height: none; }
+}

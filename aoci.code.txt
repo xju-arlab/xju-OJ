@@ -520,7 +520,7 @@ Problem.vue[EU8L]: F:创建编辑本地和远程题目、测试数据及特殊�
 ProblemList.vue[EU6M]: F:管理公开及比赛题搜索、编辑、公开化和远程导入 | R:code:frontend/src/pages/admin/api.js | A:题目列表与快捷操作 | S:关键字变化从第一页查询；不同题库路径选择相应后台接口
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/===
-App.vue[EU6T]: F:组织用户端导航与内容壳并展示一次受限OIDC错误提示 | R:code:frontend/src/pages/oj/authError.js,code:frontend/src/store/index.js | A:OJ根组件 | S:错误参数仅选择白名单文案且展示后移除；产品版本固定文本不表示构建提交
+App.vue[EU6T]: F:组织OJ导航内容壳和OIDC错误提示，并控制AI题目Notebook纯享布局 | R:code:frontend/src/pages/oj/components/NavBar.vue,code:frontend/src/pages/oj/authError.js,code:frontend/src/pages/oj/views/ai/studio.less | A:OJ根组件；notebookOnly布局状态 | S:默认分栏，离开AI题目重置纯享；切换只改CSS类，不重建编辑器；认证错误仅用白名单且展示后移除
 api.js[IN7M]: F:封装用户端题目比赛、提交、账户及远程恢复API | R:code:backend/oj/urls.py,code:frontend/src/utils/apiError.js | A:默认API对象；pollContestAnnouncementList；recoverRemoteSubmission | S:JSON error决定成功；公告后台轮询超时10秒且静默；重判使用POST；错误提取兼容网络失败和对象响应
 authError.js[LI6T]: F:将OIDC回调错误代码映射安全文案并从URL移除该参数 | R:code:backend/account/oidc.py,code:frontend/src/pages/oj/App.vue | A:authErrorMessageKey；removeAuthError；parseAuthError | S:未知输入从不回传供渲染，保留其他查询参数和hash
 contestAnnouncements.mjs[LB6T]: F:筛选最近十分钟可见比赛公告并按发布时间倒序排列 | R:code:frontend/src/pages/oj/components/ContestAnnouncementBanner.vue | A:ANNOUNCEMENT_VISIBLE_MS；activeContestAnnouncements | S:允许不足1秒的未来时钟偏差以兼容HTTP Date精度，过期边界严格排除
@@ -533,7 +533,7 @@ submissionStatus.js[LU6T]: F:把本地判题及远程登录验证同步状态转
 CodeMirror.vue[IU6S]: F:为选手代码编辑器提供语言主题切换、重置和文件导入 | R:code:frontend/src/shared/editors/CodeMirrorAdapter.vue,code:frontend/src/utils/utils.js | A:value；languages；language；theme；编辑事件 | S:文件按UTF8读入并保留源码；编辑器语言模式从后端配置加载
 ContestAnnouncementBanner.vue[EU7S]: F:在比赛页轮询并展示最近发布的富文本公告 | R:code:frontend/src/pages/oj/contestAnnouncements.mjs,code:frontend/src/pages/oj/api.js | A:contestId属性 | S:服务端Date校准时钟，隐藏页面暂停请求，30至40秒错峰轮询；卸载清理定时器，异常不打断做题
 Highlight.vue[EU4T]: F:按提交语言显示带语法高亮的只读代码块 | R:code:frontend/src/plugins/highlight.js | A:language；code | S:源码经指令写入文本，非直接v-html
-NavBar.vue[EU6S]: F:提供主导航、AI工作台入口、搜索、账号菜单与认证弹窗 | R:code:frontend/src/store/index.js,code:frontend/src/utils/runtime.js | A:用户端主导航 | S:AI工作台在正式构建可见；开发快捷登录仍受运行配置限制；慢网络不预取；小屏保留溢出入口
+NavBar.vue[EU6S]: F:提供主导航搜索账号认证及AI题目Notebook纯享开关 | R:code:frontend/src/pages/oj/App.vue,code:frontend/src/store/index.js,code:frontend/src/utils/runtime.js | A:showNotebookMode；notebookOnly；update:notebookOnly | S:布局由父组件持有，开关放菜单外避免窄屏折叠；开发登录受配置限制；慢网络不预取，导航小屏保留溢出入口
 Pagination.vue[IU4T]: F:封装用户端分页及页大小切换事件 | R:code:frontend/src/shared/ui/legacy-ui.js | A:total；pageSize；current；on-change；on-page-size-change | S:页码小于1归一为1，页大小最多200
 Panel.vue[EU3T]: F:封装用户端卡片标题、辅助区与内容插槽 | R:code:frontend/src/shared/ui/legacy-ui.js | A:shadow；padding；disHover；bordered；插槽 | S:-
 RemoteSubmissionNotice.vue[EU6T]: F:显示远程待判同步提示并允许原提交者继续或同步任务 | R:code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/pages/oj/submissionStatus.js | A:submission；updated事件；recover | S:要求助手1.1.0；恢复权限由后端再次核验；卸载清理事件监听，已有远程ID只恢复查询
@@ -806,7 +806,7 @@ AIProblem.vue[EU8M]: F:以OJ排版展示AI题面输入输出与排行并提供No
 AIStudio.vue[EU7S]: F:以双栏展示真实AI比赛题库、成功题目集锦和最近提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:frontend/src/pages/oj/views/ai/EvaluationIcon.vue | A:section；AI首页、比赛及个人提交路由 | S:最近记录按提交时间倒序含失败和进行中；成功集锦由完整历史按题去重；每10秒轮询；分页筛选从后端获取，导出属于本人答卷
 EvaluationStatus.vue[EU6T]: F:用OJ胶囊展示逻辑和模型结果及公私榜得分与模型准确率 | R:code:frontend/src/styles/judge-status.less | A:record；inline；data-status；aria-label | S:零分有效，缺分不补零；只有privatePublished才显示私榜；Accuracy置胶囊前且inline保持状态靠右；未知状态明确待确认
 studio.js[LU5T]: F:统一AI题型文案、北京时间及带接口和输入输出说明的Notebook导出 | R:code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:categories；categoryFor；formatDate；notebookFor；download | S:导出仅含题目文字与当前代码，不含执行结果或内核变量；对象URL延迟释放；未知日期显示待定
-studio.less[FU5S]: F:用OJ设计令牌统一AI首页双栏、题面分节与代码标记及Notebook和文件控件外观 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:ai-studio；studio-workspace；studio-prose；studio-cell；studio-file-picker | S:Notebook偏移绑定56px导航；窄屏纵向排版；状态靠右，长标题省略；动画尊重减少动态效果；透明文件输入保留键盘焦点
+studio.less[FU5S]: F:统一AI首页题面Notebook与文件控件的OJ外观，并支持全宽Notebook纯享布局 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/views/ai/AIProblem.vue,code:frontend/src/pages/oj/App.vue | A:ai-studio；studio-workspace；studio-prose；studio-cell；content-app.notebook-only | S:Notebook顶端绑定56px导航；纯享以CSS隐藏题面页脚并覆盖窄屏高度，保留编辑器；动画尊重减少动态效果，透明上传保留焦点
 EvaluationIcon.vue[EU4T]: F:统一映射AI等待、成功、失败及部分通过的轻量状态图标 | R:code:frontend/src/pages/oj/views/ai/AIStudio.vue | A:status；evaluation-icon | S:黄色等待旋转支持减少动态效果；图标隐藏于无障碍树，须配文字状态
 api.js[IN7T]: F:封装同源AI和后台请求、CSRF及活动任务状态集合 | R:code:backend/ai_studio/urls.py,code:backend/ai_studio/admin_urls.py | A:request；studioApi；activeStatuses | S:超时20秒且按JSON error判断业务失败；成绩写入不经此浏览器接口授权
 ProblemRanking.vue[EU7T]: F:分页展示当前AI题目的真实练习或比赛排行及评测状态 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:backend/ai_studio/services.py | A:problemId；contestId；authenticated；刷新与分页 | S:登录后请求绑定题目比赛，旧响应丢弃；后端决定最高或最后分及私榜门禁；有效零分显示而缺分显示破折号；不暴露答卷

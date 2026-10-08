@@ -1,7 +1,7 @@
 <template>
   <div class="oj-shell">
-    <NavBar />
-    <main class="content-app">
+    <NavBar v-model:notebook-only="notebookOnly" :show-notebook-mode="isAIProblem" />
+    <main :class="['content-app', { 'notebook-only': isAIProblem && notebookOnly }]">
       <router-view v-slot="{ Component }">
         <transition name="fadeInUp" mode="out-in"><component :is="Component" /></transition>
       </router-view>
@@ -18,7 +18,7 @@ import { parseAuthError } from '@oj/authError'
 import NavBar from '@oj/components/NavBar.vue'
 export default {
   name: 'app', components: { NavBar },
-  data () { return { authErrorHandled: false } },
+  data () { return { authErrorHandled: false, notebookOnly: false } },
   created () { try { document.body.removeChild(document.getElementById('app-loader')) } catch (e) {} },
   mounted () { this.getWebsiteConfig(); this.getAuthProviders(); this.surfaceAuthError() },
   methods: {
@@ -35,8 +35,12 @@ export default {
       if (authError.path !== this.$route.fullPath) this.$router.replace(authError.path)
     }
   },
-  computed: { ...mapState(['website']) },
-  watch: { website () { this.changeDomTitle() }, '$route' () { this.changeDomTitle(); this.surfaceAuthError() } }
+  computed: { ...mapState(['website']), isAIProblem () { return this.$route.name === 'ai-problem' } },
+  watch: {
+    website () { this.changeDomTitle() },
+    '$route' () { this.changeDomTitle(); this.surfaceAuthError() },
+    isAIProblem (value) { if (!value) this.notebookOnly = false }
+  }
 }
 </script>
 <style lang="less">
