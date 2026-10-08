@@ -1,5 +1,8 @@
 <template>
   <div>
+    <nav class="import-kind-tabs" aria-label="导入题库类型"><router-link to="/problem/batch_ops" :class="{ active: !isAI }">普通题目</router-link><router-link to="/ai/problem/batch_ops" :class="{ active: isAI }">AI 题目</router-link></nav>
+    <AIImportAndExport v-if="isAI" />
+    <template v-else>
     <panel title="导出题目（测试版）">
       <template #header><div >
         <el-input
@@ -111,9 +114,11 @@
         <el-button size="small" type="success" @click="submitUpload('FPS')"><Icon type="upload" />上传</el-button>
       </el-upload>
     </panel>
+    </template>
   </div>
 </template>
 <script>
+  import AIImportAndExport from '../ai/ImportAndExport.vue'
   import api from '@admin/api'
   import { csrfHeaders } from '@/utils/csrf'
   import utils from '@/utils/utils'
@@ -126,6 +131,8 @@
   ]
 
   export default {
+    components: { AIImportAndExport },
+    computed: { isAI () { return this.$route.path.startsWith('/ai/') } },
     name: 'import_and_export',
     data () {
       return {
@@ -145,7 +152,7 @@
       }
     },
     mounted () {
-      this.getProblems()
+      if (!this.isAI) this.getProblems()
     },
     methods: {
       csrfHeaders,
@@ -232,6 +239,9 @@
 </script>
 
 <style scoped lang="less">
+  .import-kind-tabs { display: flex; gap: 24px; margin-bottom: 20px; padding: 0 20px; border-bottom: 1px solid var(--color-border); }
+  .import-kind-tabs a { padding: 12px 0; color: var(--color-text-muted); border-bottom: 2px solid transparent; }
+  .import-kind-tabs a.active { color: var(--color-text); border-bottom-color: var(--color-text); font-weight: 600; }
   :deep(.import-upload) {
     display: flex;
     flex-wrap: wrap;

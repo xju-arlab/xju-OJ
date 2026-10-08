@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .package_views import PackageWorkerAPI
 
 urlpatterns = [
     path("problems", views.ProblemsAPI.as_view()),
@@ -13,4 +14,5 @@ urlpatterns = [
     path("problem-leaderboard", views.ProblemLeaderboardAPI.as_view()),
     path("health", views.HealthAPI.as_view()),
     path("worker", views.WorkerAPI.as_view()),
+    path("package-worker", PackageWorkerAPI.as_view()),
 ]

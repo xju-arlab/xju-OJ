@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
 // Browser contract fixtures. Real execution is verified by ai/tests/live_acceptance.py.
-const titles = ['线性回归从零实现', '稳定 Softmax', '补全 PyTorch 训练循环', '宿舍用电量预测', '外卖送达时间与超时风险预测']
+const titles = ['逻辑样例 A', '逻辑样例 B', '模型样例 C', '数据样例 D', '数据样例 E']
 const problems = titles.map((title, i) => ({ id: 'AI00' + (i + 1), title, type: i < 2 ? 'logic' : i === 2 ? 'model' : 'challenge',
   metric: i === 2 ? 'Accuracy' : 'MSE', points: 20, version: 1, cells: ['import torch', '# implement'],
   objective: '练习任务', requirements: ['按接口实现'], signature: 'train(X, y)', files: [],
@@ -93,7 +93,7 @@ test('home shows per-problem states, valid zero scores and latest-first activity
   await expect(page.locator('[data-submission-id="model"]')).toContainText('Accuracy 100.0%模型达标')
   await page.getByRole('button', { name: '数据挑战', exact: true }).click()
   await expect(page.locator('.studio-table tbody tr')).toHaveCount(2)
-  await page.getByRole('textbox', { name: '搜索 AI 题目' }).fill('宿舍')
+  await page.getByRole('textbox', { name: '搜索 AI 题目' }).fill('数据样例 D')
   await expect(page.locator('.studio-table tbody tr')).toHaveCount(1)
   await expect(page.locator('.studio-table')).toContainText('私榜未公布')
 })

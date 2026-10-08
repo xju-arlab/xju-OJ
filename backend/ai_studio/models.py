@@ -18,6 +18,9 @@ class AIProblem(models.Model):
     visible = models.BooleanField(default=False)
     judge = models.JSONField(default=dict)
     version = models.PositiveIntegerField(default=1)
+    revision = models.PositiveIntegerField(default=1)
+    package_import = models.ForeignKey("AIProblemImport", null=True, on_delete=models.PROTECT, related_name="problems")
+    package_index = models.PositiveSmallIntegerField(null=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -101,3 +104,26 @@ class AIServiceState(models.Model):
     # One durable admission gate. Existing jobs continue to drain while paused.
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     paused = models.BooleanField(default=False)
+
+
+class AIProblemImport(models.Model):
+    """Private archive plus durable, retryable registration of a whole problem batch."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    source_sha256 = models.CharField(max_length=64)
+    filename = models.CharField(max_length=128)
+    manifest = models.JSONField(default=list)  # Public content/configuration and hashes; private assets stay in the ZIP.
+    status = models.CharField(max_length=16, default="PREVIEW", db_index=True)
+    publish = models.BooleanField(default=False)
+    result = models.JSONField(default=list)
+    message = models.CharField(max_length=256, blank=True)
+    worker = models.CharField(max_length=64, blank=True)
+    lease = models.UUIDField(null=True)
+    lease_until = models.DateTimeField(null=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [models.UniqueConstraint(fields=("created_by", "source_sha256"), name="ai_import_owner_digest_unique")]

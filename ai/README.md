@@ -24,10 +24,9 @@ Codabench 在独立 ingestion/scoring 容器中产生正式成绩。导航沿用
   题目「排行」显示真实评测：自主练习取当前版本最高公榜分；比赛取本场正式提交，
   沿用最后一次/最高分策略、封榜和赛后私榜公布规则，同分并列。不会公开他人答卷或私有输出。
 
-五道 `AI001`–`AI005` 是可执行的练习题，覆盖线性回归、稳定 Softmax、XOR 训练和两项数据挑战。
-初始化不会创建正式考试。考试应使用独立的隐藏题目及 Codabench Phase；不要把已公开练习题当作保密试题。
-数据由私有随机种子生成；参考标签和参考解不进入 OJ 公开 API。
-线性回归的 AST 检查用于约束普通 `nn.Linear`/`torch.optim` 调用，不能证明恶意混淆代码没有绕过课程要求。
+题目通过独立 ZIP 题包导入，不在项目源码或启动脚本中维护题面、数据、参考解和评分逻辑。
+后台支持单题与批量导入、校验预览、自动编号和完整导出，格式及出题工具见
+[AI 题包说明](../docs/operations/ai-problem-packages.md)。初始化不创建题目或比赛。
 
 ## 隔离与容量
 
@@ -45,7 +44,7 @@ Codabench 在独立 ingestion/scoring 容器中产生正式成绩。导航沿用
 同一内核不接受并发任务；回写重试复用已完成结果，避免同一单元在仍存活的内核中重复执行。
 15 人同时正式提交的本地及生产 CPU 实测见验收文档，不代表 15 个常驻 Notebook 内核的测试。
 H100 SSH 当前进入现有容器，缺少可用 Docker/隔离能力，因此没有启用 GPU，
-也没有在其 root 环境直接执行学生代码。五道练习题使用 CPU PyTorch。
+也没有在其 root 环境直接执行学生代码。当前评测镜像使用 CPU PyTorch。
 
 ## 构建与首次部署
 
@@ -71,17 +70,13 @@ python3 ai/prepare.py \
 
 ```sh
 sh ai/deploy.sh /absolute/private/xju-ai
-# 用 OJ 的管理命令，将 exports/oj-practice.json 导入后端；文件须放在后端能读取的私有挂载下。
-python manage.py import_ai_practice /private/oj-practice.json --creator <已有超级管理员> --publish
+# 随后从 OJ 后台「AI 题库 → 导入 / 导出」上传题包。
 ```
 
-导入命令只创建缺失题目，已有内容不一致时拒绝覆盖。`exports` 内另有私有种子和验收参考解，
-不要整个目录放入 `/public`。Docker 服务没有宿主公开端口；Codabench 不单独提供学生登录入口。
-首次导入后必须实测一次 Notebook 和一次正式评测，再组织真实考试。
-
-仅同步本仓库新增的输入/输出说明时，在完成数据库备份后，对上面的导入命令增加
-`--refresh-statement`。它要求代码框架、公开数据、题型和评测配置完全相同，只更新题面，
-保留版本、历史分数与草稿；有关比赛进行中时拒绝刷新，普通导入仍拒绝内容冲突。
+首次导入后实测 Notebook 与正式评测，再公开题目。私有题包保存在后端
+`DATA_DIR/ai_problem_packages/`，不得放入 `/public`。评测服务不发布宿主端口，
+Codabench 不单独提供学生登录入口。`package-agent` 自动注册题包中的评测程序和私有数据，
+出题者无需填写服务器 Phase ID。
 
 离线传输可用 `docker save/load`。加载后核对两端镜像 ID；Docker 归档不保留仓库 digest，
 私有 `compose.env` 可将 `AI_RABBIT_IMAGE`、`AI_MINIO_IMAGE` 设置为核对过的 `sha256:<镜像ID>`，
@@ -91,10 +86,10 @@ python manage.py import_ai_practice /private/oj-practice.json --creator <已有�
 
 1. 提交并推送源码，在服务器 `git pull --ff-only`，构建或加载绑定该 HEAD 的三个 AI 镜像。
 2. 发布前用旧镜像运行 `python /opt/bridge/control.py pause --wait 1800`（在 evaluation-agent 中）。
-   新计算请求暂停，已有任务继续排空，草稿可保存/导出。无需删除队列。
+   新计算与题包确认导入暂停，已有计算和导入任务继续排空，草稿可保存/导出。无需删除队列。
 3. 发布 OJ；修改私有 `compose.env` 中三个 AI 镜像标签；运行 `ai/deploy.sh`。
-   脚本验证源码和镜像修订，确认任务排空，备份 Codabench PostgreSQL、对象存储、配置、种子和令牌，
-   然后迁移、幂等初始化并恢复接收任务。OJ 自身的数据库备份由根部署脚本负责。
+   脚本验证源码和镜像修订，确认任务排空，备份 Codabench PostgreSQL、对象存储、配置和令牌，
+   然后迁移、幂等初始化并恢复接收任务。OJ 自身的数据库备份由根部署脚本负责；另须备份后端私有题包目录，不能只备份数据库。
 4. 检查 `/api/ai/health`，运行真实答卷，核对两端任务数和成绩。
 
 配置已存在时 `prepare.py` 会拒绝重新生成密钥。不要运行 `down -v`、清 Redis 或删除提交来“排空”。
@@ -114,7 +109,8 @@ XJU_AI_RUNTIME_TESTS=1 AI_NOTEBOOK_IMAGE=xju-ai-notebook:dev \
 
 另运行后端全量 Django 测试、前端 lint/routes/build、Playwright。
 `tests/live_acceptance.py` 使用明确准备的 1 个管理员和 15 个受控学生会话，
-实际运行 20 分钟，验证密码、并发评测、五道题、草稿冲突、私榜和补题。
+从仓库外的 `--cases` JSON 读取题号、题型、正确答卷及错误答卷，实际运行 20 分钟，
+验证密码、并发评测、三类题目、草稿冲突、私榜和补题；不依赖固定题号或源码内参考解。
 该脚本会创建一场可见的密码测试赛，结束后隐藏，保留答卷证据；只对明确选定的环境运行。
 外部 Authentik 登录、真实邮件投递和第三方 OJ 提交不由这些会话测试证明。
 

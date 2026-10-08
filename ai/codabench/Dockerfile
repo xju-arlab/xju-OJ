@@ -10,8 +10,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY --from=codabench /LICENSE.TXT /usr/share/licenses/codabench/LICENSE.TXT
 COPY --from=codabench /src ./src
 COPY ai/codabench/site_settings.py /app/src/settings/xju.py
-COPY ai/practice /opt/xju/practice
-COPY ai/codabench/bootstrap.py /opt/xju/bootstrap.py
+COPY ai/codabench/bootstrap.py ai/codabench/packages.py ai/codabench/package_agent.py ai/codabench/export_existing.py /opt/xju/
+COPY backend/ai_studio/package_format.py ai/compute/transport.py /opt/xju/
 ENV PATH=/app/.venv/bin:$PATH DJANGO_SETTINGS_MODULE=settings.xju
 WORKDIR /app/src
 CMD ["gunicorn", "--bind=0.0.0.0:8000", "--workers=1", "--threads=4", "--timeout=60", "wsgi:application"]

@@ -3,26 +3,30 @@
            :router="true" :default-active="currentPath">
     <div class="logo"><span class="brand-mark">XJ</span><strong>XJU-OJ</strong><small>管理后台</small></div>
     <el-menu-item index="/"><Icon type="dashboard" />{{$t('m.Dashboard')}}</el-menu-item>
-    <el-submenu v-if="isSuperAdmin" index="general">
+    <el-sub-menu v-if="isSuperAdmin" index="general">
       <template #title><Icon type="menu" />{{$t('m.General')}}</template>
       <el-menu-item index="/user">{{$t('m.User')}}</el-menu-item>
       <el-menu-item index="/announcement">{{$t('m.Announcement')}}</el-menu-item>
       <el-menu-item index="/judge-server">{{$t('m.Judge_Server')}}</el-menu-item>
       <el-menu-item index="/prune-test-case">{{$t('m.Prune_Test_Case')}}</el-menu-item>
-    </el-submenu>
-    <el-submenu index="problem" v-if="hasProblemPermission">
+    </el-sub-menu>
+    <el-sub-menu index="problem" v-if="hasProblemPermission">
       <template #title><Icon type="bars" />{{$t('m.Problem')}}</template>
       <el-menu-item index="/problems">{{$t('m.Problem_List')}}</el-menu-item>
       <el-menu-item index="/problem/create">{{$t('m.Create_Problem')}}</el-menu-item>
       <el-menu-item index="/problem/batch_ops">{{$t('m.Export_Import_Problem')}}</el-menu-item>
 
-    </el-submenu>
-    <el-submenu index="contest">
+    </el-sub-menu>
+    <el-sub-menu index="contest">
       <template #title><Icon type="trophy" />{{$t('m.Contest')}}</template>
       <el-menu-item index="/contest">{{$t('m.Contest_List')}}</el-menu-item>
       <el-menu-item index="/contest/create">{{$t('m.Create_Contest')}}</el-menu-item>
-    </el-submenu>
-    <el-menu-item index="/ai/problems"><Icon type="ios-analytics" />AI 题库</el-menu-item>
+    </el-sub-menu>
+    <el-sub-menu v-if="hasProblemPermission" index="ai-problem">
+      <template #title><Icon type="ios-analytics" />AI 题库</template>
+      <el-menu-item index="/ai/problems">题目管理</el-menu-item>
+      <el-menu-item index="/ai/problem/batch_ops">导入 / 导出</el-menu-item>
+    </el-sub-menu>
   </el-menu>
 </template>
 <script>
@@ -30,15 +34,8 @@
 
   export default {
     name: 'SideMenu',
-    data () {
-      return {
-        currentPath: ''
-      }
-    },
-    mounted () {
-      this.currentPath = this.$route.path
-    },
     computed: {
+      currentPath () { return this.$route.path },
       ...mapGetters(['user', 'isSuperAdmin', 'hasProblemPermission'])
     }
   }

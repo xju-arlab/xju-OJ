@@ -78,6 +78,16 @@ services:
     <<: *site
     command: [celery, -A, celery_config, worker, -Q, site-worker, --loglevel=WARNING, --concurrency=1]
     depends_on: [codabench, redis]
+  package-agent:
+    <<: *site
+    command: [python, /opt/xju/package_agent.py]
+    environment:
+      <<: *proxy
+      XJU_EVALUATION_IMAGE: ${AI_NOTEBOOK_IMAGE:?}
+      AI_WORKER_NAME: package-1
+    secrets: [coda_secret, oj_worker_token]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on: [codabench, minio]
   compute:
     <<: *common
     image: ${AI_COMPUTE_IMAGE:?}

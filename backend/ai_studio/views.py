@@ -1,20 +1,19 @@
-import hmac
-import os
 import re
 import uuid
 from datetime import timedelta
-from pathlib import Path
 
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils.timezone import now
 
-from account.decorators import admin_role_required, ensure_created_by, login_required
+from account.decorators import admin_role_required, ensure_created_by, login_required, problem_permission_required
 from contest.models import Contest
 from utils.api import APIError, APIView, CSRFExemptAPIView
 from .contracts import ACTIVE, TERMINAL, cells_input, finite_score, judge_input, notebook_output, public_files_input, require
-from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIServiceState, AIWorker
+from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIProblemImport, AIServiceState, AIWorker
+from .packages import IMPORT_ACTIVE, managed_problems, service_lock
+from .worker_auth import authenticate_worker
 from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access, problem_leaderboard,
                        public_job, public_problem, save_draft)
 
@@ -152,18 +151,25 @@ class ProblemLeaderboardAPI(APIView):
 
 
 class ProblemAdminAPI(APIView):
-    @admin_role_required
+    @problem_permission_required
     def get(self, request):
-        problems = AIProblem.objects.all()
-        if not request.user.is_super_admin():
-            problems = problems.filter(created_by=request.user)
+        problems = managed_problems(request.user)
+        if request.GET.get("keyword"):
+            problems = problems.filter(Q(title__icontains=request.GET["keyword"]) | Q(code__icontains=request.GET["keyword"]))
+        if request.GET.get("type"):
+            problems = problems.filter(category=request.GET["type"])
         def serialize(problem):
             result = public_problem(problem, full=True)
-            result.update({"visible": problem.visible, "judge": problem.judge, "public_files": problem.public_files})
+            result.update({"visible": problem.visible, "judge": problem.judge, "public_files": problem.public_files,
+                           "revision": problem.revision, "packaged": problem.package_import_id is not None})
             return result
+        if request.GET.get("id"):
+            problem = problems.filter(code=request.GET["id"]).first()
+            require(problem is not None, "题目不存在或无管理权限")
+            return self.success(serialize(problem))
         return self.success(page(request, problems, serialize))
 
-    @admin_role_required
+    @problem_permission_required
     @transaction.atomic
     def post(self, request):
         data = request.data
@@ -185,15 +191,22 @@ class ProblemAdminAPI(APIView):
         require(isinstance(requirements, list) and len(requirements) <= 50 and
                 all(isinstance(item, str) and len(item) <= 2000 for item in requirements), "Invalid requirements")
         statement["requirements"] = requirements
+        service_lock()
         problem = AIProblem.objects.select_for_update().filter(code=data["id"]).first()
         if problem:
-            ensure_created_by(problem, request.user)
-            require(data.get("version") == problem.version, "Problem has changed; reload before saving")
+            require(managed_problems(request.user).filter(pk=problem.pk).exists(), "题目不存在或无管理权限")
+            require(data.get("revision") == problem.revision, "题目已被修改，请重新加载后保存")
             require(not AIContestProblem.objects.filter(problem=problem, contest__start_time__lte=now(),
                                                        contest__end_time__gte=now()).exists(), "Cannot edit a problem during its contest")
-            problem.version += 1
+            if problem.package_import_id:
+                require(judge == problem.judge and data["type"] == problem.category,
+                        "题包的题型和评测配置不可单独修改，请导出修改后重新导入")
+            if (problem.cells != cells or problem.public_files != public_files or
+                    problem.judge != judge or problem.category != data["type"]):
+                problem.version += 1
+            problem.revision += 1
         else:
-            problem = AIProblem(code=data["id"], created_by=request.user)
+            raise APIError("新题目请通过 AI 题包导入")
         problem.title = data["title"].strip()
         problem.category = data["type"]
         problem.visible = data["visible"]
@@ -204,7 +217,7 @@ class ProblemAdminAPI(APIView):
         problem.judge = judge
         problem.public_files = public_files
         problem.save()
-        return self.success({"id": problem.code, "version": problem.version})
+        return self.success({"id": problem.code, "version": problem.version, "revision": problem.revision})
 
 
 class ContestAdminAPI(APIView):
@@ -263,13 +276,7 @@ class ContestAdminAPI(APIView):
 class WorkerAPI(CSRFExemptAPIView):
     """Machine endpoint; browser sessions and APPKEY cannot authorize a compute worker."""
     def post(self, request):
-        path = os.environ.get("AI_WORKER_TOKEN_FILE", "")
-        try:
-            expected = Path(path).read_text().strip() if path else ""
-        except OSError:
-            expected = ""
-        supplied = request.META.get("HTTP_AUTHORIZATION", "")
-        require(len(expected) >= 32 and hmac.compare_digest(supplied, "Bearer " + expected), "Invalid worker token")
+        authenticate_worker(request)
         data = request.data
         require(isinstance(data, dict), "Invalid worker request")
         if data.get("action") == "service":
@@ -280,7 +287,9 @@ class WorkerAPI(CSRFExemptAPIView):
                 if data["operation"] != "status":
                     service.paused = data["operation"] == "pause"
                     service.save(update_fields=["paused"])
-                return self.success({"paused": service.paused, "active": AIJob.objects.filter(status__in=ACTIVE).count()})
+                imports = AIProblemImport.objects.filter(status__in=IMPORT_ACTIVE).count()
+                return self.success({"paused": service.paused, "active": AIJob.objects.filter(status__in=ACTIVE).count() + imports,
+                                     "imports": imports})
         worker = data.get("worker", "")
         require(isinstance(worker, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", worker), "Invalid worker name")
         kinds = data.get("kinds", [])

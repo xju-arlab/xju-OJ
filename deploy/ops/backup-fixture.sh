@@ -48,13 +48,22 @@ else
     docker exec "$backend_id" tar -C /data --numeric-owner -cf - public test_case > "$out/runtime/public-test-case.tar"
 fi
 
+# AI archives contain private reference data and are part of the problem backup.
+# Existing published packages are immutable; previews are not evaluation assets.
+backend_id=$(compose ps -q backend-api)
+ai_package_scope=
+if [ -n "$backend_id" ] && docker exec "$backend_id" test -d /data/ai_problem_packages; then
+    docker exec "$backend_id" tar -C /data --numeric-owner -cf - ai_problem_packages > "$out/runtime/ai-problem-packages.tar"
+    ai_package_scope=' backend/ai_problem_packages'
+fi
+
 {
     printf '%s\n' "format=xju-oj-phase2-fixture-backup-v1"
     printf '%s\n' "created_at=$timestamp"
     printf '%s\n' "postgres_image=$POSTGRES_IMAGE_REF"
     printf '%s\n' "redis_image=$REDIS_IMAGE_REF"
     printf '%s\n' "postgres_database=$POSTGRES_DB"
-    printf '%s\n' "runtime_scope=backend/public backend/test_case"
+    printf '%s\n' "runtime_scope=backend/public backend/test_case$ai_package_scope"
 } > "$out/manifest.txt"
 
 find "$out" -type f ! -path "$out/sha256sums" -print0 | sort -z | xargs -0 sha256sum > "$out/sha256sums"

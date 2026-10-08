@@ -100,6 +100,35 @@ class ArchiveTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_private_package_download_is_bounded_and_authenticated(self):
+        from email.message import Message
+        client = Client("http://service/api/", "private-test-token", "Bearer")
+        response = Mock()
+        response.headers = Message()
+        response.headers["Content-Type"] = "application/zip"
+        response.read.return_value = b"zip"
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        client.opener = Mock()
+        client.opener.open.return_value = response
+        self.assertEqual(client.get_zip("package-worker?id=example", limit=4), b"zip")
+        request = client.opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, "http://service/api/package-worker?id=example")
+        self.assertEqual(request.get_header("Authorization"), "Bearer private-test-token")
+        response.read.assert_called_once_with(5)
+        response.read.return_value = b"12345"
+        with self.assertRaisesRegex(RemoteError, "exceeded limit"):
+            client.get_zip("package-worker", limit=4)
+        response.headers.replace_header("Content-Type", "application/json")
+        with self.assertRaisesRegex(RemoteError, "Expected a private ZIP"):
+            client.get_zip("package-worker")
+        for path in ("/external", "https://external.invalid/archive", "../archive"):
+            with self.assertRaises(ValueError):
+                client.get_zip(path)
+        client.opener.open.side_effect = OSError("signed-url-and-secret")
+        with self.assertRaisesRegex(RemoteError, "^Package download failed$"):
+            client.get_zip("package-worker")
+
     def test_redirects_and_external_storage_rejected(self):
         with self.assertRaises(RemoteError):
             NoRedirect().redirect_request(None, None, 302, None, {}, "https://untrusted.invalid")

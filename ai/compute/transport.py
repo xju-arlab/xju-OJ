@@ -51,3 +51,18 @@ class Client:
                 response.read(1024)
         except (OSError, ValueError):
             raise RemoteError("Object upload failed") from None
+
+    def get_zip(self, path, limit=16 * 1024 * 1024):
+        if path.startswith(("/", "http:", "https:")) or ".." in path:
+            raise ValueError("Service paths must be relative")
+        request = urllib.request.Request(self.base + path, headers={"Authorization": self.authorization})
+        try:
+            with self.opener.open(request, timeout=30) as response:
+                if response.headers.get_content_type() != "application/zip":
+                    raise RemoteError("Expected a private ZIP archive")
+                raw = response.read(limit + 1)
+                if len(raw) > limit:
+                    raise RemoteError("Package response exceeded limit")
+                return raw
+        except (OSError, ValueError):
+            raise RemoteError("Package download failed") from None

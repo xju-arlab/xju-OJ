@@ -47,5 +47,6 @@ compose run --rm --no-deps -v "$ai_runtime/secrets:/private-secrets" codabench p
 compose up -d
 compose exec -T notebook-agent python /opt/bridge/worker.py --preflight
 compose exec -T evaluation-agent python /opt/bridge/worker.py --preflight
+compose exec -T package-agent python /opt/xju/package_agent.py --preflight
 compose run --rm --no-deps evaluation-agent python /opt/bridge/control.py resume
-echo 'AI services started. Import exports/oj-practice.json in OJ, then verify a real submission before opening access.'
+echo 'AI services started. Import AI ZIP packages in OJ administration and verify real submissions before publishing.'

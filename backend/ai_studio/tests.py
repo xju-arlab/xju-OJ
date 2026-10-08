@@ -1,5 +1,4 @@
 import json
-import io
 import os
 import tempfile
 import uuid
@@ -8,7 +7,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.utils.timezone import now
-from django.core.management import call_command, CommandError
 from rest_framework.test import APIClient
 
 from contest.models import Contest, ContestParticipation, OIContestRank
@@ -165,7 +163,7 @@ class AIStudioTests(APITestCase):
     def test_service_pause_drains_existing_jobs_and_preserves_drafts(self):
         created = self.submit().data["data"]
         paused = self.worker("service", operation="pause")
-        self.assertEqual(paused.data["data"], {"paused": True, "active": 1})
+        self.assertEqual(paused.data["data"], {"paused": True, "active": 1, "imports": 0})
         self.assertFailed(self.submit())
         self.assertSuccess(self.submit(id=created["id"]))
         self.assertSuccess(self.client.put("/api/ai/draft", {"problem_id": self.problem.code,
@@ -395,31 +393,16 @@ class AIStudioTests(APITestCase):
         self.assertEqual(result.data["data"]["results"][0]["rank"], 1)
         self.assertEqual(result.data["data"]["results"][0]["username"], "rank1")
 
-    def test_practice_statement_refresh_is_explicit_atomic_and_preserves_judge_version(self):
-        manifest = [{"id": "AI00" + str(index), "title": self.problem.title, "type": "logic", "metric": "Score",
-                     "points": 100, "statement": {"inputSpec": "X: [N, 2]", "outputSpec": "w: [2, 1]"},
-                     "cells": self.problem.cells, "public_files": {}, "judge": self.problem.judge.copy()} for index in range(1, 6)]
-        path = Path(self.temp.name) / "manifest.json"
-        path.write_text(json.dumps(manifest))
-        args = {"creator": self.admin.username, "stdout": io.StringIO()}
-        with self.assertRaises(CommandError):
-            call_command("import_ai_practice", str(path), **args)
-        with self.assertRaises(CommandError):
-            call_command("import_ai_practice", str(path), refresh_statement=True, **args)
+    def test_problem_editor_remains_frozen_during_contest(self):
+        self.client.force_login(self.admin)
+        data = self.client.get("/api/admin/ai/problems", {"id": self.problem.code}).data["data"]
+        data["outputSpec"] = "concise output"
+        self.assertFailed(self.client.post("/api/admin/ai/problems", data, format="json"))
         self.contest.end_time = now() - timedelta(seconds=1)
         self.contest.save()
-        call_command("import_ai_practice", str(path), refresh_statement=True, **args)
-        call_command("import_ai_practice", str(path), refresh_statement=True, **args)
-        self.problem.refresh_from_db()
-        self.assertEqual(self.problem.statement, manifest[0]["statement"])
-        self.assertEqual(self.problem.version, 1)
-        manifest[0]["statement"]["inputSpec"] = "changed text"
-        manifest[1]["judge"]["phase_id"] = 999
-        path.write_text(json.dumps(manifest))
-        with self.assertRaises(CommandError):
-            call_command("import_ai_practice", str(path), refresh_statement=True, **args)
-        self.problem.refresh_from_db()
-        self.assertEqual(self.problem.statement["inputSpec"], "X: [N, 2]")
+        result = self.client.post("/api/admin/ai/problems", data, format="json")
+        self.assertSuccess(result)
+        self.assertEqual(result.data["data"]["version"], 1)
 
     def test_browser_write_requires_csrf(self):
         client = APIClient(enforce_csrf_checks=True)
