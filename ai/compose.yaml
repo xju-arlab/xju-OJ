@@ -103,6 +103,9 @@ services:
       AI_WORKER_NAME: notebook-1
       AI_WORKER_KINDS: notebook
       AI_NOTEBOOK_IMAGE: ${AI_NOTEBOOK_IMAGE:?}
+      AI_NOTEBOOK_MAX_KERNELS: ${AI_NOTEBOOK_MAX_KERNELS:-3}
+      AI_NOTEBOOK_MEMORY_MB: ${AI_NOTEBOOK_MEMORY_MB:-1024}
+      AI_NOTEBOOK_IDLE_SECONDS: ${AI_NOTEBOOK_IDLE_SECONDS:-600}
     secrets: [oj_worker_token]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

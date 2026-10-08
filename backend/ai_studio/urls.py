@@ -10,6 +10,7 @@ urlpatterns = [
     path("completed", views.CompletedAPI.as_view()),
     path("contest", views.AIContestAPI.as_view()),
     path("leaderboard", views.LeaderboardAPI.as_view()),
+    path("problem-leaderboard", views.ProblemLeaderboardAPI.as_view()),
     path("health", views.HealthAPI.as_view()),
     path("worker", views.WorkerAPI.as_view()),
 ]

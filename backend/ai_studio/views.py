@@ -15,7 +15,7 @@ from contest.models import Contest
 from utils.api import APIError, APIView, CSRFExemptAPIView
 from .contracts import ACTIVE, TERMINAL, cells_input, finite_score, judge_input, notebook_output, public_files_input, require
 from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIServiceState, AIWorker
-from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access,
+from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access, problem_leaderboard,
                        public_job, public_problem, save_draft)
 
 
@@ -25,7 +25,8 @@ def page(request, queryset, serialize):
         limit = min(100, max(1, int(request.GET.get("limit", 20))))
     except ValueError:
         raise APIError("Invalid pagination")
-    return {"total": queryset.count(), "results": [serialize(item) for item in queryset[offset:offset + limit]]}
+    return {"total": len(queryset) if isinstance(queryset, list) else queryset.count(),
+            "results": [serialize(item) for item in queryset[offset:offset + limit]]}
 
 
 class ProblemsAPI(APIView):
@@ -142,6 +143,14 @@ class HealthAPI(APIView):
         return self.success({"notebook": "notebook" in kinds, "evaluation": "evaluation" in kinds})
 
 
+class ProblemLeaderboardAPI(APIView):
+    @login_required
+    def get(self, request):
+        result = problem_leaderboard(request, request.GET)
+        result.update(page(request, result["results"], lambda row: row))
+        return self.success(result)
+
+
 class ProblemAdminAPI(APIView):
     @admin_role_required
     def get(self, request):
@@ -168,7 +177,7 @@ class ProblemAdminAPI(APIView):
         judge = judge_input(data.get("judge"))
         public_files = public_files_input(data.get("public_files", {}))
         statement = {}
-        for key in ("objective", "signature", "data", "evaluation"):
+        for key in ("objective", "signature", "inputSpec", "outputSpec", "data", "evaluation"):
             value = data.get(key, "")
             require(isinstance(value, str) and len(value) <= 32000, "Invalid statement")
             statement[key] = value
@@ -300,6 +309,16 @@ class WorkerAPI(CSRFExemptAPIView):
             if data["action"] == "finish":
                 self.finish(job, data)
             else:
+                if "output" in data:
+                    require(job.kind == "notebook", "Only Notebook jobs accept progress")
+                    output = notebook_output(data["output"])
+                    require("predictions" not in output and "cells" in output and
+                            len(output["cells"]) == len(job.payload["cells"]),
+                            "Progress must match the submitted cells")
+                    require(all("status" in cell for cell in output["cells"]), "Cell progress status is required")
+                    require(sum(cell["status"] == "RUNNING" for cell in output["cells"]) <= 1,
+                            "Notebook cells run sequentially")
+                    job.output = output
                 job.lease_until = now() + timedelta(seconds=90)
             job.save()
         return self.success({"finished": job.status not in ACTIVE})
@@ -320,6 +339,8 @@ class WorkerAPI(CSRFExemptAPIView):
         job.lease = uuid.uuid4()
         job.lease_until = now() + timedelta(seconds=90)
         job.attempts += 1
+        if job.kind == "notebook":
+            job.output = {}  # The worker reconciles the kernel; old progress is not current.
         job.status = "RUNNING" if job.kind == "notebook" else {
             "logic": "JUDGING", "model": "TRAINING", "challenge": "SCORING"
         }[job.category]
@@ -334,7 +355,11 @@ class WorkerAPI(CSRFExemptAPIView):
         errors = ("RUNTIME_ERROR", "TIME_LIMIT", "MEMORY_LIMIT", "SYSTEM_ERROR", "CANCELLED")
         if job.kind == "notebook":
             require(status in errors + ("SUCCEEDED",), "Invalid notebook status")
-            job.output = notebook_output(data.get("output", {}))
+            job.output = notebook_output(data.get("output", job.output or {}))
+            if status != "SUCCEEDED":
+                for cell in job.output.get("cells", []):
+                    if cell.get("status") in ("PENDING", "RUNNING"):
+                        cell["status"] = "ERROR" if cell["status"] == "RUNNING" else "SKIPPED"
         else:
             require(status in errors + ("SCORED",), "Evaluation must provide trusted scores or an error")
             if status == "SCORED":
@@ -353,5 +378,7 @@ class WorkerAPI(CSRFExemptAPIView):
         # Never return scoring-container logs: they can include hidden answers.
         job.message = {"RUNTIME_ERROR": "运行失败，请检查代码或提交格式。", "TIME_LIMIT": "运行超时。",
                        "MEMORY_LIMIT": "内存超限。", "SYSTEM_ERROR": "评测服务异常，请联系管理员。"}.get(status, "")
+        if job.kind == "notebook" and job.output.get("kernel_reset"):
+            job.message = "内核已重启，先前变量已清空。请重新运行所需单元格或运行全部。"
         job.finished_at = now()
         job.lease_until = None

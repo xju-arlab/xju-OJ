@@ -1,7 +1,9 @@
 """An outbound-only compute agent. Run on a dedicated Docker host, outside OJ."""
 import argparse
+import atexit
 import logging
 import os
+import signal
 import time
 from pathlib import Path
 
@@ -29,8 +31,12 @@ def main():
     if not kinds or set(kinds) - {"notebook", "evaluation"}:
         raise ValueError("Invalid worker capabilities")
     notebook = None
+    worker = os.environ.get("AI_WORKER_NAME", "ai-worker-1")
     if "notebook" in kinds:
-        notebook = NotebookExecutor(os.environ["AI_NOTEBOOK_IMAGE"])
+        notebook = NotebookExecutor(os.environ["AI_NOTEBOOK_IMAGE"], owner=worker,
+                                    max_kernels=os.environ.get("AI_NOTEBOOK_MAX_KERNELS", "3"),
+                                    memory_mb=os.environ.get("AI_NOTEBOOK_MEMORY_MB", "1024"),
+                                    idle_seconds=os.environ.get("AI_NOTEBOOK_IDLE_SECONDS", "600"))
         notebook.preflight()
     oj = Client(os.environ["OJ_AI_URL"], secret("AI_WORKER_TOKEN_FILE"), "Bearer")
     evaluator = None
@@ -41,7 +47,14 @@ def main():
     if args.preflight:
         log.info("Container engine, notebook image and configured evaluation service are available")
         return
-    worker = os.environ.get("AI_WORKER_NAME", "ai-worker-1")
+    if notebook:
+        notebook.recover()
+        atexit.register(notebook.close)
+
+        def stop(_signal, _frame):
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGTERM, stop)
 
     def call(action, **data):
         result = oj.call("POST", "worker", {"worker": worker, "kinds": kinds, "action": action, **data})
@@ -52,6 +65,8 @@ def main():
 
     while True:
         try:
+            if notebook:
+                notebook.reap_idle()
             job = call("claim")
             if job:
                 log.info("Claimed %s %s", job["kind"], job["id"])

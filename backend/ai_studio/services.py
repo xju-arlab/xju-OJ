@@ -64,7 +64,7 @@ def public_problem(problem, points=None, full=False):
               "version": problem.version}
     if full:
         result.update({key: problem.statement.get(key, [] if key == "requirements" else "")
-                       for key in ("objective", "requirements", "signature", "data", "evaluation")})
+                       for key in ("objective", "requirements", "signature", "inputSpec", "outputSpec", "data", "evaluation")})
         result["cells"] = problem.cells
         result["files"] = list(problem.public_files)
     return result
@@ -131,6 +131,23 @@ def create_job(request, data):
     except ValueError:
         raise APIError("A submission UUID is required")
     payload = {"cells": cells_input(data.get("cells")), "files": problem.public_files}
+    if kind == "notebook" and "kernel" in data:
+        try:
+            kernel = str(uuid.UUID(str(data["kernel"])))
+        except (ValueError, TypeError):
+            raise APIError("Invalid Notebook session")
+        cell_index = data.get("cell_index")
+        require(cell_index is None or (type(cell_index) is int and 0 <= cell_index < len(payload["cells"])),
+                "Invalid cell index")
+        generation = data.get("kernel_generation", "")
+        require(isinstance(generation, str) and (not generation or (len(generation) == 32 and
+                all(char in "0123456789abcdef" for char in generation))), "Invalid kernel generation")
+        # Never let a browser-chosen UUID attach to another user's or contest's kernel.
+        identity = [request.user.pk, problem.pk, problem.version, contest.pk if contest else None, kernel]
+        payload.update(kernel_id=hashlib.sha256(json.dumps(identity).encode()).hexdigest(),
+                       kernel_generation=generation, cell_index=cell_index)
+    else:
+        require("cell_index" not in data, "Single-cell execution requires a Notebook session")
     if problem.category == "challenge" and kind == "evaluation":
         predictions = data.get("predictions")
         require(isinstance(predictions, str) and 0 < len(predictions.encode()) <= MAX_PREDICTION_BYTES
@@ -149,6 +166,9 @@ def create_job(request, data):
     service = AIServiceState.objects.select_for_update().get(pk=1)
     require(not service.paused, "AI compute service is being updated. Your draft can still be saved and exported.")
     require(AIJob.objects.filter(user=user, status__in=ACTIVE).count() < 3, "Wait for your current jobs to finish")
+    if payload.get("kernel_id"):
+        require(not AIJob.objects.filter(user=user, kind="notebook", status__in=ACTIVE,
+                                         payload__kernel_id=payload["kernel_id"]).exists(), "This Notebook is already running")
     require(AIWorker.objects.filter(last_seen__gte=now() - timedelta(seconds=90), kinds__contains=[kind]).exists(),
             "AI compute service is offline. Your draft can still be saved and exported.")
     require(kind == "notebook" or bool(problem.judge.get("phase_id")), "Evaluation is not configured")
@@ -164,6 +184,45 @@ def create_job(request, data):
                                payload=payload, source_sha256=digest, judge=problem.judge.copy())
 
 
+def select_scores(jobs, selection, private):
+    selected = {}
+    for job in jobs:  # newest first: latest includes unsuccessful and unfinished submissions
+        key = (job.user_id, job.problem_id)
+        score = job.private_score if private and job.category == "challenge" else job.public_score
+        previous = selected.get(key)
+        if previous is None or (selection == "best" and score is not None and
+                                (previous[1] is None or score > previous[1])):
+            selected[key] = (job, score)
+    return selected
+
+
+def problem_leaderboard(request, data):
+    problem, contest, config = problem_access(request, data)
+    private = bool(contest and config.private_published and contest.end_time < now())
+    jobs = AIJob.objects.filter(problem=problem, contest=contest, kind="evaluation", user__is_disabled=False)
+    selection = config.selection if contest else "best"
+    if contest:
+        require(contest.real_time_rank or contest.end_time < now() or request.user.is_contest_admin(contest),
+                "Leaderboard is hidden during this contest")
+        jobs = jobs.filter(official=True)
+    else:
+        # Practice never mixes contest submissions or scores from a changed judge contract.
+        jobs = jobs.filter(problem_version=problem.version, public_score__isnull=False)
+    selected = select_scores(jobs.select_related("user"), selection, private)
+    rows = [{"userId": job.user_id, "username": job.user.username, "score": score,
+             "record": {"type": job.category, "status": job.status, "accuracy": job.accuracy,
+                        "publicScore": job.public_score, "privateScore": job.private_score if private else None,
+                        "privatePublished": private}} for job, score in selected.values()]
+    rows.sort(key=lambda row: (-round(row["score"] or 0, 4), row["username"], row["userId"]))
+    last_score, rank = None, 0
+    for index, row in enumerate(rows):
+        score = round(row["score"] or 0, 4)
+        if index == 0 or score != last_score:
+            rank = index + 1
+        row["rank"], last_score = rank, score
+    return {"privatePublished": private, "selection": selection, "results": rows}
+
+
 def leaderboard(request, contest_id):
     contest, config = contest_access(request, contest_id)
     require(contest.real_time_rank or contest.end_time < now() or request.user.is_contest_admin(contest),
@@ -171,14 +230,7 @@ def leaderboard(request, contest_id):
     private = config.private_published and contest.end_time < now()
     weights = dict(AIContestProblem.objects.filter(contest=contest).values_list("problem_id", "points"))
     jobs = AIJob.objects.filter(contest=contest, official=True, kind="evaluation", user__is_disabled=False).select_related("user", "problem")
-    selected = {}
-    for job in jobs:  # newest first: latest includes unsuccessful and unfinished submissions
-        key = (job.user_id, job.problem_id)
-        score = job.private_score if private and job.category == "challenge" else job.public_score
-        previous = selected.get(key)
-        if previous is None or (config.selection == "best" and score is not None and
-                                (previous[1] is None or score > previous[1])):
-            selected[key] = (job, score)
+    selected = select_scores(jobs, config.selection, private)
     rows = {}
     for (user_id, problem_id), (job, score) in selected.items():
         row = rows.setdefault(user_id, {"userId": user_id, "username": job.user.username, "total": 0, "scores": {}})

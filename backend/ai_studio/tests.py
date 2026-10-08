@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import tempfile
 import uuid
@@ -7,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.utils.timezone import now
+from django.core.management import call_command, CommandError
 from rest_framework.test import APIClient
 
 from contest.models import Contest, ContestParticipation, OIContestRank
@@ -226,6 +228,67 @@ class AIStudioTests(APITestCase):
         self.assertEqual(AIJob.objects.get().status, "ACCEPTED")
         self.assertIsNone(self.claim())
 
+    def test_notebook_progress_is_private_fenced_and_preserved_on_failure(self):
+        self.assertSuccess(self.submit(kind="notebook", kernel=str(uuid.uuid4()), cells=["x = 1", "print(x)"]))
+        claim = self.claim()
+        progress = {"cells": [{"status": "SUCCEEDED", "execution_count": 1, "text": "first result"},
+                              {"status": "RUNNING", "execution_count": None}], "kernel_id": uuid.uuid4().hex}
+        self.assertSuccess(self.worker("heartbeat", id=claim["id"], lease=claim["lease"], output=progress))
+        detail = self.client.get("/api/ai/jobs", {"id": claim["id"]}).data["data"]
+        self.assertEqual(detail["status"], "RUNNING")
+        self.assertEqual(detail["output"], progress)
+        self.assertFalse(detail["official"])
+        self.create_user("another", "another")
+        self.assertFailed(self.client.get("/api/ai/jobs", {"id": claim["id"]}))
+        self.assertSuccess(self.worker("finish", id=claim["id"], lease=claim["lease"], status="TIME_LIMIT"))
+        job = AIJob.objects.get(pk=claim["id"])
+        self.assertEqual(job.output["cells"][0]["text"], "first result")
+        self.assertEqual(job.output["cells"][1]["status"], "ERROR")
+        self.assertIsNone(job.public_score)
+        self.assertFailed(self.worker("heartbeat", id=claim["id"], lease=claim["lease"], output=progress))
+
+    def test_notebook_sessions_bind_user_contest_version_and_serialize_execution(self):
+        kernel = str(uuid.uuid4())
+        first = self.submit(kind="notebook", kernel=kernel, cell_index=0).data["data"]
+        self.assertFailed(self.submit(kind="notebook", kernel=kernel, cell_index=0))
+        claim = self.claim()
+        self.assertSuccess(self.worker("finish", id=claim["id"], lease=claim["lease"], status="SUCCEEDED"))
+        again = self.submit(kind="notebook", kernel=kernel).data["data"]
+        self.assertEqual(first["payload"]["kernel_id"], again["payload"]["kernel_id"])
+        self.register()
+        contest = self.submit(kind="notebook", kernel=kernel, contest_id=self.contest.id).data["data"]
+        self.assertNotEqual(first["payload"]["kernel_id"], contest["payload"]["kernel_id"])
+        self.problem.version += 1
+        self.problem.save()
+        version = self.submit(kind="notebook", kernel=kernel).data["data"]
+        self.assertNotEqual(first["payload"]["kernel_id"], version["payload"]["kernel_id"])
+        self.create_user("another", "another")
+        other = self.submit(kind="notebook", kernel=kernel).data["data"]
+        self.assertNotEqual(version["payload"]["kernel_id"], other["payload"]["kernel_id"])
+
+    def test_notebook_progress_validation_and_replaced_lease(self):
+        for index in (-1, 1, True, "0"):
+            self.assertFailed(self.submit(kind="notebook", kernel=str(uuid.uuid4()), cell_index=index))
+        self.assertFailed(self.submit(kind="notebook", cell_index=0))
+        self.assertFailed(self.submit(kind="notebook", kernel="invalid"))
+        self.assertSuccess(self.submit(kind="notebook", kernel=str(uuid.uuid4()), cells=["x", "y"]))
+        first = self.claim()
+        for output in ({"cells": [{"status": "RUNNING"}]},
+                       {"cells": [{"status": "RUNNING"}, {"status": "RUNNING"}]},
+                       {"cells": [{"status": "INVALID"}, {"status": "IDLE"}]},
+                       {"cells": [{"status": "RUNNING", "html": "unsafe"}, {"status": "IDLE"}]}):
+            self.assertFailed(self.worker("heartbeat", id=first["id"], lease=first["lease"], output=output))
+        progress = {"cells": [{"status": "RUNNING"}, {"status": "PENDING"}]}
+        self.assertSuccess(self.worker("heartbeat", id=first["id"], lease=first["lease"], output=progress))
+        AIJob.objects.filter(pk=first["id"]).update(lease_until=now() - timedelta(seconds=1))
+        second = self.claim()
+        self.assertEqual(AIJob.objects.get(pk=first["id"]).output, {})
+        self.assertFailed(self.worker("heartbeat", id=first["id"], lease=first["lease"], output=progress))
+        self.assertSuccess(self.worker("heartbeat", id=second["id"], lease=second["lease"], output=progress))
+        self.assertSuccess(self.submit())
+        evaluation = self.claim()
+        self.assertFailed(self.worker("heartbeat", id=evaluation["id"], lease=evaluation["lease"], output=progress))
+
     def test_browser_cannot_post_scores_or_claim_jobs(self):
         self.assertFailed(self.post("worker", {"action": "claim", "worker": "x", "kinds": ["evaluation"]}))
         self.assertSuccess(self.submit(public_score=100, status="ACCEPTED"))
@@ -261,6 +324,102 @@ class AIStudioTests(APITestCase):
 
     def test_regular_user_cannot_manage_ai(self):
         self.assertFailed(self.client.post("/api/admin/ai/problems", {}, format="json"))
+
+    def test_problem_ranking_practice_best_score_scope_and_no_private_data(self):
+        def record(score, **values):
+            return AIJob.objects.create(user=self.user, problem=self.problem, category="challenge", problem_version=1,
+                                        kind="evaluation", status="SCORED", public_score=score, private_score=99,
+                                        source_sha256="test", payload={"cells": ["private answer"]}, **values)
+        record(70)
+        record(0)
+        record(100, contest=self.contest, official=True)
+        old = record(90)
+        old.problem_version = 2
+        old.save()
+        self.problem.statement = {"inputSpec": "X: [N, 2]", "outputSpec": "w: [2, 1]"}
+        self.problem.save()
+        statement = self.client.get("/api/ai/problems", {"problem_id": "AI001"}).data["data"]
+        self.assertEqual(statement["inputSpec"], "X: [N, 2]")
+        result = self.client.get("/api/ai/problem-leaderboard", {"problem_id": "AI001"})
+        self.assertSuccess(result)
+        row = result.data["data"]["results"][0]
+        self.assertEqual(row["score"], 70)
+        self.assertIsNone(row["record"]["privateScore"])
+        self.assertNotIn("payload", row)
+        self.assertNotIn("private answer", json.dumps(result.data))
+        self.problem.visible = False
+        self.problem.save()
+        self.assertFailed(self.client.get("/api/ai/problem-leaderboard", {"problem_id": "AI001"}))
+
+    def test_problem_ranking_contest_selection_embargo_and_post_contest_practice(self):
+        data = {"problem_id": "AI001", "contest_id": self.contest.id}
+        self.assertFailed(self.client.get("/api/ai/problem-leaderboard", data))
+        self.register()
+        self.problem.category = "challenge"
+        self.problem.save()
+        for public, private in [(80, 20), (30, 95)]:
+            AIJob.objects.create(user=self.user, problem=self.problem, contest=self.contest, category="challenge",
+                                 official=True, problem_version=1, kind="evaluation", status="SCORED",
+                                 public_score=public, private_score=private, source_sha256="test")
+        def board():
+            response = self.client.get("/api/ai/problem-leaderboard", data)
+            self.assertSuccess(response)
+            return response.data["data"]
+        self.assertEqual(board()["results"][0]["score"], 30)
+        self.assertIsNone(board()["results"][0]["record"]["privateScore"])
+        self.config.selection = "best"
+        self.config.private_published = True
+        self.config.save()
+        self.assertEqual(board()["results"][0]["score"], 80)
+        self.assertFalse(board()["privatePublished"])
+        self.contest.real_time_rank = False
+        self.contest.save()
+        self.assertFailed(self.client.get("/api/ai/problem-leaderboard", data))
+        self.contest.end_time = now() - timedelta(seconds=1)
+        self.contest.save()
+        AIJob.objects.create(user=self.user, problem=self.problem, contest=self.contest, category="challenge",
+                             official=False, problem_version=1, kind="evaluation", status="SCORED",
+                             public_score=100, private_score=100, source_sha256="practice")
+        self.assertTrue(board()["privatePublished"])
+        self.assertEqual(board()["results"][0]["score"], 95)
+
+    def test_problem_ranking_ties_pagination_and_disabled_users(self):
+        for index in range(3):
+            user = self.create_user("rank" + str(index), "password", login=False)
+            AIJob.objects.create(user=user, problem=self.problem, category="logic", problem_version=1,
+                                 kind="evaluation", status="ACCEPTED", public_score=100, source_sha256="test")
+        user.is_disabled = True
+        user.save()
+        result = self.client.get("/api/ai/problem-leaderboard", {"problem_id": "AI001", "offset": 1, "limit": 1})
+        self.assertEqual(result.data["data"]["total"], 2)
+        self.assertEqual(result.data["data"]["results"][0]["rank"], 1)
+        self.assertEqual(result.data["data"]["results"][0]["username"], "rank1")
+
+    def test_practice_statement_refresh_is_explicit_atomic_and_preserves_judge_version(self):
+        manifest = [{"id": "AI00" + str(index), "title": self.problem.title, "type": "logic", "metric": "Score",
+                     "points": 100, "statement": {"inputSpec": "X: [N, 2]", "outputSpec": "w: [2, 1]"},
+                     "cells": self.problem.cells, "public_files": {}, "judge": self.problem.judge.copy()} for index in range(1, 6)]
+        path = Path(self.temp.name) / "manifest.json"
+        path.write_text(json.dumps(manifest))
+        args = {"creator": self.admin.username, "stdout": io.StringIO()}
+        with self.assertRaises(CommandError):
+            call_command("import_ai_practice", str(path), **args)
+        with self.assertRaises(CommandError):
+            call_command("import_ai_practice", str(path), refresh_statement=True, **args)
+        self.contest.end_time = now() - timedelta(seconds=1)
+        self.contest.save()
+        call_command("import_ai_practice", str(path), refresh_statement=True, **args)
+        call_command("import_ai_practice", str(path), refresh_statement=True, **args)
+        self.problem.refresh_from_db()
+        self.assertEqual(self.problem.statement, manifest[0]["statement"])
+        self.assertEqual(self.problem.version, 1)
+        manifest[0]["statement"]["inputSpec"] = "changed text"
+        manifest[1]["judge"]["phase_id"] = 999
+        path.write_text(json.dumps(manifest))
+        with self.assertRaises(CommandError):
+            call_command("import_ai_practice", str(path), refresh_statement=True, **args)
+        self.problem.refresh_from_db()
+        self.assertEqual(self.problem.statement["inputSpec"], "X: [N, 2]")
 
     def test_browser_write_requires_csrf(self):
         client = APIClient(enforce_csrf_checks=True)

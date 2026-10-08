@@ -13,7 +13,8 @@ export const notebookFor = (problem, cells) => ({
   nbformat: 4, nbformat_minor: 5,
   metadata: { kernelspec: { display_name: 'Python 3', language: 'python', name: 'python3' }, language_info: { name: 'python' } },
   cells: [
-    { id: 'instructions', cell_type: 'markdown', metadata: {}, source: ['# ' + problem.title + '\n', problem.objective] },
+    { id: 'instructions', cell_type: 'markdown', metadata: {}, source: ['# ' + problem.title + '\n', problem.objective,
+      '\n\n## 接口约定\n', problem.signature || '', '\n\n## 输入\n', problem.inputSpec || '', '\n\n## 输出\n', problem.outputSpec || ''] },
     ...cells.map((source, index) => ({ id: 'answer-' + index, cell_type: 'code', metadata: {}, source: [source], execution_count: null, outputs: [] }))
   ]
 })

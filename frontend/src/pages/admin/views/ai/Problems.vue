@@ -7,6 +7,8 @@
       <el-form-item label="任务目标"><el-input v-model="form.objective" type="textarea" :rows="3" /></el-form-item>
       <el-form-item label="实现要求（每行一项）"><el-input v-model="requirements" type="textarea" :rows="3" /></el-form-item>
       <el-form-item label="接口约定"><el-input v-model="form.signature" type="textarea" :rows="2" /></el-form-item>
+      <el-form-item label="输入（张量/数据形状与约束）"><el-input v-model="form.inputSpec" type="textarea" :rows="4" /></el-form-item>
+      <el-form-item label="输出（返回值/提交格式与约束）"><el-input v-model="form.outputSpec" type="textarea" :rows="4" /></el-form-item>
       <el-form-item label="数据说明"><el-input v-model="form.data" type="textarea" :rows="2" /></el-form-item>
       <el-form-item label="评分说明"><el-input v-model="form.evaluation" type="textarea" :rows="3" /></el-form-item>
       <div class="ai-admin-grid"><el-form-item label="指标名称"><el-input v-model="form.metric" /></el-form-item><el-form-item label="分值"><el-input-number v-model="form.points" :min="1" :max="10000" /></el-form-item><el-form-item label="在公开题库显示"><el-switch v-model="form.visible" /></el-form-item></div>
@@ -27,7 +29,7 @@ import { request } from '@oj/views/ai/api'
 const problems = ref([]); const selected = ref(''); const form = ref(null); const requirements = ref('')
 const error = ref(''); const saving = ref(false)
 async function load () { try { problems.value = (await request('admin/ai/problems', 'get', { limit: 100 })).results } catch (failure) { error.value = failure.message } }
-function create () { selected.value = ''; requirements.value = ''; form.value = { id: '', title: '', type: 'logic', objective: '', signature: '', data: '', evaluation: '', metric: 'Score', points: 100, visible: false, public_files: {}, cells: ['import torch\nfrom torch import nn\nimport numpy as np\nimport pandas as pd', '# 完成你的实现', '# 公开样例'], judge: { phase_id: 1, public_column: 'score', private_column: '', accuracy_column: '', pass_score: 100, run_seconds: 120 } } }
+function create () { selected.value = ''; requirements.value = ''; form.value = { id: '', title: '', type: 'logic', objective: '', signature: '', inputSpec: '', outputSpec: '', data: '', evaluation: '', metric: 'Score', points: 100, visible: false, public_files: {}, cells: ['import torch\nfrom torch import nn\nimport numpy as np\nimport pandas as pd', '# 完成你的实现', '# 公开样例'], judge: { phase_id: 1, public_column: 'score', private_column: '', accuracy_column: '', pass_score: 100, run_seconds: 120 } } }
 function edit () { form.value = JSON.parse(JSON.stringify(problems.value.find(item => item.id === selected.value))); requirements.value = form.value.requirements.join('\n') }
 async function readFiles (event) {
   const files = Array.from(event.target.files || [])

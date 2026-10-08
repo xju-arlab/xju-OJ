@@ -345,6 +345,7 @@ audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、代码和宿主�
 release-and-recovery.md[SO7T]: F:规定统一发布、临时Git网络访问、宿主能力与排空重启及备份恢复 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:Git转发仅回环且代理按命令覆盖；可信入口按frontend实际来源；dump不含文件和Redis；有新写入不可直接回旧备份；手停unless-stopped须显式恢复
 acceptance-2026-10-07.md[SQ7T]: F:记录统一发布、备份恢复、HWE升级及真实20分钟比赛与补题验收证据 | R:code:docs/operations/audit-2026-10.md,code:deploy/ops/check-judge-host.py | A:2026年10月7日线上验收记录 | S:测试使用受控会话，外部登录邮件和第三方提交未实测；52项检查不代表全分支覆盖；测试账号已停用且对象隐藏，21条合成提交仍保留
 ai-acceptance-2026-10-07.md[SQ7T]: F:记录本地20分钟AI比赛、15人并发及真实评测与发布竞态修复 | R:code:ai/README.md,code:ai/tests/live_acceptance.py,code:ai/tests/test_contracts.py | A:2026年10月7日本地AI验收报告 | S:受控会话不证明外部登录邮件第三方OJ；CPU测量不代表生产容量；GPU未启用；覆盖上游完成先于分数写入的有界等待，正式考试未创建
+ai-notebook-2026-10-08.md[SQ7T]: F:记录Notebook交互、五题输入输出和单题排行的自动化及本地真实验收 | R:code:ai/README.md,code:ai/tests/test_runtime.py,code:backend/ai_studio/tests.py | A:2026年10月8日验收和发布步骤 | S:真实测试使用独立账号，私有会话及答卷不入库；记录本地实测与生产复验步骤，未声称15个常驻内核或GPU已验证
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/plans/feiyue-style-migration/===
 00-visual-audit-and-baseline.md[SU4T]: F:记录Feiyue视觉参考到OJ页面的映射及行为基线 | R:code:docs/plans/feiyue-style-migration/README.md | A:视觉审计计划 | S:保留判题、权限和接口行为；视觉参考冲突时优先业务可读性
@@ -799,18 +800,19 @@ normalize_remote_acm_verdicts.py[OD7T]: F:预览或备份后修正历史洛谷AC
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/ai/===
 AIContest.vue[EU7M]: F:以共用OJ比赛样式展示真实AI比赛、报名门禁、题目状态和成绩榜 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/styles/contest-detail.less,code:frontend/src/styles/contest-problems.less | A:/ai-studio/contest/:contestID；概览、题目和成绩页签 | S:题目链接携带contest隔离草稿；密码报名及赛后权限来自后端；私榜显式公布前不显示；每10秒轮询并丢弃迟到响应；富文本用DOMPurify清洗
-AIProblem.vue[EU8S]: F:并排提供AI题面和Notebook编辑、云端草稿、Jupyter运行与可信评测提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/studio.js,code:frontend/src/shared/editors/CodeMirrorAdapter.vue | A:/ai-studio/problem/:problemID；contest；运行全部、保存、导出、提交及CSV | S:草稿按用户题目比赛隔离且云端CAS冲突保留本地内容；并发保存失败阻止后续提交；请求绑定路由和用户代次；浏览器不计算成绩；运行输出仅文本PNG，挑战题可下载Jupyter预测CSV再提交
+AIProblem.vue[EU8M]: F:并排展示AI题面输入输出与排行并提供共享Notebook逐格运行和评测提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/ProblemRanking.vue,code:frontend/src/shared/editors/CodeMirrorAdapter.vue | A:运行全部；单格按钮；Shift+Enter；保存、导出和提交 | S:草稿按用户题目比赛隔离且CAS冲突保留备份；会话存储恢复内核任务，显示真实进度和执行计数；快捷键捕获避免编辑器插入换行；旧路由回复丢弃；输出仅文本PNG；评分由后端决定
 AIStudio.vue[EU7S]: F:以双栏展示真实AI比赛题库、成功题目集锦和最近提交 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:frontend/src/pages/oj/views/ai/EvaluationIcon.vue | A:section；AI首页、比赛及个人提交路由 | S:最近记录按提交时间倒序含失败和进行中；成功集锦由完整历史按题去重；每10秒轮询；分页筛选从后端获取，导出属于本人答卷
 EvaluationStatus.vue[EU6T]: F:用OJ胶囊展示逻辑和模型结果及公私榜得分与模型准确率 | R:code:frontend/src/styles/judge-status.less | A:record；inline；data-status；aria-label | S:零分有效，缺分不补零；只有privatePublished才显示私榜；Accuracy置胶囊前且inline保持状态靠右；未知状态明确待确认
-studio.js[LU5T]: F:统一三类题型文案、北京时间展示及Notebook和文件导出 | R:code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:categories；categoryFor；formatDate；notebookFor；download | S:导出Notebook仅题目说明与当前代码，不含执行输出；对象URL延迟释放；未知日期显示待定
-studio.less[FU5S]: F:定义AI首页双栏分隔、单行活动和Notebook及运行输出的响应式布局 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/App.vue | A:ai-studio；studio-home-grid；studio-activity-row；ai-problem-page；studio-workspace | S:Notebook顶部偏移绑定56px导航；窄屏分隔线改横线；长标题省略以保留右侧状态胶囊；表格隐藏表头不撑宽页面
+studio.js[LU5T]: F:统一AI题型文案、北京时间及带接口和输入输出说明的Notebook导出 | R:code:frontend/src/pages/oj/views/ai/AIProblem.vue | A:categories；categoryFor；formatDate；notebookFor；download | S:导出仅含题目文字与当前代码，不含执行结果或内核变量；对象URL延迟释放；未知日期显示待定
+studio.less[FU5S]: F:定义AI首页双栏、深色题面及Notebook逐格运行反馈的响应式外观 | R:code:frontend/src/styles/tokens.css,code:frontend/src/pages/oj/App.vue | A:ai-studio；studio-workspace；studio-cell；studio-spin；studio-io-description | S:Notebook顶部偏移绑定56px导航；窄屏分隔线改横线；状态靠右且长标题省略；运行旋转支持减少动态效果；正文用OJ字体和深色令牌
 EvaluationIcon.vue[EU4T]: F:统一映射AI等待、成功、失败及部分通过的轻量状态图标 | R:code:frontend/src/pages/oj/views/ai/AIStudio.vue | A:status；evaluation-icon | S:黄色等待旋转支持减少动态效果；图标隐藏于无障碍树，须配文字状态
 api.js[IN7T]: F:封装同源AI和后台请求、CSRF及活动任务状态集合 | R:code:backend/ai_studio/urls.py,code:backend/ai_studio/admin_urls.py | A:request；studioApi；activeStatuses | S:超时20秒且按JSON error判断业务失败；成绩写入不经此浏览器接口授权
+ProblemRanking.vue[EU7T]: F:分页展示当前AI题目的真实练习或比赛排行及评测状态 | R:code:frontend/src/pages/oj/views/ai/api.js,code:frontend/src/pages/oj/views/ai/EvaluationStatus.vue,code:backend/ai_studio/services.py | A:problemId；contestId；authenticated；刷新与分页 | S:登录后请求绑定题目比赛，旧响应丢弃；后端决定最高或最后分及私榜门禁；有效零分显示而缺分显示破折号；不暴露答卷
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/===
-README.md[SO7S]: F:说明AI计算架构、五道练习及在线离线部署和备份验收 | R:code:ai/prepare.py,code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-acceptance-2026-10-07.md | A:AI部署、导入、验收及恢复步骤 | S:CPU评测且每次新内核；令牌0600归容器backend用户；离线load丢失仓库digest，基础镜像可用两端核对的镜像ID；H100未启用；正式考试单独配置
+README.md[SO7S]: F:说明AI题型、共享Notebook、题目排行及部署备份和验收流程 | R:code:ai/build.sh,code:ai/deploy.sh,code:docs/operations/ai-notebook-2026-10-08.md | A:AI部署、导入和恢复步骤 | S:默认仅保留3个1GiB内核且空闲10分钟回收；题面刷新不改判分版本；令牌归容器backend用户；H100未启用，正式考试须另配
 build.sh[OV8T]: F:从固定Codabench修订及本仓库构建Notebook、站点和计算镜像 | R:code:ai/notebook/Dockerfile,code:ai/codabench/Dockerfile | A:镜像tag参数；AI_UPSTREAM_CACHE；BUILD_NETWORK | S:非dev构建要求干净HEAD；核验上游精确修订及无改动；三个镜像均标记OJ和上游修订，私有运行目录不进入构建上下文
-compose.yaml[OR9S]: F:编排私有Codabench、数据队列存储及Notebook和评测代理 | R:code:ai/prepare.py,code:ai/deploy.sh,code:ai/compute/worker.py | A:AI_RUNTIME；AI_SITE_IMAGE；AI_COMPUTE_IMAGE；AI_NOTEBOOK_IMAGE；AI_RABBIT_IMAGE；AI_MINIO_IMAGE；workspace卷 | S:不发布宿主端口；Docker仅可信计算与Notebook代理可访问；学生容器另行无网络隔离；有界tmpfs及串行CPU评测；令牌外置不交学生；Rabbit和Minio默认固定digest，离线可显式用已核对镜像ID
+compose.yaml[OR9S]: F:编排私有Codabench、数据服务及Notebook和评测代理并配置内核池 | R:code:ai/prepare.py,code:ai/deploy.sh,code:ai/compute/worker.py | A:AI_RUNTIME；AI_SITE_IMAGE；AI_COMPUTE_IMAGE；AI_NOTEBOOK_IMAGE；AI_NOTEBOOK_MAX_KERNELS/MEMORY_MB/IDLE_SECONDS | S:不发布宿主端口；Docker仅可信代理可访问，学生另行无网络隔离；Notebook默认3个1GiB内核和600秒空闲期限；评测串行且临时卷有界；令牌不交学生；离线基础镜像可用核对后的镜像ID
 deploy.sh[OV9T]: F:在干净源码和镜像溯源核验后排空备份并更新AI服务 | R:code:ai/compose.yaml,code:ai/compute/control.py,code:ai/codabench/bootstrap.py | A:私有runtime绝对路径参数 | S:排他锁且镜像必须匹配当前HEAD；先暂停排空OJ及Codabench，再备份数据库对象和配置；迁移初始化后预检并恢复接单；失败保留暂停和数据，不删除队列或卷；需先部署OJ迁移及共享令牌
 prepare.py[OC8T]: F:在仓库外创建AI私有配置凭据及有界临时工作卷 | R:code:ai/compose.yaml,code:ai/deploy.sh | A:--runtime；--project；--oj-url；--tag；--postgres-image | S:拒绝已有配置而不覆盖令牌；随机密钥文件0600；复用卷必须精确匹配512MiB tmpfs选项；只输出路径，不输出密钥
 
@@ -823,32 +825,32 @@ site_settings.py[FS8T]: F:配置只供内部桥接使用的Codabench站点及文
 ===/home/winbeau/xju-arlab/xju-oj/ai/compute/===
 codabench.py[IN9S]: F:把OJ答卷交给Codabench并恢复不确定派发和读取可信成绩 | R:code:ai/compute/transport.py,code:ai/compute/worker.py,code:backend/ai_studio/views.py | A:Codabench.find_submission；submit；run；submission_bundle | S:POST前持久标记派发，断连后按UUID文件名恢复而不盲重发；远程ID固定；验证阶段及有限唯一分数；上游先Finished后逐列写分，缺列继续轮询最多30秒，绝不补零；必要时取唯一子任务分数；TLE和OOM仅据可信元数据
 control.py[OW7T]: F:通过认证Worker接口暂停接收新任务、等待排空和恢复AI服务 | R:code:backend/ai_studio/views.py,code:ai/deploy.sh | A:pause；resume；status；--wait | S:排空超时失败而不清理队列；暂停只阻止新计算任务，草稿仍可保存
-notebook.py[RS9T]: F:在独立Docker容器中运行Jupyter答卷并提取受限结果 | R:code:ai/notebook/notebook_runner.py,code:ai/compute/worker.py | A:NotebookExecutor；镜像预检与任务执行 | S:UID65532、无网络、只读根、无凭据和socket；CPU内存进程及输出均有界；等待时续租；即使返回JSON也先检查OOM避免误报超时；最终只清理本任务容器
+notebook.py[RS9S]: F:管理隔离Jupyter内核池并通过逐格事件续租回传运行结果 | R:code:ai/notebook/notebook_runner.py,code:ai/compute/worker.py | A:NotebookExecutor；preflight；recover；run；close | S:UID65532、无网络只读根且无凭据；空闲容器暂停全部进程，容量和闲置到期回收；旧generation单格请求取消而不补跑前置代码；同内核已完成任务重试复用结果；OOM优先容器事实；只清理绑定owner的容器
 transport.py[IN8T]: F:封装有界JSON请求及不携带服务认证的预签名对象上传 | R:code:ai/compute/codabench.py,code:ai/compute/worker.py | A:Client.call；Client.put_zip；RemoteError；NoRedirect | S:拒绝重定向及URL内凭据；上传来源匹配允许origin；响应限制8MiB；异常不泄露带令牌URL
-worker.py[AW9T]: F:从OJ认领Notebook或评测任务、续租并以栅栏令牌交付结果 | R:code:backend/ai_studio/views.py,code:ai/compute/notebook.py,code:ai/compute/codabench.py | A:--once；--preflight；AI_WORKER_KINDS；AI_WORKER_NAME | S:计算期间续租，结果最多三次回写；只向外请求OJ且服务不对学生开放；不回退宿主执行；失败日志只记录异常类型，令牌从私有文件读取
+worker.py[AW9S]: F:认领AI任务、维护Notebook内核池并以租约交付进度及结果 | R:code:backend/ai_studio/views.py,code:ai/compute/notebook.py,code:ai/compute/codabench.py | A:--once；--preflight；AI_WORKER_KINDS；AI_WORKER_NAME；AI_NOTEBOOK_* | S:预检不回收内核，正式启动才清理本owner遗留容器；退出关闭池；计算期间续租，结果最多回写三次；仅出站请求OJ，不回退宿主执行；日志不含凭据和答卷
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/notebook/===
 Dockerfile[OV8T]: F:构建固定Python及CPU版PyTorch的Jupyter运行与评测镜像 | R:code:ai/notebook/pyproject.toml,code:ai/notebook/uv.lock,code:ai/notebook/notebook_runner.py | A:Notebook镜像；python运行入口 | S:冻结依赖且以65532运行；禁用CUDA依赖；容器隔离和限额由可信启动器施加，镜像本身不替代沙箱边界
-notebook_runner.py[EA7T]: F:以新Jupyter内核执行全部代码单元并收集安全输出及预测CSV | R:code:ai/compute/notebook.py,code:backend/ai_studio/contracts.py | A:stdin任务JSON；stdout结果JSON | S:仅返回文本与PNG且总量有界，排除HTML和JavaScript；公开CSV写入任务工作目录；每次运行不保留内核状态，OOM最终由宿主容器状态识别
+notebook_runner.py[EA7S]: F:在持久Jupyter内核中执行单格或顺序全格并流式交付进度和输出 | R:code:ai/compute/notebook.py,code:backend/ai_studio/contracts.py | A:stdin与stdout逐行JSON；start/cell/result事件 | S:同内核保留变量及执行计数，异常停止后续格；公开CSV仅首次写入；只输出有界文本PNG及预测CSV；不是可信成绩，OOM由宿主识别
 pyproject.toml[FV7T]: F:固定Notebook环境的Jupyter、数值分析与CPU版PyTorch依赖 | R:code:ai/notebook/uv.lock,code:ai/notebook/Dockerfile | A:uv项目与PyTorch CPU索引 | S:运行Python3.12，torch从专用CPU索引获取；依赖升级须同步锁及真实运行验证
 uv.lock[FV7L]: F:锁定Notebook和评测环境的依赖图、来源及分发摘要 | R:code:ai/notebook/pyproject.toml,code:ai/notebook/Dockerfile | A:uv frozen sync锁文件 | S:PyTorch使用CPU分发；平台条件与hash由解析器维护，不手工改写或混入GPU环境
 
 ===/home/winbeau/xju-arlab/xju-oj/ai/practice/===
 ingestion.py[KA8T]: F:在无参考标签的容器中执行逻辑和模型答卷并输出供独立评分的产物 | R:code:ai/practice/scoring.py,code:ai/practice/problems.py | A:Codabench ingestion程序；线性参数、Softmax和XOR预测产物 | S:执行学生代码但不挂载评分参考；训练结果与源码约束信息交独立scorer检查；模型定义必须经过真实训练更新
-problems.py[FA7S]: F:定义五道深度学习练习的题面、接口框架、参考答卷和合成数据生成 | R:code:ai/codabench/bootstrap.py,code:ai/practice/scoring.py | A:PROBLEMS；数据与Notebook框架构造 | S:生成的隐藏数据和随机种子保存在私有运行资产；参考解只供受控验收，不进入OJ公开题目导出；这些练习不等于正式考试题
+problems.py[FA7M]: F:生成五道深度学习练习的接口形状说明、框架参考解与合成数据 | R:code:ai/codabench/bootstrap.py,code:ai/practice/ingestion.py,code:ai/practice/scoring.py | A:generate；IO_SPECS；Notebook和CSV框架 | S:新增输入输出文字不改变随机数据和判分契约；隐藏数据与种子留私有资产，参考解不进入公开清单；五题为练习而非保密考试
 scoring.py[KA8T]: F:独立检查实现约束及模型输出并计算测试分、准确率和公私榜指标 | R:code:ai/practice/ingestion.py,code:ai/practice/problems.py | A:Codabench scores产物；MSE、Accuracy、RMSE及LogLoss | S:不执行学生源码；AST课程约束不构成防作弊证明；预测CSV严格校验列、ID顺序、有限值和概率；隐藏数据按40/60分公私榜；合法零分仍有效
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/ai_studio/===
 admin_urls.py[EB6T]: F:挂载AI题目和比赛配置及私榜发布的后台管理接口 | R:code:backend/ai_studio/views.py,code:backend/oj/urls.py | A:/api/admin/ai路由 | S:路径位于后台权限中间件范围，视图继续核验对象归属
-contracts.py[ES8T]: F:统一校验AI答卷、公开文件、评测配置和可返回的Notebook输出 | R:code:backend/ai_studio/services.py,code:backend/ai_studio/views.py | A:单元、CSV、judge配置及输出规范函数 | S:代码64单元512KiB、预测CSV1MiB；公开文件16个总1MiB；输出仅文本PNG且2MiB；分数必须有限且在0至100，缺分不能补零
+contracts.py[ES8T]: F:校验AI答卷、评测配置、公开文件及Notebook逐格输出和内核标识 | R:code:backend/ai_studio/services.py,code:backend/ai_studio/views.py | A:cells_input；judge_input；notebook_output；public_files_input；CELL_STATUSES | S:代码64单元512KiB，预测CSV1MiB；公开文件16个总1MiB；Notebook输出仅白名单字段及文本PNG且总2MiB；进度状态六种，内核标识32位小写十六进制；分数有限且0至100，缺分不补零
 models.py[PA9S]: F:定义AI题目、比赛配置编排、隔离草稿和可租约认领的持久任务 | R:code:backend/ai_studio/services.py,code:backend/ai_studio/views.py | A:AIProblem；AIContestConfig；AIContestProblem；AIDraft；AIJob；AIWorker；AIServiceState | S:答卷保存题目版本、judge配置、类别、内容摘要和官方资格快照；远程派发及租约独立持久化；成绩独立于ACM/OI；题目用户比赛有关联任务时保护删除；草稿按用户题目scope唯一，比赛题序和题目分别唯一
-services.py[AA9S]: F:执行AI题目比赛授权、草稿并发保存、任务创建和正式成绩投影 | R:code:backend/ai_studio/models.py,code:backend/ai_studio/contracts.py,code:backend/contest/models.py | A:AI访问、序列化、保存与排名服务 | S:赛前锁题，赛中核验报名IP，赛后按配置开放免密码练习；官方资格创建时冻结；每人最多3个活动任务且要求Worker在线；UUID重复只接受同答卷；草稿版本冲突不覆盖；latest按提交顺序包含失败及待判，私榜仅赛后显式公布
-tests.py[TA8M]: F:回归AI授权、租约幂等、草稿冲突、成绩可信边界和赛后排名隔离 | R:code:backend/ai_studio/views.py,code:backend/ai_studio/services.py | A:Django AI API测试 | S:测试使用受控Worker结果而非真实Codabench；覆盖有效零分、私榜不泄露、配置冻结、过期租约及赛内提交赛后完成；真实计算另由ai测试验证
-urls.py[EA7T]: F:挂载AI题库草稿文件提交比赛排名健康和计算Worker接口 | R:code:backend/ai_studio/views.py,code:backend/oj/urls.py | A:/api/ai下problems、draft、file、jobs、completed、contest、leaderboard、health、worker | S:浏览器写入保留CSRF；Worker使用独立文件令牌，不能借浏览器会话提交成绩
-views.py[EA9M]: F:提供AI学习与比赛API、管理员配置及受认证Worker调度和结果回写 | R:code:backend/ai_studio/services.py,code:backend/ai_studio/contracts.py,code:backend/ai_studio/models.py | A:ProblemsAPI；DraftAPI；JobsAPI；AIContestAPI；ProblemAdminAPI；ContestAdminAPI；WorkerAPI | S:答卷只归属本人，评分配置不公开；后台版本CAS且赛中冻结题目规则；Worker令牌至少32字符并与APPKEY分离；认领skip_locked并以90秒租约栅栏防迟到覆盖，最多3次；远程ID不可更换，终态重试幂等；结果只接受有限合法分数和受限输出
+services.py[AA9M]: F:执行AI授权、草稿保存、内核绑定任务创建及比赛和题目成绩投影 | R:code:backend/ai_studio/models.py,code:backend/ai_studio/contracts.py,code:backend/contest/models.py | A:problem_access；save_draft；create_job；leaderboard；problem_leaderboard | S:内核绑定用户题目版本比赛及浏览器UUID，同内核串行且每人最多3个活动任务；草稿CAS；官方资格创建时冻结，赛后练习不改排行；latest包含失败待判；题目练习取当前版本最高公榜分；比赛沿用封榜与赛后私榜公布规则
+tests.py[TA8L]: F:回归AI权限、租约进度、内核隔离、题目排行和题面更新边界 | R:code:backend/ai_studio/views.py,code:backend/ai_studio/services.py,code:backend/ai_studio/management/commands/import_ai_practice.py | A:Django AI API测试 | S:使用受控Worker结果而非真实Codabench；覆盖同内核串行、过期进度、有效零分、私榜封榜与补题隔离及题面刷新事务；真实沙箱另由ai测试验证
+urls.py[EA7T]: F:挂载AI学习、提交、比赛和单题排行及可信Worker接口 | R:code:backend/ai_studio/views.py,code:backend/oj/urls.py | A:/api/ai下problems、draft、jobs、problem-leaderboard、leaderboard、worker等 | S:浏览器写入保留CSRF；单题排行须登录并核验题目比赛门禁；Worker凭据独立于浏览器会话
+views.py[EA9M]: F:提供AI题目输入输出、草稿提交排行、后台配置及Worker进度结果API | R:code:backend/ai_studio/services.py,code:backend/ai_studio/contracts.py,code:backend/ai_studio/models.py | A:ProblemsAPI；JobsAPI；ProblemLeaderboardAPI；ProblemAdminAPI；ContestAdminAPI；WorkerAPI | S:答卷只归本人，后台CAS且赛中冻结；Worker令牌独立且至少32字符；90秒租约栅栏最多认领3次；仅Notebook接受匹配格数且至多一格RUNNING的进度；失败保留先前输出；终态重试幂等，评分日志不公开
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/ai_studio/management/commands/===
-import_ai_practice.py[OD7T]: F:从可信私有清单幂等导入五道AI练习并可显式公开 | R:code:ai/codabench/bootstrap.py,code:backend/ai_studio/models.py | A:manage.py import_ai_practice；manifest；creator；publish | S:要求现有超级管理员作为作者；只接受完整五题清单；已有内容冲突立即拒绝覆盖；不创建比赛
+import_ai_practice.py[OD7T]: F:事务导入五道练习并支持显式刷新题面而保留评测版本 | R:code:ai/codabench/bootstrap.py,code:backend/ai_studio/models.py | A:manifest；--creator；--publish；--refresh-statement | S:作者须超级管理员；普通导入拒绝冲突；刷新仍要求所有非题面字段一致且无进行中比赛，保留版本草稿与成绩；整批原子，不创建比赛
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/ai_studio/migrations/===
 0001_initial.py[PD7S]: F:追加AI题目、比赛配置编排、草稿、持久任务和Worker心跳表 | R:code:backend/ai_studio/models.py | A:ai_studio初始迁移 | S:保持既有用户比赛表身份；草稿按用户题目scope唯一；AI答卷和配置独立于ACM/OI统计表；任务关联题目和用户采用保护删除
@@ -857,4 +859,4 @@ import_ai_practice.py[OD7T]: F:从可信私有清单幂等导入五道AI练习�
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/views/ai/===
 ContestSettings.vue[EU7T]: F:编辑AI比赛题序权重、最后或最高分策略及私榜和补题开关 | R:code:frontend/src/pages/admin/views/contest/Contest.vue,code:frontend/src/pages/oj/views/ai/api.js | A:contestId；save；validate | S:合并可管理和公开题目各最多100项；父表单创建比赛后单独保存设置；赛中冻结和赛后公布由后端核验
-Problems.vue[EU7T]: F:管理AI题面接口代码框架、公开CSV及私有Codabench评分配置 | R:code:frontend/src/pages/oj/views/ai/api.js,code:backend/ai_studio/views.py | A:AI题库创建编辑页面 | S:保存传题目版本以防覆盖；前端文件筛查不能替代服务端总量和内容校验；评分列及phase配置仅管理员可见
+Problems.vue[EU7T]: F:管理AI题面及输入输出形状、Notebook框架、公开CSV和评测配置 | R:code:frontend/src/pages/oj/views/ai/api.js,code:backend/ai_studio/views.py | A:AI题库创建编辑表单 | S:保存绑定题目版本防覆盖；前端文件检查不代替后端总量校验；输入输出为普通文本；私有评分列及phase仅管理员可见

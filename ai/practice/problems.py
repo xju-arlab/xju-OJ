@@ -50,6 +50,30 @@ def train_xor(model, X, y):
 '''
 
 
+IO_SPECS = {
+    "AI001": {
+        "inputSpec": "X：float32 张量，形状 [N, 2]，每行一个样本。\ny：float32 张量，形状 [N, 1]，与 X 按行对应。\n评测调用 train(X, y, lr=0.03, epochs=20, batch_size=32)，N=1024；公开样例 N=128。通过函数参数接收数据，无需读取标准输入。",
+        "outputSpec": "返回 (w, b)：w 为形状 [2, 1] 的张量，b 为单元素张量（如 [1] 或标量）。\n预测 X @ w + b 的形状应为 [N, 1]。参数及预测须为有限数值；系统检查参数误差和独立样本的 MSE，无需打印答案。",
+    },
+    "AI002": {
+        "inputSpec": "logits：float64 张量，形状 [B, C]，B 为批量大小，C 为类别数；每行是一个样本的未归一化分数。\ny：int64 张量，形状 [B]，标签取值 0 到 C−1。测试包含普通值、相同值及绝对值达到 10⁶ 的有限 logits，不可假设固定 B、C。",
+        "outputSpec": "stable_softmax(logits)：返回形状 [B, C] 的概率张量，每行和为 1，元素处于 [0, 1]。\ncross_entropy(logits, y)：返回批量平均交叉熵，标量张量（形状 []）或 Python 数值。\naccuracy(logits, y)：返回准确率，标量张量或 Python 数值，范围 [0, 1]。所有输出须有限；相对误差要求见评测说明。",
+    },
+    "AI003": {
+        "inputSpec": "X：float32 张量，形状 [4, 2]，四行依次为 [0,0]、[0,1]、[1,0]、[1,1]。\ny：int64 张量，形状 [4]，值为 [0,1,1,0]。\n系统先实例化 XORNet()，再调用 train_xor(model, X, y)；forward(x) 应支持形状 [B, 2] 的输入。",
+        "outputSpec": "XORNet.forward(x)：返回形状 [B, 2] 的有限 logits，每行对应类别 0、1，不在输出层应用 Softmax。\ntrain_xor(model, X, y)：返回训练后的 nn.Module，参数须实际更新。评测用 model.eval() 计算 [4, 2] 的 logits，再按 argmax(dim=1) 得到形状 [4] 的预测标签；要求准确率 100%。",
+    },
+    "AI004": {
+        "inputSpec": "data/train.csv：600 行 × 6 列；data/valid.csv：160 行 × 6 列，均包含 id、previous_power、temperature、occupants、hour、next_power_kwh。\ndata/test.csv：160 行 × 5 列，包含同样的 id 与 4 个特征，不含 next_power_kwh。上述形状不计表头；id 仅作记录标识。\n训练特征矩阵形状 [600, 4]，目标为 [600] 或 [600, 1]；测试特征为 [160, 4]。只在训练集拟合预处理，验证集用于调参与检查。",
+        "outputSpec": "提交 predictions.csv，含表头且恰好 160 行 × 2 列：id,next_power_kwh。\nid 必须与 test.csv 完全同序，不得重复、遗漏或增加行；next_power_kwh 为下一时段用电量预测，必须是有限数值。不要写入 DataFrame 索引（to_csv(..., index=False)）。\n可在 Notebook 中生成文件并运行后下载，或上传本地 CSV；点击“提交评测”才计分。系统按隐藏标签 RMSE 换算为分数，公私榜规则见评测页。",
+    },
+    "AI005": {
+        "inputSpec": "data/train.csv：600 行 × 8 列；data/valid.csv：160 行 × 8 列，列为 id、merchant、distance_km、hour、rain、orders、minutes、late。\ndata/test.csv：160 行 × 6 列，仅含 id 与 5 个特征，不含 minutes、late；形状不计表头。训练/测试特征形状分别为 [600, 5]、[160, 5]。\nmerchant 为 0–3 的类别编码，rain 为 0/1；minutes 为送达分钟数，late 为是否超过 40 分钟（0/1）。两个训练目标各为 [600]；id 仅作记录标识。只在训练集拟合预处理。",
+        "outputSpec": "提交 predictions.csv，含表头且恰好 160 行 × 3 列：id,minutes,late_probability。\nid 与 test.csv 完全同序且不重复、不缺失；minutes 为有限的送达时间预测；late_probability 为有限的超时概率，范围 [0, 1]，应提交概率而非 logits。不要写入 DataFrame 索引。\n系统综合隐藏集的 RMSE 与 LogLoss 评分；上传或在 Notebook 生成 CSV 后，点击“提交评测”。公私榜分组与评分公式见评测页。",
+    },
+}
+
+
 def csv_text(columns, rows):
     stream = io.StringIO()
     writer = csv.writer(stream, lineterminator="\n")
@@ -61,7 +85,8 @@ def csv_text(columns, rows):
 def base(code, title, category, metric, objective, signature, requirements, evaluation, starter, reference):
     return {"id": code, "title": title, "type": category, "metric": metric, "points": 20,
             "statement": {"objective": objective, "signature": signature, "requirements": requirements,
-                          "evaluation": evaluation, "data": "本题为合成数据练习，使用 CPU 即可完成。每次运行启动全新内核；请把所需代码保存在 Notebook 中。"},
+                          "evaluation": evaluation, **IO_SPECS[code],
+                          "data": "本题为合成数据练习，使用 CPU 即可完成。单元格共享当前内核变量；内核回收或重启后需重新运行所需代码，请保留云端草稿。"},
             "cells": [IMPORTS, starter], "reference_cells": [IMPORTS, reference], "public_files": {}}
 
 

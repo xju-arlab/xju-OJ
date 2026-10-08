@@ -11,21 +11,26 @@
             </div>
           </header>
           <nav class="studio-tabs small" aria-label="题目资料"><button v-for="tab in infoTabs" :key="tab.id" :class="{ active: infoTab === tab.id }" @click="infoTab = tab.id">{{ tab.name }}</button></nav>
-          <div v-if="infoTab === 'description'" class="studio-prose"><h2>任务目标</h2><p>{{ problem.objective }}</p><h2>实现要求</h2><ol><li v-for="item in problem.requirements" :key="item">{{ item }}</li></ol><h2>接口约定</h2><pre>{{ problem.signature }}</pre><div class="studio-callout"><Lightbulb :size="17" /><p>先阅读框架与公开样例。运行全部用于调试；提交评测会保存本次答卷并计入评测记录。</p></div></div>
+          <div v-if="infoTab === 'description'" class="studio-prose"><h2>任务目标</h2><p>{{ problem.objective }}</p><h2>实现要求</h2><ol><li v-for="item in problem.requirements" :key="item">{{ item }}</li></ol><h2>接口约定</h2><pre>{{ problem.signature }}</pre><template v-if="problem.inputSpec"><h2>输入</h2><p class="studio-io-description">{{ problem.inputSpec }}</p></template><template v-if="problem.outputSpec"><h2>输出</h2><p class="studio-io-description">{{ problem.outputSpec }}</p></template><div class="studio-callout"><Lightbulb :size="17" /><p>先阅读框架与公开样例。运行全部用于调试；提交评测会保存本次答卷并计入评测记录。</p></div></div>
           <div v-else-if="infoTab === 'data'" class="studio-prose"><h2>数据说明</h2><p>{{ problem.data }}</p><div v-for="name in problem.files" :key="name" class="studio-file-row"><FileCode :size="20" /><strong>{{ name }}</strong><a class="studio-text-button" :href="dataUrl(name)">下载</a></div><div class="studio-file-row"><FileCode :size="20" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook">下载</button></div></div>
-          <div v-else class="studio-prose"><h2>评分说明</h2><p>{{ problem.evaluation }}</p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
+          <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><p>{{ problem.evaluation }}</p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
+          <ProblemRanking v-else :problem-id="problem.id" :contest-id="contestId" :authenticated="authenticated" />
           <div class="studio-problem-pagination"><router-link v-if="previous" :to="problemRoute(previous.id)"><ArrowLeft :size="14" />上一题</router-link><span v-else></span><router-link v-if="next" :to="problemRoute(next.id)">下一题<ArrowRight :size="14" /></router-link></div>
         </section>
         <section class="studio-notebook" aria-label="Notebook 作答区">
           <div class="studio-notebook-title">
             <span class="studio-notebook-filename"><NotebookPen :size="16" />{{ problem.id }}.ipynb</span>
-            <div class="studio-notebook-toolbar"><button class="studio-button compact" :disabled="running || !authenticated" title="运行全部" aria-label="运行全部" @click="runTask('notebook')"><Play :size="14" /><span class="studio-notebook-action-label">运行全部</span></button><button class="studio-button compact" title="保存草稿" aria-label="保存草稿" @click="save"><Save :size="14" /><span class="studio-notebook-action-label">保存草稿</span></button><button class="studio-button compact" title="导出" aria-label="导出" @click="exportNotebook"><Download :size="14" /><span class="studio-notebook-action-label">导出</span></button><button class="studio-icon-button" title="重置为题目框架" aria-label="重置题目框架" @click="showReset = true"><RotateCcw :size="15" /></button></div>
+            <div class="studio-notebook-toolbar"><button :class="['studio-button', 'compact', { 'is-running': running }]" :disabled="running || !authenticated" :aria-busy="running" :title="running ? runLabel : '运行全部'" aria-label="运行全部" @click="runTask('notebook')"><LoaderCircle v-if="running" class="studio-spin" :size="14" /><Play v-else :size="14" /><span class="studio-notebook-action-label">{{ running ? runLabel : '运行全部' }}</span></button><button class="studio-button compact" title="保存草稿" aria-label="保存草稿" @click="save"><Save :size="14" /><span class="studio-notebook-action-label">保存草稿</span></button><button class="studio-button compact" title="导出" aria-label="导出" @click="exportNotebook"><Download :size="14" /><span class="studio-notebook-action-label">导出</span></button><button class="studio-icon-button" :disabled="running" title="重置为题目框架" aria-label="重置题目框架" @click="showReset = true"><RotateCcw :size="15" /></button></div>
           </div>
           <div class="studio-notebook-scroll">
-            <article v-for="(code, index) in cells" :key="activeKey + index" class="studio-cell"><div class="studio-cell-heading"><span class="studio-cell-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ cellTitles[index] || '代码单元格' }}</strong><span>Python</span></div><div class="studio-cell-input"><span class="studio-cell-prompt">[{{ outputs[index]?.execution_count || ' ' }}]</span><CodeMirror :model-value="code" mode="text/x-python" @update:model-value="value => updateCell(index, value)" /></div><div v-if="outputs[index]" class="studio-cell-output"><pre>{{ outputs[index].text }}</pre><img v-for="(png, imageIndex) in outputs[index].png" :key="imageIndex" :src="'data:image/png;base64,' + png" alt="单元格输出图表" /></div></article>
+            <article v-for="(code, index) in cells" :key="activeKey + index" :class="['studio-cell', 'cell-' + cellStatus(index).toLowerCase()]" :data-cell-state="cellStatus(index)" @keydown.shift.enter.capture.prevent.stop="runCell(index, true)">
+              <div class="studio-cell-heading"><span class="studio-cell-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ cellTitles[index] || '代码单元格' }}</strong><span v-if="cellStatus(index) !== 'IDLE'" class="studio-cell-state"><Check v-if="cellStatus(index) === 'SUCCEEDED'" :size="12" /><X v-else-if="cellStatus(index) === 'ERROR'" :size="12" />{{ cellLabels[cellStatus(index)] }}</span><span class="studio-cell-language">Python</span><button class="studio-icon-button studio-cell-run" :disabled="running || !authenticated" :aria-label="'运行第 ' + (index + 1) + ' 个单元格'" title="运行当前单元格 · Shift+Enter 运行并前进" @click="runCell(index)"><LoaderCircle v-if="cellStatus(index) === 'RUNNING'" class="studio-spin" :size="14" /><Play v-else :size="14" /></button></div>
+              <div class="studio-cell-input"><span class="studio-cell-prompt">[{{ cellStatus(index) === 'RUNNING' ? '*' : outputs[index]?.execution_count ?? ' ' }}]</span><CodeMirror :ref="editor => { cellEditors[index] = editor }" :model-value="code" mode="text/x-python" @update:model-value="value => updateCell(index, value)" /></div>
+              <div v-if="hasOutput(index)" class="studio-cell-output"><pre>{{ outputs[index].text }}</pre><img v-for="(png, imageIndex) in outputs[index].png" :key="imageIndex" :src="'data:image/png;base64,' + png" alt="单元格输出图表" /></div>
+            </article>
             <div v-if="problem.type === 'challenge'" class="studio-notebook-notice"><FileCode :size="15" /><label>预测结果 CSV <input type="file" accept=".csv,text/csv" @change="readPredictions" /></label><span>{{ predictionName }}</span><button v-if="predictions" class="studio-text-button" @click="download('predictions.csv', predictions, 'text/csv')">下载</button></div><p v-if="error" role="alert" class="studio-error">{{ error }}</p><button v-if="oldBackup" class="studio-text-button" @click="exportBackup">导出旧的本机备份</button>
           </div>
-          <div class="studio-notebook-status"><span>Notebook · {{ cells.length }} 个代码单元格</span><span class="studio-kernel"><span></span>Python 3 · {{ running ? '运行中' : 'Jupyter' }}</span><span>{{ authenticated ? '云端草稿' : '登录后保存云端草稿' }}</span></div>
+          <div class="studio-notebook-status"><span class="studio-run-state" aria-live="polite">{{ runState ? runLabel : 'Notebook · ' + cells.length + ' 个代码单元格' }}</span><span :class="['studio-kernel', { 'is-busy': running }]"><span></span>Python 3 · {{ running ? '忙碌' : '空闲' }}</span><span>Shift+Enter 运行并前进</span></div>
           <div class="studio-submit-dock">
             <div class="studio-submit-feedback"><span class="studio-save-state" role="status">{{ saveStatus }}</span><div v-if="latestEvaluation" class="studio-last-evaluation"><span>最近评测</span><EvaluationStatus :record="latestEvaluation" /></div></div>
             <button class="studio-button primary" :disabled="submitting || !authenticated" @click="runTask('evaluation')"><Send :size="15" />{{ submitting ? '提交中…' : '提交评测' }}</button>
@@ -38,15 +43,16 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, ArrowRight, Download, FileCode, Lightbulb, NotebookPen, Play, RotateCcw, Save, Send } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Check, Download, FileCode, Lightbulb, LoaderCircle, NotebookPen, Play, RotateCcw, Save, Send, X } from 'lucide-vue-next'
 import CodeMirror from '@/shared/editors/CodeMirrorAdapter.vue'
 import store from '@/store'
 import storage from '@/utils/storage'
 import { categoryFor, notebookFor, download, formatDate } from './studio'
 import { studioApi, activeStatuses } from './api'
 import EvaluationStatus from './EvaluationStatus.vue'
+import ProblemRanking from './ProblemRanking.vue'
 import './studio.less'
 
 const route = useRoute()
@@ -55,10 +61,24 @@ const contestId = computed(() => typeof route.query.contest === 'string' ? route
 const authenticated = computed(() => store.getters.isAuthenticated)
 const cells = ref([]); const outputs = ref([]); const activeKey = ref(''); const saveStatus = ref('尚未修改')
 const latestEvaluation = ref(null); const running = ref(false); const submitting = ref(false)
+const runState = ref(''); const cellEditors = ref([])
+const cellLabels = { PENDING: '等待执行', RUNNING: '运行中', SUCCEEDED: '已完成', ERROR: '运行失败', SKIPPED: '未执行' }
+const cellStatus = index => outputs.value[index]?.status || (outputs.value[index]?.execution_count != null ? 'SUCCEEDED' : 'IDLE')
+const hasOutput = index => !!(outputs.value[index]?.text || outputs.value[index]?.png?.length)
+const runLabel = computed(() => {
+  if (runState.value === 'SUBMITTING') return '正在提交…'
+  if (runState.value === 'PENDING') return '排队中…'
+  if (running.value) {
+    const index = outputs.value.findIndex(cell => cell.status === 'RUNNING')
+    if (index >= 0) return '正在运行第 ' + (index + 1) + ' 格'
+    return outputs.value.some(cell => cell.status === 'PENDING') ? '正在准备内核…' : '正在收尾…'
+  }
+  return { SUCCEEDED: '运行完成', RUNTIME_ERROR: '运行失败', TIME_LIMIT: '运行超时', MEMORY_LIMIT: '内存超限', SYSTEM_ERROR: '运行服务异常', CANCELLED: '运行已取消', KERNEL_RESET: '内核已重启', REQUEST_FAILED: '运行未开始' }[runState.value] || 'Notebook'
+})
 const predictionName = ref(''); const predictions = ref('')
 const oldBackup = ref(null)
 const infoTab = ref('description'); const showReset = ref(false); const snapshot = ref(null)
-const infoTabs = [{ id: 'description', name: '题目' }, { id: 'data', name: '数据与框架' }, { id: 'evaluation', name: '评测' }]
+const infoTabs = [{ id: 'description', name: '题目' }, { id: 'data', name: '数据与框架' }, { id: 'evaluation', name: '评测' }, { id: 'ranking', name: '排行' }]
 const cellTitles = ['准备环境', '完成你的实现', '公开样例']
 const previous = ref(null); const next = ref(null)
 const dataUrl = name => '/api/ai/file?' + new URLSearchParams({ problem_id: problem.value.id, contest_id: contestId.value, name })
@@ -66,6 +86,19 @@ const problemRoute = id => ({ name: 'ai-problem', params: { problemID: id }, que
 let timer; let generation = 0; let context = null
 const polls = new Map()
 function clearPolls () { for (const timer of polls.values()) clearTimeout(timer); polls.clear() }
+function kernelSession (key) {
+  try { const saved = JSON.parse(sessionStorage.getItem(key + ':kernel')); if (typeof saved?.id === 'string' && /^[0-9a-f-]{36}$/.test(saved.id)) return saved } catch {}
+  return { id: crypto.randomUUID(), generation: '', job: '' }
+}
+function saveKernel (ctx) { try { sessionStorage.setItem(ctx.key + ':kernel', JSON.stringify(ctx.kernel)) } catch {} }
+function applyNotebookResult (result) {
+  runState.value = result.output?.kernel_reset ? 'KERNEL_RESET' : result.status
+  running.value = activeStatuses.has(result.status)
+  if (Array.isArray(result.output?.cells)) outputs.value = result.output.cells
+  if (result.output?.kernel_id && context) { context.kernel.generation = result.output.kernel_id; saveKernel(context) }
+  if (typeof result.output?.predictions === 'string') { predictions.value = result.output.predictions; predictionName.value = 'predictions.csv（本次运行）' }
+  if (result.message) error.value = result.message
+}
 function backup (ctx) { return storage.set(ctx.key, { cells: [...ctx.cells], revision: ctx.revision }) }
 async function persist (ctx) {
   if (!ctx || !ctx.dirty) return true
@@ -103,6 +136,7 @@ async function load () {
   context = null; clearTimeout(timer); clearPolls()
   problem.value = null; error.value = ''; outputs.value = []; snapshot.value = null; showReset.value = false
   infoTab.value = 'description'; loading.value = true; running.value = false; submitting.value = false
+  runState.value = ''; cellEditors.value = []
   predictions.value = ''; predictionName.value = ''; previous.value = null; next.value = null
   latestEvaluation.value = null; oldBackup.value = null
   const scope = { problem_id: route.params.problemID, contest_id: contestId.value }
@@ -118,7 +152,7 @@ async function load () {
     const local = storage.get(key)
     const recover = local && local.revision === draft.revision && Array.isArray(local.cells) && local.cells.every(cell => typeof cell === 'string')
     cells.value = recover ? [...local.cells] : [...draft.cells]
-    context = { key, scope, userId: store.getters.user.id, cells: [...cells.value], revision: draft.revision, dirty: !!recover, conflict: false, saving: null }
+    context = { key, scope, userId: store.getters.user.id, cells: [...cells.value], revision: draft.revision, dirty: !!recover, conflict: false, saving: null, kernel: kernelSession(key) }
     saveStatus.value = recover ? '已恢复本机备份' : authenticated.value ? '已加载云端草稿' : '登录后可运行与评测'
     if (local && !recover && Array.isArray(local.cells)) {
       oldBackup.value = local.cells
@@ -129,6 +163,14 @@ async function load () {
       if (current !== generation) return
       latestEvaluation.value = records.results[0] || null
       if (latestEvaluation.value && activeStatuses.has(latestEvaluation.value.status)) poll(latestEvaluation.value.id, 'evaluation', current)
+      if (context.kernel.job) {
+        const run = await studioApi('jobs', 'get', { id: context.kernel.job })
+        if (current !== generation) return
+        if (run.kind === 'notebook' && run.problemId === item.id && String(run.contestId || '') === String(scope.contest_id || '')) {
+          applyNotebookResult(run)
+          if (running.value) poll(run.id, 'notebook', current)
+        }
+      }
     }
   } catch (failure) { if (current === generation) error.value = failure.message }
   finally { if (current === generation) loading.value = false }
@@ -147,25 +189,44 @@ async function readPredictions (event) {
   const text = await file.text()
   if (current === generation) { predictions.value = text; predictionName.value = file.name }
 }
-async function runTask (kind) {
-  if (!context || !authenticated.value) return
+function runCell (index, advance = false) {
+  if (running.value || !authenticated.value) return
+  runTask('notebook', index)
+  if (advance) {
+    if (index === cells.value.length - 1 && cells.value.length < 64) updateCell(cells.value.length, '')
+    nextTick(() => cellEditors.value[index + 1]?.focus())
+  }
+}
+async function runTask (kind, cellIndex = null) {
+  if (!context || !authenticated.value || (kind === 'notebook' && running.value)) return
   const current = generation; const ctx = context
   error.value = ''
   const pendingKey = kind === 'notebook' ? 'pendingRun' : 'pendingSubmit'
   const payload = { ...ctx.scope, cells: [...cells.value], kind, ...(kind === 'evaluation' && problem.value.type === 'challenge' ? { predictions: predictions.value } : {}) }
+  if (kind === 'notebook') Object.assign(payload, { kernel: ctx.kernel.id, kernel_generation: ctx.kernel.generation, cell_index: cellIndex })
   const signature = JSON.stringify(payload)
   if (!ctx[pendingKey] || ctx[pendingKey].signature !== signature) ctx[pendingKey] = { id: crypto.randomUUID(), signature }
-  if (kind === 'notebook') running.value = true
+  if (kind === 'notebook') {
+    running.value = true; runState.value = 'SUBMITTING'
+    outputs.value = cells.value.map((_, index) => cellIndex === null || index === cellIndex
+      ? { status: 'PENDING', text: '', png: [], execution_count: null }
+      : outputs.value[index] || { status: 'IDLE', text: '', png: [], execution_count: null })
+  }
   else submitting.value = true
   try {
     backup(ctx)
     const record = await studioApi('jobs', 'post', { id: ctx[pendingKey].id, ...payload })
     ctx[pendingKey] = null
+    if (kind === 'notebook') { ctx.kernel.job = record.id; saveKernel(ctx) }
     if (current !== generation) return
     if (kind === 'evaluation') { latestEvaluation.value = record; snapshot.value = record }
+    else applyNotebookResult(record)
     poll(record.id, kind, current)
   } catch (failure) {
-    if (current === generation) { error.value = failure.message; if (kind === 'notebook') running.value = false }
+    if (current === generation) {
+      error.value = failure.message
+      if (kind === 'notebook') { running.value = false; runState.value = 'REQUEST_FAILED'; outputs.value = outputs.value.map(cell => cell.status === 'PENDING' ? { ...cell, status: 'IDLE' } : cell) }
+    }
   } finally { if (current === generation) submitting.value = false }
 }
 async function poll (id, kind, current) {
@@ -175,8 +236,8 @@ async function poll (id, kind, current) {
     const result = await studioApi('jobs', 'get', { id })
     if (current !== generation) return
     if (kind === 'evaluation' && latestEvaluation.value?.id === id) latestEvaluation.value = result
-    if (activeStatuses.has(result.status)) { polls.set(id, setTimeout(() => poll(id, kind, current), 2000)); return }
-    if (kind === 'notebook') { running.value = false; outputs.value = result.output?.cells || []; if (typeof result.output?.predictions === 'string') { predictions.value = result.output.predictions; predictionName.value = 'predictions.csv（本次运行）' }; if (result.message) error.value = result.message }
+    if (kind === 'notebook') applyNotebookResult(result)
+    if (activeStatuses.has(result.status)) { polls.set(id, setTimeout(() => poll(id, kind, current), kind === 'notebook' ? 1000 : 2000)); return }
   } catch (failure) {
     if (current === generation) { error.value = failure.message; polls.set(id, setTimeout(() => poll(id, kind, current), 10000)) }
   }

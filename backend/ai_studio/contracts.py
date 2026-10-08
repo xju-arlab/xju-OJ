@@ -10,6 +10,7 @@ TERMINAL = ("ACCEPTED", "WRONG_ANSWER", "PARTIAL", "SCORED", "RUNTIME_ERROR", "T
             "MEMORY_LIMIT", "SYSTEM_ERROR", "SUCCEEDED", "CANCELLED")
 MAX_SOURCE_BYTES = 512 * 1024
 MAX_PREDICTION_BYTES = 1024 * 1024
+CELL_STATUSES = ("IDLE", "PENDING", "RUNNING", "SUCCEEDED", "ERROR", "SKIPPED")
 
 
 def require(condition, message):
@@ -47,14 +48,19 @@ def judge_input(value):
 
 def notebook_output(value):
     # Only inert text and bounded PNGs are returned, never HTML/JS/SVG/widget output.
-    require(isinstance(value, dict) and set(value) <= {"cells", "predictions"}, "Invalid notebook output")
+    require(isinstance(value, dict) and set(value) <= {"cells", "predictions", "kernel_id", "kernel_reset"}, "Invalid notebook output")
+    if "kernel_id" in value:
+        require(isinstance(value["kernel_id"], str) and re.fullmatch(r"[0-9a-f]{32}", value["kernel_id"]), "Invalid kernel ID")
+    if "kernel_reset" in value:
+        require(type(value["kernel_reset"]) is bool, "Invalid kernel reset flag")
     if "predictions" in value:
         require(isinstance(value["predictions"], str) and len(value["predictions"].encode()) <= MAX_PREDICTION_BYTES,
                 "Prediction output is too large")
     cells = value.get("cells", [])
     require(isinstance(cells, list) and len(cells) <= 64, "Invalid notebook output")
     for cell in cells:
-        require(isinstance(cell, dict) and set(cell) <= {"text", "png", "execution_count"}, "Invalid cell output")
+        require(isinstance(cell, dict) and set(cell) <= {"text", "png", "execution_count", "status"}, "Invalid cell output")
+        require("status" not in cell or cell["status"] in CELL_STATUSES, "Invalid cell status")
         require(isinstance(cell.get("text", ""), str), "Invalid output text")
         require(isinstance(cell.get("png", []), list) and len(cell.get("png", [])) <= 4, "Invalid images")
         for png in cell.get("png", []):
