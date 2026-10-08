@@ -116,7 +116,7 @@
   .studio-prediction-file > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; }
   .studio-prediction-file > button { display: inline-flex; align-items: center; gap: 5px; flex: none; }
   .studio-file-picker { position: relative; overflow: hidden; cursor: pointer; }.studio-file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-  .studio-file-picker:focus-within { outline: 2px solid var(--color-link); outline-offset: 3px; }
+  .studio-file-picker:has(input:focus-visible) { outline: 2px solid var(--color-link); outline-offset: 3px; }
   .studio-notebook-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; border-top: 1px solid var(--color-border); padding: 8px 16px; font-size: 10px; color: var(--color-text-muted); }
   .studio-submit-dock { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 10px 12px; border-top: 1px solid var(--color-border); }
   .studio-submit-feedback { display: flex; flex-direction: column; gap: 6px; min-width: 0; }.studio-submit-dock > button { flex: none; }
