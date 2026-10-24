@@ -37,9 +37,16 @@ class ContestPrepRole(Choices):
     VERIFIER = "Verifier"
 
 
+# Every review of a preparation contest runs as a 5-hour contest.
+PREP_REVIEW_HOURS = 5
+# A preparation invite link works once and only within this many days.
+PREP_INVITE_DAYS = 7
+
+
 class CacheKey:
     waiting_queue = "waiting_queue"
     contest_rank_cache = "contest_rank_cache"
+    prep_invite_failures = "prep_invite_failures"
     website_config = "website_config"
 
 

@@ -4,7 +4,12 @@ These views live outside /api/admin/ because problem setters and verifiers may
 be regular users. Every view resolves its contest through load_prep_contest,
 which hides the contest from everyone without a preparation role.
 """
+import hashlib
+import secrets
+from datetime import timedelta
+
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils.timezone import now
 
@@ -18,12 +23,13 @@ from problem.serializers import (CreatePrepContestProblemSerializer, EditPrepCon
                                  ProblemAdminSerializer)
 from problem.views.admin import CompileSPJAPI, ImportProblemAPI, ProblemBase, TestCaseAPI
 from utils.api import APIError, APIView, validate_serializer
-from utils.constants import CacheKey, ContestPrepRole, ContestPrepState
+from utils.constants import CacheKey, ContestPrepRole, ContestPrepState, PREP_INVITE_DAYS
 from utils.shortcuts import datetime2str
-from ..models import Contest, ContestPrepMember, ContestProblemFeedback
+from ..models import Contest, ContestPrepInvite, ContestPrepMember, ContestProblemFeedback
 from ..prep_publish import publish_prep_contest
 from ..prep_rank import review_rank
-from ..serializers import (ContestPrepMemberSerializer, ContestPrepProblemOrderSerializer,
+from ..serializers import (AcceptContestPrepInviteSerializer, ContestPrepMemberSerializer,
+                           ContestPrepProblemOrderSerializer, CreateContestPrepInviteSerializer,
                            ContestPrepProblemVisibleSerializer, ContestPrepPublicProblemSerializer,
                            ContestPrepPublishSerializer,
                            ContestPrepStateSerializer, ContestProblemFeedbackSerializer,
@@ -31,6 +37,9 @@ from ..serializers import (ContestPrepMemberSerializer, ContestPrepProblemOrderS
                            EditContestPrepMemberSerializer, EditContestProblemFeedbackSerializer)
 
 VIEW, AUTHOR, EDIT, MANAGE = "view", "author", "edit", "manage"
+MAX_OPEN_INVITES = 20
+INVITE_FAILURE_LIMIT = 10
+INVITE_FAILURE_WINDOW = 10 * 60
 
 
 def load_prep_contest(request, contest_id, need=VIEW):
@@ -350,3 +359,72 @@ class ContestPrepPublicProblemAPI(APIView):
         problem.save()
         problem.tags.set(tags)
         return self.success(ProblemAdminSerializer(problem).data)
+
+
+def invite_token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def open_invites(contest):
+    return ContestPrepInvite.objects.filter(contest=contest, used_time__isnull=True, expire_time__gt=now())
+
+
+class ContestPrepInviteAPI(APIView):
+    """One-time invite links; the raw token is shown once and never stored."""
+
+    @login_required
+    def get(self, request):
+        contest = load_prep_contest(request, request.GET.get("contest_id"), MANAGE)
+        counts = open_invites(contest).values("role").annotate(count=Count("id")).values_list("role", "count")
+        return self.success({"open": dict(counts)})
+
+    @validate_serializer(CreateContestPrepInviteSerializer)
+    @login_required
+    def post(self, request):
+        contest = load_prep_contest(request, request.data["contest_id"], MANAGE)
+        if open_invites(contest).count() >= MAX_OPEN_INVITES:
+            return self.error("Too many unused invite links; revoke them first")
+        # The link itself is the credential, so it carries 256 random bits.
+        token = secrets.token_urlsafe(32)
+        invite = ContestPrepInvite.objects.create(
+            contest=contest, role=request.data["role"], token_hash=invite_token_hash(token),
+            created_by=request.user, expire_time=now() + timedelta(days=PREP_INVITE_DAYS))
+        return self.success({"token": token, "role": invite.role, "expire_time": datetime2str(invite.expire_time)})
+
+    @login_required
+    def delete(self, request):
+        contest = load_prep_contest(request, request.GET.get("contest_id"), MANAGE)
+        # Expire rather than delete, so redeemed and revoked links stay auditable.
+        revoked = open_invites(contest).update(expire_time=now())
+        return self.success({"revoked": revoked})
+
+
+class ContestPrepInviteAcceptAPI(APIView):
+    @validate_serializer(AcceptContestPrepInviteSerializer)
+    @login_required
+    def post(self, request):
+        user = request.user
+        failures_key = f"{CacheKey.prep_invite_failures}:{user.id}"
+        if (cache.get(failures_key) or 0) >= INVITE_FAILURE_LIMIT:
+            return self.error("Too many invalid invite links, try again later")
+        with transaction.atomic():
+            # The row lock keeps the link single-use under concurrent requests.
+            invite = (ContestPrepInvite.objects.select_for_update().select_related("contest")
+                      .filter(token_hash=invite_token_hash(request.data["token"])).first())
+            contest = invite.contest if invite else None
+            if invite is None or invite.used_time is not None or invite.expire_time <= now() or \
+                    not contest.visible or not contest.is_preparation:
+                cache.add(failures_key, 0, INVITE_FAILURE_WINDOW)
+                cache.incr(failures_key)
+                return self.error("This invite link is invalid or has expired")
+            # Members keep their role and leave the link unused for its intended person.
+            if contest.prep_role(user) is not None:
+                return self.error("You are already a member of this contest")
+            _, created = ContestPrepMember.objects.get_or_create(contest=contest, user=user,
+                                                                 defaults={"role": invite.role})
+            if not created:
+                return self.error("You are already a member of this contest")
+            invite.used_by = user
+            invite.used_time = now()
+            invite.save(update_fields=["used_by", "used_time"])
+        return self.success({"contest_id": contest.id, "title": contest.title, "role": invite.role})

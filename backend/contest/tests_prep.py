@@ -6,6 +6,7 @@ from datetime import timedelta
 from unittest import mock
 from zipfile import ZipFile
 
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
@@ -17,8 +18,8 @@ from problem.publication import publish_due_contest_problems
 from problem.tests import DEFAULT_PROBLEM_DATA
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
-from utils.constants import ContestPrepRole, ContestPrepState
-from .models import ACMContestRank, Contest, ContestAnnouncement, ContestPrepMember
+from utils.constants import CacheKey, ContestPrepRole, ContestPrepState
+from .models import ACMContestRank, Contest, ContestAnnouncement, ContestPrepInvite, ContestPrepMember
 
 PREP_CONTEST_DATA = {"title": "Regional prep", "description": "<p>prep</p>", "rule_type": "ACM",
                      "password": "secret", "real_time_rank": True, "allowed_ip_ranges": ["10.0.0.0/8"]}
@@ -70,14 +71,20 @@ class ContestPrepTestBase(APITestCase):
 class ContestPrepCreationTest(ContestPrepTestBase):
     def test_admin_creates_private_preparation_contest(self):
         self.login(self.creator)
-        start = timezone.now() + timedelta(days=1)
-        payload = dict(PREP_CONTEST_DATA, start_time=start.isoformat(),
-                       end_time=(start + timedelta(hours=5)).isoformat(), visible=False, preparation=True)
+        payload = dict(PREP_CONTEST_DATA, visible=False, preparation=True)
+        before = timezone.now()
         response = self.client.post(self.reverse("contest_admin_api"), data=payload)
         self.assertSuccess(response)
         contest = Contest.objects.get(id=response.data["data"]["id"])
         self.assertEqual(contest.prep_state, ContestPrepState.PREPARATION)
         self.assertTrue(contest.visible)
+        # The window is only chosen on publish; until then it starts at creation.
+        self.assertGreaterEqual(contest.start_time, before)
+        self.assertEqual(contest.end_time - contest.start_time, timedelta(hours=5))
+
+        normal = dict(PREP_CONTEST_DATA, visible=True)
+        self.assertFailed(self.client.post(self.reverse("contest_admin_api"), data=normal),
+                          "Start time and end time are required")
 
         payload["rule_type"] = "AI"
         self.assertFailed(self.client.post(self.reverse("contest_admin_api"), data=payload),
@@ -536,3 +543,78 @@ class ContestPrepPublicProblemTest(ContestPrepTestBase):
         self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "problem_id": hidden.id}),
                           "Problem does not exist")
         self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "problem_id": oi_problem.id}))
+
+
+class ContestPrepInviteTest(ContestPrepTestBase):
+    def setUp(self):
+        super().setUp()
+        self.newcomer = self.create_user("newcomer", "newcomer-pass", login=False)
+        self.other = self.create_user("other", "other-pass", login=False)
+        for user in (self.creator, self.newcomer, self.other):
+            cache.delete(f"{CacheKey.prep_invite_failures}:{user.id}")
+
+    def create_invite(self, role="Setter"):
+        self.login(self.creator)
+        response = self.client.post(self.reverse("contest_prep_invite_api"),
+                                    data={"contest_id": self.contest.id, "role": role})
+        self.assertSuccess(response)
+        return response.data["data"]["token"]
+
+    def accept(self, user, token):
+        self.login(user)
+        return self.client.post(self.reverse("contest_prep_invite_accept_api"), data={"token": token})
+
+    def test_only_the_creator_creates_links_and_only_a_digest_is_stored(self):
+        self.login(self.setter)
+        self.assertFailed(self.client.post(self.reverse("contest_prep_invite_api"),
+                                           data={"contest_id": self.contest.id, "role": "Setter"}),
+                          "Only the contest creator can do this")
+        token = self.create_invite()
+        self.assertGreaterEqual(len(token), 40)
+        invite = ContestPrepInvite.objects.get(contest=self.contest)
+        self.assertNotIn(token, invite.token_hash)
+        self.assertGreater(invite.expire_time, timezone.now() + timedelta(days=6))
+        counts = self.client.get(self.reverse("contest_prep_invite_api") + f"?contest_id={self.contest.id}")
+        self.assertEqual(counts.data["data"]["open"], {"Setter": 1})
+
+    def test_a_link_works_exactly_once(self):
+        token = self.create_invite("Verifier")
+        response = self.accept(self.newcomer, token)
+        self.assertSuccess(response)
+        self.assertEqual(response.data["data"], {"contest_id": self.contest.id, "title": self.contest.title,
+                                                 "role": "Verifier"})
+        self.assertEqual(self.contest.prep_members.get(user=self.newcomer).role, "Verifier")
+        invite = ContestPrepInvite.objects.get(contest=self.contest)
+        self.assertEqual(invite.used_by, self.newcomer)
+        self.assertFailed(self.accept(self.other, token), "This invite link is invalid or has expired")
+        self.assertFalse(self.contest.prep_members.filter(user=self.other).exists())
+
+    def test_members_do_not_consume_a_link(self):
+        token = self.create_invite()
+        self.assertFailed(self.accept(self.verifier, token), "You are already a member of this contest")
+        self.assertFailed(self.accept(self.creator, token), "You are already a member of this contest")
+        self.assertEqual(self.contest.prep_members.get(user=self.verifier).role, "Verifier")
+        self.assertSuccess(self.accept(self.newcomer, token))
+
+    def test_expired_revoked_and_published_links_are_refused(self):
+        expired = self.create_invite()
+        ContestPrepInvite.objects.update(expire_time=timezone.now() - timedelta(seconds=1))
+        self.assertFailed(self.accept(self.newcomer, expired), "This invite link is invalid or has expired")
+
+        revoked = self.create_invite()
+        self.login(self.creator)
+        response = self.client.delete(self.reverse("contest_prep_invite_api") + f"?contest_id={self.contest.id}")
+        self.assertEqual(response.data["data"], {"revoked": 1})
+        self.assertFailed(self.accept(self.newcomer, revoked), "This invite link is invalid or has expired")
+
+        stale = self.create_invite()
+        Contest.objects.filter(id=self.contest.id).update(prep_state=None)
+        self.assertFailed(self.accept(self.newcomer, stale), "This invite link is invalid or has expired")
+        self.assertFalse(ContestPrepMember.objects.filter(user=self.newcomer).exists())
+
+    def test_guessing_is_throttled(self):
+        for _ in range(10):
+            self.assertFailed(self.accept(self.newcomer, "x" * 43), "This invite link is invalid or has expired")
+        token = self.create_invite()
+        self.assertFailed(self.accept(self.newcomer, token), "Too many invalid invite links, try again later")
+        self.assertSuccess(self.accept(self.other, token))

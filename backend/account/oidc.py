@@ -43,7 +43,7 @@ _STUDIO_ACCOUNT_ID_RE = re.compile(r"^[1-9][0-9]{7}$")
 _CANONICAL_ISSUER = "https://auth.icthub.top/application/o/xju-oj"
 _CANONICAL_REDIRECT_URI = "https://oj.icthub.top/api/auth/oidc/callback/"
 _CANONICAL_POST_LOGOUT_URI = "https://oj.icthub.top"
-_ALLOWED_NEXT_PATHS = frozenset({"/", "/user-home", "/setting/profile", "/setting/security"})
+_ALLOWED_NEXT_PATHS = frozenset({"/", "/user-home", "/setting/profile", "/setting/security", "/invite"})
 _ADMIN_GROUP = "icthub-admins"
 
 

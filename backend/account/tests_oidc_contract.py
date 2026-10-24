@@ -15,6 +15,7 @@ class OIDCContractTests(SimpleTestCase):
     def test_return_path_is_a_fixed_internal_allowlist(self):
         self.assertEqual(oidc._safe_next("/"), "/")
         self.assertEqual(oidc._safe_next("/setting/security"), "/setting/security")
+        self.assertEqual(oidc._safe_next("/invite"), "/invite")
         for value in ("https://evil.example/", "//evil.example", "/setting/security?next=/", "/../admin", "\\\\evil"):
             self.assertEqual(oidc._safe_next(value), "/")
 

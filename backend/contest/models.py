@@ -136,6 +136,27 @@ class ContestPrepMember(models.Model):
         ordering = ("create_time", "id")
 
 
+class ContestPrepInvite(models.Model):
+    """A one-time link that makes whoever redeems it a setter or verifier.
+
+    Only the SHA-256 digest of the random token is stored, so neither the
+    database nor a backup can be turned back into a working link.
+    """
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="prep_invites")
+    # ContestPrepRole.SETTER or ContestPrepRole.VERIFIER
+    role = models.TextField()
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    create_time = models.DateTimeField(auto_now_add=True)
+    expire_time = models.DateTimeField()
+    used_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    used_time = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = "contest_prep_invite"
+        ordering = ("-create_time", "-id")
+
+
 class ContestParticipation(models.Model):
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)

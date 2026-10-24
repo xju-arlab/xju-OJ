@@ -8,8 +8,9 @@ from .models import ACMContestRank, OIContestRank
 class CreateConetestSeriaizer(serializers.Serializer):
     title = serializers.CharField(max_length=128)
     description = serializers.CharField(allow_blank=True)
-    start_time = serializers.DateTimeField()
-    end_time = serializers.DateTimeField()
+    # Required for a normal contest; a preparation contest is scheduled when published.
+    start_time = serializers.DateTimeField(required=False)
+    end_time = serializers.DateTimeField(required=False)
     rule_type = serializers.ChoiceField(choices=[ContestRuleType.ACM, ContestRuleType.OI, ContestRuleType.AI])
     password = serializers.CharField(allow_blank=True, max_length=32)
     visible = serializers.BooleanField()
@@ -184,6 +185,15 @@ class EditContestProblemFeedbackSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     id = serializers.IntegerField()
     resolved = serializers.BooleanField()
+
+
+class CreateContestPrepInviteSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
+
+
+class AcceptContestPrepInviteSerializer(serializers.Serializer):
+    token = serializers.CharField(min_length=16, max_length=128)
 
 
 class ContestPrepPublicProblemSerializer(serializers.Serializer):
