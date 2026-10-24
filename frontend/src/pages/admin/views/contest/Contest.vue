@@ -24,7 +24,8 @@
             </el-form-item>
           </div>
 
-          <div class="field-grid time-grid">
+          <!-- A preparation contest picks its window when it is published. -->
+          <div v-if="!isPrepWorkspace" class="field-grid time-grid">
             <el-form-item :label="$t('m.Contest_Start_Time')" required>
               <el-date-picker
                 v-model="contest.start_time"
@@ -157,6 +158,9 @@
     computed: {
       isCreate () {
         return this.$route.name !== 'edit-contest'
+      },
+      isPrepWorkspace () {
+        return this.isCreate ? this.preparation && this.contest.rule_type !== 'AI' : Boolean(this.contest.prep_state)
       }
     },
     methods: {
@@ -174,7 +178,11 @@
         let funcName = this.$route.name === 'edit-contest' ? 'editContest' : 'createContest'
         let data = Object.assign({}, this.contest)
         data.allowed_ip_ranges = Array.isArray(data.allowed_ip_ranges) ? data.allowed_ip_ranges : []
-        if (this.isCreate) data.preparation = this.preparation && this.contest.rule_type !== 'AI'
+        if (this.isCreate) data.preparation = this.isPrepWorkspace
+        if (this.isCreate && data.preparation) {
+          delete data.start_time
+          delete data.end_time
+        }
         try {
           if (this.contest.rule_type === 'AI') this.$refs.aiSettings.validate()
           const res = await api[funcName](data)

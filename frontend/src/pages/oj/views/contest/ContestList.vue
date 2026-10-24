@@ -37,7 +37,7 @@
       </div></template>
       <p id="no-contest" v-if="contests.length == 0">{{$t('m.No_contest')}}</p>
       <ol id="contest-list">
-        <li v-for="contest in contests" :key="contest.title">
+        <li v-for="contest in contests" :key="contest.title" :class="{ 'is-prep': contest.prep_state }">
           <div class="contest-row">
             <span class="contest-logo" aria-hidden="true"><Icon type="trophy" /></span>
             <div class="contest-main">
@@ -46,8 +46,9 @@
                 <Icon v-if="contest.contest_type != 'Public' && !isEnded(contest)" type="ios-locked-outline" size="16"></Icon>
               </p>
               <ul class="detail">
-                <li><Icon type="calendar" />{{ $filters.localtime(contest.start_time, 'YYYY-M-D HH:mm') }}</li>
-                <li><Icon type="android-time" />{{getDuration(contest.start_time, contest.end_time)}}</li>
+                <!-- A preparation contest is scheduled only when it is published. -->
+                <li><Icon type="calendar" />{{ $filters.localtime(contest.prep_state ? contest.create_time : contest.start_time, 'YYYY-M-D HH:mm') }}</li>
+                <li v-if="!contest.prep_state"><Icon type="android-time" />{{getDuration(contest.start_time, contest.end_time)}}</li>
                 <li><span :class="['contest-rule', ruleClass(contest.rule_type)]">{{contest.rule_type}}</span></li>
               </ul>
             </div>
@@ -283,6 +284,11 @@
         border-bottom: 1px solid rgba(187, 187, 187, 0.5);
         list-style: none;
         &:last-child { border-bottom: 0; }
+        &.is-prep {
+          background: linear-gradient(100deg, rgba(35, 131, 226, .09) 0%, rgba(35, 131, 226, .035) 38%, rgba(35, 131, 226, 0) 72%);
+          box-shadow: inset 3px 0 0 rgba(35, 131, 226, .55);
+          .contest-logo { border-color: rgba(35, 131, 226, .22); background: rgba(35, 131, 226, .08); color: var(--color-link); }
+        }
         .contest-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
         .contest-logo {
           display: inline-flex;

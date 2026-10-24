@@ -97,6 +97,13 @@ export default [
     meta: {title: 'Contest List'},
     component: Contest.ContestList
   },
+  // One-time preparation invite; the token travels in the URL fragment.
+  {
+    name: 'prep-invite',
+    path: '/invite',
+    meta: {title: 'Invite'},
+    component: Contest.PrepInvite
+  },
   {
     name: 'contest-details',
     path: '/contest/:contestID/',

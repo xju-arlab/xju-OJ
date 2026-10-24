@@ -193,52 +193,79 @@
 
       <section class="recent-submission-card" aria-labelledby="recent-submissions-title">
         <RemoteSubmissionNotice v-if="result.id" :submission="result" @updated="checkSubmissionStatus" />
-        <button type="button" class="recent-submission-header" @click="handleRoute(submissionRoute)">
-          <span id="recent-submissions-title" class="recent-submission-heading">
+        <div class="recent-submission-header">
+          <button type="button" class="recent-submission-heading" @click="handleRoute(submissionRoute)">
             <Icon type="navicon-round"></Icon>
-            <span>{{$t('m.Submissions')}}</span>
-          </span>
-          <Icon type="arrow-down-b" class="recent-submission-arrow"></Icon>
-        </button>
+            <span id="recent-submissions-title">{{ ownSubmissionsMode ? $t('m.My_Submissions') : $t('m.Submissions') }}</span>
+            <Icon type="arrow-down-b" class="recent-submission-arrow"></Icon>
+          </button>
+          <div v-if="ownSubmissionsMode" class="submission-filter" role="group" :aria-label="$t('m.My_Submissions')">
+            <button type="button" :class="{ 'is-active': !acceptedOnly }" :aria-pressed="acceptedOnly ? 'false' : 'true'"
+                    @click="setAcceptedOnly(false)">{{ $t('m.All') }}</button>
+            <button type="button" :class="{ 'is-active': acceptedOnly }" :aria-pressed="acceptedOnly ? 'true' : 'false'"
+                    @click="setAcceptedOnly(true)">AC</button>
+          </div>
+        </div>
         <div class="recent-submission-divider"></div>
         <div class="recent-submission-list">
-          <div v-for="submission in recentSubmissions" :key="submission.id" class="recent-submission-row">
-            <span class="recent-submission-main">
-              <strong>{{submission.username}}</strong>
-              <small>{{submission.language}}</small>
-            </span>
-            <span :class="['judge-status-badge', submissionStatusClass(submission)]">
-              {{submissionStatusLabel(submission)}}
-            </span>
-            <time>{{formatSubmissionTime(submission.create_time)}}</time>
+          <template v-if="ownSubmissionsMode">
+            <button v-for="submission in recentSubmissions" :key="submission.id" type="button"
+                    class="recent-submission-row is-own" :title="$t('m.Submission_Code')"
+                    @click="openSubmissionCode(submission)">
+              <span class="recent-submission-main">
+                <strong>{{submission.language}}</strong>
+                <small>{{formatSubmissionTime(submission.create_time)}}</small>
+              </span>
+              <span :class="['judge-status-badge', submissionStatusClass(submission)]">
+                {{submissionStatusLabel(submission)}}
+              </span>
+              <Icon type="file-text" class="recent-submission-code" />
+            </button>
+          </template>
+          <template v-else>
+            <div v-for="submission in recentSubmissions" :key="submission.id" class="recent-submission-row">
+              <span class="recent-submission-main">
+                <strong>{{submission.username}}</strong>
+                <small>{{submission.language}}</small>
+              </span>
+              <span :class="['judge-status-badge', submissionStatusClass(submission)]">
+                {{submissionStatusLabel(submission)}}
+              </span>
+              <time>{{formatSubmissionTime(submission.create_time)}}</time>
+            </div>
+          </template>
+          <div v-if="!recentSubmissions.length" class="recent-submission-empty">
+            {{ acceptedOnly ? $t('m.No_Accepted_Code') : $t('m.No_Recent_Submissions') }}
           </div>
-          <div v-if="!recentSubmissions.length" class="recent-submission-empty">{{ $t('m.No_Recent_Submissions') }}</div>
         </div>
-        <button v-if="acceptedCodeAvailable" type="button" class="my-accepted-code-link" @click="openAcceptedCode">
-          <Icon type="file-text" />
-          <span>{{ $t('m.My_Accepted_Code') }}</span>
-        </button>
       </section>
 
-      <LegacyDialog :title="$t('m.My_Accepted_Code')" width="760px"
-                    :visible="acceptedDialogVisible" @update:visible="acceptedDialogVisible = $event">
-        <p v-if="acceptedLoading" class="accepted-code-empty">{{ $t('m.Loading') }}</p>
-        <p v-else-if="!acceptedSubmissions.length" class="accepted-code-empty">{{ $t('m.No_Accepted_Code') }}</p>
-        <template v-else>
-          <div class="accepted-code-picker" role="tablist">
-            <button v-for="item in acceptedSubmissions" :key="item.id" type="button" role="tab"
-                    :aria-selected="acceptedCode.id === item.id ? 'true' : 'false'"
-                    :class="{ 'is-active': acceptedCode.id === item.id }"
-                    @click="loadAcceptedCode(item)">
-              {{ item.language }} · {{ formatSubmissionTime(item.create_time) }}
-            </button>
-          </div>
-          <Highlight v-if="acceptedCode.code" :code="acceptedCode.code" :language="acceptedCode.language" />
-        </template>
+      <LegacyDialog :title="$t('m.Submission_Code')" width="760px" class="submission-code-dialog"
+                    :visible="codeDialogVisible" @update:visible="codeDialogVisible = $event">
+        <div class="submission-code-meta">
+          <span v-if="codeSubmission.id" :class="['judge-status-badge', submissionStatusClass(codeSubmission)]">
+            {{ submissionStatusLabel(codeSubmission) }}
+          </span>
+          <span>{{ codeSubmission.language }}</span>
+          <span v-if="codeSubmission.statistic_info && codeSubmission.statistic_info.time_cost !== undefined">
+            {{ $filters.submissionTime(codeSubmission.statistic_info.time_cost) }}
+          </span>
+          <span v-if="codeSubmission.statistic_info && codeSubmission.statistic_info.memory_cost !== undefined">
+            {{ $filters.submissionMemory(codeSubmission.statistic_info.memory_cost) }}
+          </span>
+          <time v-if="codeSubmission.create_time">{{ formatSubmissionTime(codeSubmission.create_time) }}</time>
+        </div>
+        <p v-if="codeLoading" class="submission-code-empty">{{ $t('m.Loading') }}</p>
+        <div v-else-if="codeSubmission.code" class="submission-code-body">
+          <Highlight :code="codeSubmission.code" :language="codeSubmission.language" />
+        </div>
         <template #footer>
-          <el-button v-if="acceptedCode.id" @click="handleRoute('/status/' + acceptedCode.id)">{{ $t('m.Submission_Details') }}</el-button>
-          <el-button v-if="acceptedCode.code" @click="copySample(acceptedCode.code)">{{ $t('m.Copy') }}</el-button>
-          <el-button v-if="acceptedCode.code" type="primary" @click="loadAcceptedIntoEditor">{{ $t('m.Load_Into_Editor') }}</el-button>
+          <div class="submission-code-actions">
+            <el-button v-if="codeSubmission.id" text @click="handleRoute('/status/' + codeSubmission.id)">{{ $t('m.Submission_Details') }}</el-button>
+            <span class="submission-code-spacer"></span>
+            <el-button v-if="codeSubmission.code" @click="copySample(codeSubmission.code)">{{ $t('m.Copy') }}</el-button>
+            <el-button v-if="codeSubmission.code" type="primary" @click="loadSubmissionIntoEditor">{{ $t('m.Load_Into_Editor') }}</el-button>
+          </div>
         </template>
       </LegacyDialog>
 
@@ -335,10 +362,10 @@
         feedbackDialogVisible: false,
         feedbackDraft: '',
         feedbackSending: false,
-        acceptedDialogVisible: false,
-        acceptedLoading: false,
-        acceptedSubmissions: [],
-        acceptedCode: {},
+        acceptedOnly: false,
+        codeDialogVisible: false,
+        codeLoading: false,
+        codeSubmission: {},
         result: {
           result: 9
         },
@@ -469,10 +496,10 @@
         const generation = this.pageGeneration
         const params = { problem_id: problemID }
         const method = this.contestID ? 'getContestSubmissionList' : 'getSubmissionList'
-        if (this.contestID) {
-          params.contest_id = this.contestID
-          params.myself = '1'
-        }
+        if (this.contestID) params.contest_id = this.contestID
+        // Signed-in users see their own runs, whose code they can open here.
+        if (this.contestID || this.ownSubmissionsMode) params.myself = '1'
+        if (this.ownSubmissionsMode && this.acceptedOnly) params.result = '0'
         api[method](0, 5, params).then(res => {
           if (this.disposed || generation !== this.pageGeneration) return
           const data = res.data.data || {}
@@ -487,10 +514,15 @@
       },
       mockSubmissions (problemID) {
         const submissions = MOCK_SUBMISSIONS.filter(item => String(item.problem) === String(problemID))
-        const visibleSubmissions = this.contestID
+        const visibleSubmissions = this.contestID || this.ownSubmissionsMode
           ? submissions.filter(item => item.username === this.user?.username)
           : submissions
-        return cloneFixtures(visibleSubmissions)
+        return cloneFixtures(this.acceptedOnly ? visibleSubmissions.filter(item => item.result === 0) : visibleSubmissions)
+      },
+      setAcceptedOnly (value) {
+        if (this.acceptedOnly === value) return
+        this.acceptedOnly = value
+        this.loadRecentSubmissions(this.problem._id)
       },
       submissionStatusLabel (submission) {
         return presentSubmissionStatus(submission, this.$t).label
@@ -722,38 +754,26 @@
           this.favoriting = false
         })
       },
-      openAcceptedCode () {
+      openSubmissionCode (submission) {
         const generation = this.pageGeneration
-        this.acceptedDialogVisible = true
-        this.acceptedLoading = true
-        this.acceptedSubmissions = []
-        this.acceptedCode = {}
-        // The submission lists only return the caller's own rows with myself=1.
-        const params = { problem_id: this.problem._id, myself: '1', result: '0' }
-        const method = this.contestID ? 'getContestSubmissionList' : 'getSubmissionList'
-        if (this.contestID) params.contest_id = this.contestID
-        api[method](0, 10, params).then(res => {
-          if (this.disposed || generation !== this.pageGeneration) return
-          const results = (res.data.data && res.data.data.results) || []
-          this.acceptedSubmissions = results
-          if (results.length) this.loadAcceptedCode(results[0])
+        this.codeSubmission = { ...submission }
+        this.codeLoading = true
+        this.codeDialogVisible = true
+        api.getSubmission(submission.id).then(res => {
+          if (this.disposed || generation !== this.pageGeneration || this.codeSubmission.id !== submission.id) return
+          this.codeSubmission = res.data.data || {}
         }).catch(() => {}).finally(() => {
-          if (generation === this.pageGeneration) this.acceptedLoading = false
+          if (this.codeSubmission.id === submission.id) this.codeLoading = false
         })
       },
-      loadAcceptedCode (submission) {
-        api.getSubmission(submission.id).then(res => {
-          const data = res.data.data || {}
-          this.acceptedCode = { id: data.id, code: data.code, language: data.language }
-        }).catch(() => {})
-      },
-      loadAcceptedIntoEditor () {
+      loadSubmissionIntoEditor () {
+        const submission = this.codeSubmission
         const apply = () => {
-          if (this.problem.languages.includes(this.acceptedCode.language)) this.language = this.acceptedCode.language
-          this.code = this.acceptedCode.code
-          this.acceptedDialogVisible = false
+          if (this.problem.languages.includes(submission.language)) this.language = submission.language
+          this.code = submission.code
+          this.codeDialogVisible = false
         }
-        if (!this.code.trim() || this.code === this.acceptedCode.code) return apply()
+        if (!this.code.trim() || this.code === submission.code) return apply()
         this.$Modal.confirm({
           content: this.$t('m.Load_Into_Editor_Confirm'),
           onOk: apply
@@ -802,7 +822,7 @@
       feedbackKey () {
         return this.isPrepContest ? `${this.problem.id}:${this.contest.prep_state}` : ''
       },
-      acceptedCodeAvailable () {
+      ownSubmissionsMode () {
         // Keep OI results hidden while a non-real-time contest is running.
         return this.isAuthenticated && (!this.contestID || this.OIContestRealTimePermission)
       },
@@ -830,6 +850,7 @@
       this.submissionId = ''
       this.submitted = this.submitting = this.statusVisible = false
       this.recentSubmissions = []
+      this.acceptedOnly = this.codeDialogVisible = false
       this.hideAcceptedCelebration()
       this.completeAcceptedCelebration()
       this.loadProblemCode(to.params.problemID, to.params.contestID)
@@ -1140,26 +1161,73 @@
   }
   .recent-submission-header {
     display: flex;
-    width: 100%;
     min-height: 48px;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     padding: 10px 15px;
-    border: 0;
-    background: var(--color-bg);
-    color: var(--color-text-muted);
-    text-align: left;
-    cursor: pointer;
-    transition: color var(--transition), background-color var(--transition);
   }
-  .recent-submission-header:hover, .recent-submission-header:focus-visible { background: var(--color-bg); color: var(--color-text); }
-  .recent-submission-heading { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+  .recent-submission-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color var(--transition);
+  }
+  .recent-submission-heading:hover, .recent-submission-heading:focus-visible { color: var(--color-text); }
   .recent-submission-heading :deep(.legacy-icon) { display: inline-flex; align-items: center; }
   .recent-submission-arrow { color: var(--color-text-faint); transform: rotate(-90deg); }
+  .submission-filter {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 6px;
+    background: rgba(55, 53, 47, .06);
+    button {
+      height: 22px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--color-text-muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color var(--transition), color var(--transition), box-shadow var(--transition);
+      &:hover:not(.is-active) { color: var(--color-text); }
+      &.is-active {
+        background: var(--color-bg);
+        color: var(--color-text);
+        font-weight: 600;
+        box-shadow: 0 0 0 1px rgba(15, 15, 15, .06), 0 1px 2px rgba(15, 15, 15, .1);
+      }
+    }
+  }
   .recent-submission-divider { width: 34px; height: 1px; margin: 0 16px 4px; background: var(--line-strong); }
   .recent-submission-list { padding: 2px 15px 8px; }
-  .recent-submission-row { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
+  .recent-submission-row { display: grid; width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
   .recent-submission-row:last-child { border-bottom: 0; }
+  .recent-submission-row.is-own {
+    margin: 0;
+    padding: 8px 6px;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--transition);
+    &:last-child { border-bottom: 0; }
+    &:hover, &:focus-visible { background: var(--bg-hover); }
+    &:hover .recent-submission-code, &:focus-visible .recent-submission-code { color: var(--color-link); }
+  }
+  .recent-submission-code { display: inline-flex; color: var(--color-text-faint); transition: color var(--transition); }
   .recent-submission-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 1px; }
   .recent-submission-main strong { overflow: hidden; color: var(--color-text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
   .recent-submission-main small, .recent-submission-row time { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
@@ -1248,37 +1316,27 @@
     font-size: 12px;
     cursor: pointer;
   }
-  .my-accepted-code-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-link);
-    font-size: 13px;
-    cursor: pointer;
-    :deep(.legacy-icon) { display: inline-flex; }
-    &:hover, &:focus-visible { text-decoration: underline; }
-  }
-  .accepted-code-empty { padding: 18px 0; color: var(--color-text-faint); text-align: center; }
-  .accepted-code-picker {
+  .submission-code-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-    button {
-      padding: 4px 10px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      background: var(--color-bg);
-      color: var(--color-text-muted);
-      font-size: 12px;
-      cursor: pointer;
-      &.is-active { border-color: var(--color-link); color: var(--color-link); }
-    }
+    align-items: center;
+    gap: 6px 14px;
+    margin: -4px 0 12px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    time { margin-left: auto; color: var(--color-text-faint); }
   }
+  .submission-code-empty { padding: 28px 0; color: var(--color-text-faint); text-align: center; }
+  .submission-code-body {
+    overflow: auto;
+    max-height: 60vh;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    :deep(pre) { margin: 0; border: 0; border-radius: 0; }
+  }
+  .submission-code-actions { display: flex; align-items: center; gap: 8px; }
+  .submission-code-spacer { flex: 1; }
 
   @import "@/styles/judge-status.less";
   .submission-status-link {

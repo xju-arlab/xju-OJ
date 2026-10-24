@@ -34,7 +34,7 @@
             </div>
           </div>
 
-          <div v-if="!isPrepContest" class="contest-countdown" :aria-label="countdownCaption">
+          <div v-if="!isPrepContest || isPrepReview" class="contest-countdown" :aria-label="countdownCaption">
             <span>{{countdownCaption}}</span>
             <strong>{{countdownValue}}</strong>
           </div>
@@ -43,11 +43,11 @@
         <dl class="contest-meta">
           <div>
             <dt><Icon type="calendar" />{{$t('m.StartAt')}}</dt>
-            <dd>{{formatTime(contest.start_time)}}</dd>
+            <dd>{{formatTime(isPrepContest ? contest.create_time : contest.start_time)}}</dd>
           </div>
           <div>
             <dt><Icon type="calendar" />{{$t('m.EndAt')}}</dt>
-            <dd>{{formatTime(contest.end_time)}}</dd>
+            <dd>{{isPrepContest ? '—' : formatTime(contest.end_time)}}</dd>
           </div>
           <div>
             <dt><Icon type="android-time" />{{$t('m.Duration')}}</dt>
@@ -161,7 +161,7 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
-  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE } from '@/utils/constants'
+  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_REVIEW_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
   const PREP_STATES = ['Preparation', 'Review']
@@ -196,11 +196,8 @@
           const data = res.data.data
           if (data.rule_type === 'AI') return this.$router.replace({ name: 'ai-contest', params: { contestID: data.id } })
           this.changeDomTitle({ title: data.title })
-          clearInterval(this.timer)
-          if (data.prep_state) return this.enterPrepTab()
-          if (moment(data.end_time).isAfter(moment(data.now))) {
-            this.timer = setInterval(() => this.$store.commit(types.NOW_ADD_1S), 1000)
-          }
+          this.syncClock()
+          if (data.prep_state) this.enterPrepTab()
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
         })
@@ -219,6 +216,22 @@
       formatTime (value) {
         return value ? this.$filters.localtime(value, 'YYYY-MM-DD HH:mm') : '—'
       },
+      syncClock () {
+        // Tick while a contest or a review is still running.
+        clearInterval(this.timer)
+        this.timer = null
+        const end = this.isPrepContest ? this.reviewEndsAt : moment(this.contest.end_time)
+        if (end && end.isAfter(moment(this.now))) {
+          this.timer = setInterval(() => this.$store.commit(types.NOW_ADD_1S), 1000)
+        }
+      },
+      formatCountdown (seconds) {
+        const duration = moment.duration(Math.max(seconds, 0), 'seconds')
+        const days = Math.floor(duration.asDays())
+        const clock = [Math.floor(duration.asHours()) % 24, duration.minutes(), duration.seconds()]
+          .map(value => String(value).padStart(2, '0')).join(':')
+        return days ? `${days}d ${clock}` : clock
+      },
       enterPrepTab () {
         // Setting mode has no overview page; review keeps the contest tabs.
         const names = this.visibleTabs.flatMap(tab => [tab.name, ...(tab.activeNames || [])])
@@ -232,6 +245,7 @@
         try {
           await api.setPrepContestState(this.contestID, state)
           await this.$store.dispatch('getContest')
+          this.syncClock()
           this.enterPrepTab()
         } catch (_) {
           // The API client already shows the error.
@@ -240,10 +254,18 @@
         }
       },
       openPublish () {
+        // The contest window is set here; keep a future one, otherwise
+        // suggest tomorrow 09:00 for the usual five hours.
+        let start = moment(this.contest.start_time)
+        let end = moment(this.contest.end_time)
+        if (!start.isAfter(moment(this.now))) {
+          start = moment(this.now).add(1, 'day').startOf('day').hour(9)
+          end = start.clone().add(PREP_REVIEW_HOURS, 'hours')
+        }
         this.publishForm = {
           title: this.contest.title,
-          start_time: new Date(this.contest.start_time),
-          end_time: new Date(this.contest.end_time),
+          start_time: start.toDate(),
+          end_time: end.toDate(),
           password: this.contest.password || '',
           real_time_rank: this.contest.real_time_rank !== false
         }
@@ -346,23 +368,30 @@
         const item = CONTEST_STATUS_REVERSE[this.contestStatus]
         return item ? this.$t(`m.${item.name.replace(/ /g, '_')}`) : this.$t('m.Status')
       },
+      reviewEndsAt () {
+        // Every review runs like a 5-hour contest from the moment it first started.
+        if (!this.isPrepReview || !this.contest.review_started_at) return null
+        return moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
+      },
       countdownCaption () {
+        if (this.isPrepContest) {
+          return this.$t(this.reviewEndsAt && this.reviewEndsAt.isAfter(this.now) ? 'm.Prep_Review_Countdown' : 'm.Prep_Review_Ended')
+        }
         if (this.contestStatus === CONTEST_STATUS.NOT_START) return this.$t('m.Not_Started')
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
         return this.$t('m.Underway')
       },
       countdownValue () {
+        if (this.isPrepContest) {
+          return this.reviewEndsAt ? this.formatCountdown(this.reviewEndsAt.diff(this.now, 'seconds')) : '—'
+        }
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
         const target = this.contestStatus === CONTEST_STATUS.NOT_START ? this.contest.start_time : this.contest.end_time
         if (!target) return '—'
-        const seconds = Math.max(moment(target).diff(this.now, 'seconds'), 0)
-        const duration = moment.duration(seconds, 'seconds')
-        const days = Math.floor(duration.asDays())
-        const clock = [Math.floor(duration.asHours()) % 24, duration.minutes(), duration.seconds()]
-          .map(value => String(value).padStart(2, '0')).join(':')
-        return days ? `${days}d ${clock}` : clock
+        return this.formatCountdown(moment(target).diff(this.now, 'seconds'))
       },
       durationLabel () {
+        if (this.isPrepContest) return this.isPrepReview ? `${PREP_REVIEW_HOURS}h` : '—'
         if (!this.contest.start_time || !this.contest.end_time) return '—'
         const hours = Math.abs(moment(this.contest.end_time).diff(moment(this.contest.start_time), 'minutes')) / 60
         if (hours >= 24) return `${Number((hours / 24).toFixed(1))}d`

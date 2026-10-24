@@ -70,6 +70,7 @@
   import api from '@oj/api'
   import { FormMixin } from '@oj/components/mixins'
   import runtime from '@/utils/runtime'
+  import { hasPendingInvite } from '@oj/views/contest/prepInvite'
 
   export default {
     mixins: [FormMixin],
@@ -155,7 +156,8 @@
           return
         }
         const url = new URL('/api/auth/oidc/login/', window.location.origin)
-        url.searchParams.set('next', '/')
+        // Come back to a pending preparation invite after signing in.
+        url.searchParams.set('next', hasPendingInvite() ? '/invite' : '/')
         window.location.assign(url.toString())
       },
       goAuthentikRegister () {

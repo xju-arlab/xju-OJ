@@ -17,12 +17,6 @@
         <el-form-item :label="$t('m.Contest_Password')">
           <el-input v-model="form.password" maxlength="32" :placeholder="$t('m.Prep_Password_Placeholder')"></el-input>
         </el-form-item>
-        <el-form-item prop="start_time" :label="$t('m.Contest_Start_Time')">
-          <el-date-picker v-model="form.start_time" type="datetime" class="full-control"></el-date-picker>
-        </el-form-item>
-        <el-form-item prop="end_time" :label="$t('m.Contest_End_Time')">
-          <el-date-picker v-model="form.end_time" type="datetime" class="full-control"></el-date-picker>
-        </el-form-item>
       </div>
       <el-form-item :label="$t('m.ContestDescription')">
         <el-input v-model="form.description" type="textarea" :rows="3"></el-input>
@@ -42,19 +36,12 @@
 <script>
 import api from '@oj/api'
 
-const HOUR = 3600 * 1000
-
+// The contest window is chosen when publishing, not while preparing.
 function defaultForm () {
-  // Default to tomorrow 09:00, five hours long; the creator adjusts it when publishing.
-  const start = new Date()
-  start.setDate(start.getDate() + 1)
-  start.setHours(9, 0, 0, 0)
   return {
     title: '',
     rule_type: 'ACM',
     password: '',
-    start_time: start,
-    end_time: new Date(start.getTime() + 5 * HOUR),
     description: '',
     real_time_rank: true
   }
@@ -69,9 +56,7 @@ export default {
       form: defaultForm(),
       saving: false,
       rules: {
-        title: { required: true, message: this.$t('m.Prep_Title_Required'), trigger: 'blur' },
-        start_time: { required: true, trigger: 'change' },
-        end_time: { required: true, trigger: 'change' }
+        title: { required: true, message: this.$t('m.Prep_Title_Required'), trigger: 'blur' }
       }
     }
   },
@@ -87,10 +72,6 @@ export default {
       } catch (_) {
         return
       }
-      if (new Date(this.form.end_time) <= new Date(this.form.start_time)) {
-        this.$error(this.$t('m.Prep_Time_Invalid'))
-        return
-      }
       this.saving = true
       try {
         const res = await api.createPrepContest({
@@ -98,8 +79,6 @@ export default {
           description: this.form.description,
           rule_type: this.form.rule_type,
           password: this.form.password,
-          start_time: new Date(this.form.start_time).toISOString(),
-          end_time: new Date(this.form.end_time).toISOString(),
           real_time_rank: this.form.real_time_rank,
           visible: true,
           allowed_ip_ranges: []
@@ -120,7 +99,6 @@ export default {
 .prep-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 .full-control { width: 100%; }
 .prep-create-switch { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 0; color: var(--color-text-muted); font-size: 13px; }
-:deep(.el-date-editor.el-input) { width: 100%; }
 @media (max-width: 560px) {
   .prep-create-grid { grid-template-columns: 1fr; }
 }

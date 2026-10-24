@@ -76,6 +76,9 @@ export const CONTEST_STATUS = {
   'ENDED': '-1'
 }
 
+// Every review of a preparation contest runs as a 5-hour contest (backend PREP_REVIEW_HOURS).
+export const PREP_REVIEW_HOURS = 5
+
 export const CONTEST_STATUS_REVERSE = {
   '1': {
     name: 'Not Started',

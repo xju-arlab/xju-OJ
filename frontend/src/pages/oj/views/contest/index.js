@@ -7,8 +7,9 @@ const ContestPrepProblems = () => import('./children/ContestPrepProblems.vue')
 const ContestPrepProblemEdit = () => import('./children/ContestPrepProblemEdit.vue')
 const ContestPrepUpload = () => import('./children/ContestPrepUpload.vue')
 const ContestPrepRoles = () => import('./children/ContestPrepRoles.vue')
+const PrepInvite = () => import('./PrepInvite.vue')
 
 export {
   ContestDetails, ContestList, ContestProblemList, ContestRank, ACMContestHelper,
-  ContestPrepProblems, ContestPrepProblemEdit, ContestPrepUpload, ContestPrepRoles
+  ContestPrepProblems, ContestPrepProblemEdit, ContestPrepUpload, ContestPrepRoles, PrepInvite
 }

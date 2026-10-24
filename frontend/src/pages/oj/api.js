@@ -418,6 +418,26 @@ export default {
       data: { contest_id: contestId, id, resolved }
     })
   },
+  getPrepInvites (contestId) {
+    return ajax('contest/prep/invite', 'get', {
+      params: { contest_id: contestId }
+    })
+  },
+  createPrepInvite (contestId, role) {
+    return ajax('contest/prep/invite', 'post', {
+      data: { contest_id: contestId, role }
+    })
+  },
+  revokePrepInvites (contestId) {
+    return ajax('contest/prep/invite', 'delete', {
+      params: { contest_id: contestId }
+    })
+  },
+  acceptPrepInvite (token) {
+    return ajax('contest/prep/invite/accept', 'post', {
+      data: { token }
+    })
+  },
   deletePrepFeedback (contestId, id) {
     return ajax('contest/prep/feedback', 'delete', {
       params: { contest_id: contestId, id }
