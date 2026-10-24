@@ -369,7 +369,7 @@
         return item ? this.$t(`m.${item.name.replace(/ /g, '_')}`) : this.$t('m.Status')
       },
       reviewEndsAt () {
-        // Every review runs like a 5-hour contest from the moment it first started.
+        // Every switch into review restarts a 5-hour clock, like a fresh contest.
         if (!this.isPrepReview || !this.contest.review_started_at) return null
         return moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
       },

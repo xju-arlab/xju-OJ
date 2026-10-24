@@ -428,9 +428,10 @@ export default {
       data: { contest_id: contestId, role }
     })
   },
-  revokePrepInvites (contestId) {
+  // Revokes one link by id, or every unused link of the contest.
+  revokePrepInvites (contestId, id) {
     return ajax('contest/prep/invite', 'delete', {
-      params: { contest_id: contestId }
+      params: id ? { contest_id: contestId, id } : { contest_id: contestId }
     })
   },
   acceptPrepInvite (token) {

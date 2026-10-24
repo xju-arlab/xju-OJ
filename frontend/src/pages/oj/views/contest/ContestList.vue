@@ -286,7 +286,6 @@
         &:last-child { border-bottom: 0; }
         &.is-prep {
           background: linear-gradient(100deg, rgba(35, 131, 226, .09) 0%, rgba(35, 131, 226, .035) 38%, rgba(35, 131, 226, 0) 72%);
-          box-shadow: inset 3px 0 0 rgba(35, 131, 226, .55);
           .contest-logo { border-color: rgba(35, 131, 226, .22); background: rgba(35, 131, 226, .08); color: var(--color-link); }
         }
         .contest-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
