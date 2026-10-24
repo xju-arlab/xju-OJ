@@ -475,5 +475,7 @@ export const m = {
   Prep_Penalty: 'Penalty',
   No_Submissions: 'No submissions yet',
   Rank_Solved_Problems: 'AC / Problems',
-  Contest_Name: 'Contest name'
+  Contest_Name: 'Contest name',
+  Profile_Refresh_IDs: 'Refresh IDs',
+  Profile_Refreshed: 'Problem IDs refreshed'
 }

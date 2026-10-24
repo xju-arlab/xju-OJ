@@ -475,5 +475,7 @@ export const m = {
   Prep_Penalty: '罚时',
   No_Submissions: '暂无提交',
   Rank_Solved_Problems: 'AC / 题数',
-  Contest_Name: '比赛名称'
+  Contest_Name: '比赛名称',
+  Profile_Refresh_IDs: '刷新题号',
+  Profile_Refreshed: '题号已刷新'
 }

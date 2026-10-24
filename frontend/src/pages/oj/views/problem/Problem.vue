@@ -10,6 +10,16 @@
             <small>Problem {{problem._id}}</small>
             <div class="problem-title-line">
               <strong>{{problem.title}}</strong>
+              <button v-if="!contestID && isAuthenticated"
+                      type="button"
+                      :class="['problem-favorite', { 'is-active': problem.favorited }]"
+                      :title="problem.favorited ? $t('m.Favorited') : $t('m.Favorite')"
+                      :aria-label="problem.favorited ? $t('m.Favorited') : $t('m.Favorite')"
+                      :aria-pressed="problem.favorited ? 'true' : 'false'"
+                      :disabled="favoriting"
+                      @click="toggleFavorite">
+                <Icon type="star" />
+              </button>
               <div v-if="publicProblemTags.length" class="problem-title-tags" :aria-label="$t('m.Tags')">
                 <span v-for="(tag, index) in publicProblemTags" :key="`${tag}-${index}`" :title="tag">{{tag}}</span>
               </div>
@@ -21,15 +31,6 @@
                   @click="handleRoute({name: 'contest-problem-list', params: {contestID: contestID}})">
             <Icon type="arrow-left" />
             <span>{{$t('m.Problems_List')}}</span>
-          </button>
-          <button v-else-if="isAuthenticated"
-                  type="button"
-                  :class="['problem-header-action', 'problem-favorite', { 'is-active': problem.favorited }]"
-                  :aria-pressed="problem.favorited ? 'true' : 'false'"
-                  :disabled="favoriting"
-                  @click="toggleFavorite">
-            <Icon type="star" />
-            <span>{{ problem.favorited ? $t('m.Favorited') : $t('m.Favorite') }}</span>
           </button>
         </div></template>
         <div id="problem-content" class="markdown-body" v-katex v-highlight>
@@ -994,8 +995,8 @@
   .problem-title-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
   .problem-title-copy small { color: var(--color-text-faint); font-family: var(--font-mono); font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
   .problem-title-line { display: flex; min-width: 0; align-items: flex-end; justify-content: space-between; gap: 16px; }
-  .problem-title-copy strong { min-width: 0; flex: 1; overflow: hidden; color: var(--color-text); font-family: var(--font-serif); font-size: 23px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-  .problem-title-tags { display: flex; width: fit-content; max-width: 48%; max-height: 51px; flex: none; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 5px; overflow: hidden; }
+  .problem-title-copy strong { min-width: 0; flex: 0 1 auto; overflow: hidden; color: var(--color-text); font-family: var(--font-serif); font-size: 23px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+  .problem-title-tags { display: flex; width: fit-content; max-width: 48%; max-height: 51px; flex: none; margin-left: auto; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 5px; overflow: hidden; }
   .problem-title-tags span { display: inline-flex; max-width: 132px; min-height: 23px; align-items: center; overflow: hidden; padding: 0 8px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-bg-subtle); color: var(--color-text-muted); font-family: var(--font-sans); font-size: 11px; font-weight: 600; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
   .problem-header-action {
     display: inline-flex;
@@ -1163,8 +1164,27 @@
   .recent-submission-main small, .recent-submission-row time { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
   .recent-submission-row time { flex: none; color: var(--color-text-faint); }
   .recent-submission-empty { padding: 14px 0 10px; color: var(--color-text-faint); font-size: 12px; }
-  .problem-favorite.is-active { color: #c58a00; }
-  .problem-favorite.is-active :deep(svg) { fill: currentColor; }
+  .problem-favorite {
+    display: inline-flex;
+    flex: none;
+    margin-left: -8px;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-faint);
+    cursor: pointer;
+    transition: background-color var(--transition), color var(--transition);
+    :deep(.legacy-icon) { display: inline-flex; }
+    :deep(svg) { width: 17px; height: 17px; }
+    &:hover, &:focus-visible { background: var(--color-bg-subtle); color: var(--color-text-muted); }
+    &.is-active { color: #d9a400; }
+    &.is-active :deep(svg) { fill: currentColor; }
+  }
   .problem-feedback-button {
     display: inline-flex;
     height: 36px;

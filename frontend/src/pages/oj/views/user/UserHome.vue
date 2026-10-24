@@ -29,17 +29,16 @@
           </div>
         </div>
         <div id="problems">
+          <button v-if="refreshVisible && activeTab === 'solved'"
+                  type="button"
+                  class="profile-refresh"
+                  :disabled="refreshing"
+                  @click="freshProblemDisplayID">
+            <Icon :type="refreshing ? 'loading' : 'refresh'" :class="{ 'is-spinning': refreshing }" />
+            <span>{{ $t('m.Profile_Refresh_IDs') }}</span>
+          </button>
           <el-tabs v-model="activeTab" class="profile-tabs">
             <el-tab-pane name="solved" :label="$t('m.Profile_Tab_Solved')">
-              <div v-if="refreshVisible" class="profile-tab-tools">
-                <Poptip trigger="hover" placement="right-start">
-                  <Icon type="ios-help-outline"></Icon>
-                  <template #content><div >
-                    <p>If you find the following problem id does not exist,<br> try to click the button.</p>
-                    <LegacyButton type="info" @click="freshProblemDisplayID">regenerate</LegacyButton>
-                  </div></template>
-                </Poptip>
-              </div>
               <ProfileProblemList :key="`solved-${profileKey}`" type="solved" :username="username"
                                   :empty-text="$t('m.UserHomeIntro')" />
             </el-tab-pane>
@@ -85,6 +84,7 @@
         username: '',
         profile: {},
         activeTab: 'solved',
+        refreshing: false,
         // Bumped after the display IDs are regenerated so the lists reload.
         refreshCount: 0
       }
@@ -105,10 +105,13 @@
         })
       },
       freshProblemDisplayID () {
+        this.refreshing = true
         api.freshDisplayID().then(res => {
-          this.$success('Update successfully')
+          this.$success(this.$t('m.Profile_Refreshed'))
           this.refreshCount += 1
           this.init()
+        }).catch(() => {}).finally(() => {
+          this.refreshing = false
         })
       }
     },
@@ -184,9 +187,37 @@
       margin-top: 40px;
       padding-left: 30px;
       padding-right: 30px;
+      position: relative;
       text-align: left;
-      .profile-tab-tools { display: flex; justify-content: flex-end; margin-bottom: 4px; color: var(--color-text-faint); }
     }
+    // Sits at the right end of the tab bar, level with the tabs.
+    .profile-refresh {
+      position: absolute;
+      z-index: 1;
+      top: 4px;
+      right: 30px;
+      display: inline-flex;
+      height: 30px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg);
+      color: var(--color-text-muted);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+      :deep(.legacy-icon) { display: inline-flex; }
+      :deep(svg) { width: 14px; height: 14px; }
+      &:hover:not(:disabled), &:focus-visible { border-color: var(--line-strong); background: var(--color-bg-subtle); color: var(--color-text); }
+      &:focus { outline: none; }
+      &:focus-visible { box-shadow: 0 0 0 2px rgba(35, 131, 226, .25); }
+      &:disabled { cursor: wait; color: var(--color-text-faint); }
+      .is-spinning { animation: profile-spin 1s linear infinite; }
+    }
+    @keyframes profile-spin { to { transform: rotate(360deg); } }
     #icons {
       position: absolute;
       bottom: 20px;
