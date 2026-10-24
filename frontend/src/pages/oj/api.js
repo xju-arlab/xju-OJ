@@ -378,6 +378,11 @@ export default {
       data: { contest_id: contestId, id: problemId, visible }
     })
   },
+  addPrepProblemFromPublic (contestId, problemId) {
+    return ajax('contest/prep/problem/from_public', 'post', {
+      data: { contest_id: contestId, problem_id: problemId }
+    })
+  },
   reorderPrepProblems (contestId, problemIds) {
     return ajax('contest/prep/problem/order', 'put', {
       data: { contest_id: contestId, problem_ids: problemIds }

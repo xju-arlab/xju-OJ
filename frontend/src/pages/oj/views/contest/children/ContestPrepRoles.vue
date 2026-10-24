@@ -8,7 +8,12 @@
                        :trigger-on-focus="false"
                        value-key="username"
                        :placeholder="$t('m.Prep_Username_Placeholder')"
-                       @select="item => newMember.username = item.username"></el-autocomplete>
+                       @select="item => newMember.username = item.username">
+        <template #default="{ item }">
+          <span class="suggestion-name">{{ item.username }}</span>
+          <span v-if="item.real_name" class="suggestion-real-name">{{ item.real_name }}</span>
+        </template>
+      </el-autocomplete>
       <el-select v-model="newMember.role" class="prep-member-role">
         <el-option v-for="role in assignableRoles" :key="role" :value="role" :label="roleLabel(role)"></el-option>
       </el-select>
@@ -140,6 +145,8 @@ export default {
 .prep-member-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
 .prep-member-user { flex: 0 1 320px; min-width: 200px; }
 .prep-member-role { width: 140px; }
+.suggestion-name { color: var(--color-text); }
+.suggestion-real-name { margin-left: 8px; color: var(--color-text-faint); font-size: 12px; }
 .prep-member-table {
   width: 100%;
   border-collapse: collapse;

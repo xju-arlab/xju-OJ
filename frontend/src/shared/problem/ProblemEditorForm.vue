@@ -15,6 +15,9 @@
             <h3>基本信息</h3>
             <p>题号由系统自动分配，只需维护标题、来源与判题属性。</p>
           </div>
+          <div v-if="$slots['basic-actions']" class="section-actions">
+            <slot name="basic-actions"></slot>
+          </div>
         </div>
 
         <div class="field-grid basic-grid">
@@ -97,7 +100,7 @@
             <el-switch v-model="problem.visible"></el-switch>
           </label>
           <label class="toggle-field">
-            <span><strong>{{$t('m.ShareSubmission')}}</strong><small>允许其他用户查看共享提交</small></span>
+            <span><strong>{{$t('m.ShareSubmission')}}</strong><small>{{ shareHint }}</small></span>
             <el-switch v-model="problem.share_submission"></el-switch>
           </label>
         </div>
@@ -302,6 +305,9 @@
       uploadData () {
         return {...(this.service.testCaseUploadData || {}), spj: this.problem.spj}
       },
+      shareHint () {
+        return this.contestId ? '允许其他用户在比赛结束后查看共享提交' : '允许其他用户查看共享提交'
+      },
       visibleHint () {
         if (this.contest.prep_state) return '对验题人可见'
         return '允许普通用户在题库中看到该题'
@@ -318,7 +324,8 @@
           memory_limit: 256,
           difficulty: 'Low',
           visible: true,
-          share_submission: false,
+          // Contest problems share submissions by default; they open after the contest.
+          share_submission: Boolean(this.contestId),
           tags: [],
           languages: [],
           template: {},
@@ -579,6 +586,7 @@
   .section-heading h3 { margin: 0; color: var(--color-text); font-size: 16px; font-weight: 680; }
   .section-heading p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
   .section-heading.is-inline > :last-child { flex: none; }
+  .section-actions { display: flex; flex: none; align-items: center; gap: 8px; }
   .field-grid { display: grid; gap: 0 var(--form-gap); }
   .basic-grid { grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); }
   .limit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }

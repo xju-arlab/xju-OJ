@@ -477,5 +477,10 @@ export const m = {
   Rank_Solved_Problems: 'AC / Problems',
   Contest_Name: 'Contest name',
   Profile_Refresh_IDs: 'Refresh IDs',
-  Profile_Refreshed: 'Problem IDs refreshed'
+  Profile_Refreshed: 'Problem IDs refreshed',
+  Prep_Select_Problem: 'Select problems',
+  Prep_Search_Problem: 'ID or title',
+  Prep_Add: 'Add',
+  Prep_Added: 'Added',
+  Prep_Done: 'Done'
 }

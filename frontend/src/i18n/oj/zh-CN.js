@@ -477,5 +477,10 @@ export const m = {
   Rank_Solved_Problems: 'AC / 题数',
   Contest_Name: '比赛名称',
   Profile_Refresh_IDs: '刷新题号',
-  Profile_Refreshed: '题号已刷新'
+  Profile_Refreshed: '题号已刷新',
+  Prep_Select_Problem: '选择题目',
+  Prep_Search_Problem: '题号或标题',
+  Prep_Add: '添加',
+  Prep_Added: '已添加',
+  Prep_Done: '完成'
 }

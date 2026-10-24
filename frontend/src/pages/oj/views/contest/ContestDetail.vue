@@ -110,7 +110,8 @@
             <div><dt>{{$t('m.Rule')}}</dt><dd :class="['contest-rule', ruleClass]">{{contest.rule_type || 'ACM'}}</dd></div>
             <div><dt>{{$t('m.ContestType')}}</dt><dd>{{contestTypeLabel}}</dd></div>
             <div><dt>{{$t('m.Problems')}}</dt><dd>{{contestProblemIds.length || '—'}}</dd></div>
-            <div><dt>{{$t('m.Status')}}</dt><dd :class="['contest-status', statusClass]">{{statusLabel}}</dd></div>
+            <div v-if="isPrepContest"><dt>{{$t('m.Status')}}</dt><dd><span :class="['contest-prep-badge', { 'is-review': isPrepReview }]">{{ prepStateLabel }}</span></dd></div>
+            <div v-else><dt>{{$t('m.Status')}}</dt><dd :class="['contest-status', statusClass]">{{statusLabel}}</dd></div>
           </dl>
           <button type="button"
                   class="contest-primary-link"
@@ -219,7 +220,7 @@
         return value ? this.$filters.localtime(value, 'YYYY-MM-DD HH:mm') : '—'
       },
       enterPrepTab () {
-        // Preparation contests have no overview page.
+        // Setting mode has no overview page; review keeps the contest tabs.
         const names = this.visibleTabs.flatMap(tab => [tab.name, ...(tab.activeNames || [])])
         if (!names.includes(this.routeName) && this.routeName !== 'contest-problem-details') {
           this.$router.replace(this.visibleTabs[0].route)
@@ -292,6 +293,7 @@
       },
       canReadAnnouncements () {
         if (!this.isAuthenticated || !this.contestID || String(this.contest.id) !== String(this.contestID)) return false
+        if (this.isPrepContest) return this.isPrepReview
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       isProblemRoute () {
@@ -302,15 +304,8 @@
       },
       tabs () {
         const common = { contestID: this.contestID }
-        if (this.isPrepContest && this.isPrepReview) {
-          // Review runs like a real contest, without announcements.
-          return [
-            { name: 'contest-problem-list', label: 'Problems', icon: 'ios-photos', route: { name: 'contest-problem-list', params: common } },
-            { name: 'contest-submission-list', label: 'Submissions', icon: 'navicon-round', route: { name: 'contest-submission-list', params: common } },
-            { name: 'contest-rank', label: 'Rankings', icon: 'stats-bars', route: { name: 'contest-rank', params: common } }
-          ]
-        }
-        if (this.isPrepContest) {
+        // Review uses the same tabs as a published contest.
+        if (this.isPrepContest && !this.isPrepReview) {
           const list = this.canAuthorPrep ? 'contest-prep-problems' : 'contest-problem-list'
           return [
             { name: list, label: 'Prep_Problem_List', icon: 'list-ol', route: { name: list, params: common }, activeNames: ['contest-prep-problem-edit'] },

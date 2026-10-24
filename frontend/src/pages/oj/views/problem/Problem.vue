@@ -776,6 +776,7 @@
       },
       canReadAnnouncements () {
         if (!this.contestID || !this.isAuthenticated || String(this.contest.id) !== String(this.contestID)) return false
+        if (this.isPrepContest) return this.isPrepReview
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       contestEnded () {
