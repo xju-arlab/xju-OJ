@@ -29,21 +29,29 @@
           </div>
         </div>
         <div id="problems">
-          <div v-if="problems.length">{{$t('m.List_Solved_Problems')}}
-            <Poptip v-if="refreshVisible" trigger="hover" placement="right-start">
-              <Icon type="ios-help-outline"></Icon>
-              <template #content><div >
-                <p>If you find the following problem id does not exist,<br> try to click the button.</p>
-                <LegacyButton type="info" @click="freshProblemDisplayID">regenerate</LegacyButton>
-              </div></template>
-            </Poptip>
-          </div>
-          <p v-else>{{$t('m.UserHomeIntro')}}</p>
-          <div class="btns">
-            <div class="problem-btn" v-for="problemID of problems" :key="problemID">
-              <LegacyButton type="ghost" @click="goProblem(problemID)">{{problemID}}</LegacyButton>
-            </div>
-          </div>
+          <el-tabs v-model="activeTab" class="profile-tabs">
+            <el-tab-pane name="solved" :label="$t('m.Profile_Tab_Solved')">
+              <div v-if="refreshVisible" class="profile-tab-tools">
+                <Poptip trigger="hover" placement="right-start">
+                  <Icon type="ios-help-outline"></Icon>
+                  <template #content><div >
+                    <p>If you find the following problem id does not exist,<br> try to click the button.</p>
+                    <LegacyButton type="info" @click="freshProblemDisplayID">regenerate</LegacyButton>
+                  </div></template>
+                </Poptip>
+              </div>
+              <ProfileProblemList :key="`solved-${profileKey}`" type="solved" :username="username"
+                                  :empty-text="$t('m.UserHomeIntro')" />
+            </el-tab-pane>
+            <el-tab-pane name="uploaded" :label="$t('m.Profile_Tab_Uploaded')" lazy>
+              <ProfileProblemList :key="`uploaded-${profileKey}`" type="uploaded" :username="username"
+                                  :empty-text="$t('m.Profile_No_Uploaded')" />
+            </el-tab-pane>
+            <el-tab-pane v-if="isOwnProfile" name="favorites" :label="$t('m.Profile_Tab_Favorites')" lazy>
+              <ProfileProblemList :key="`favorites-${profileKey}`" type="favorites"
+                                  :empty-text="$t('m.Profile_No_Favorites')" />
+            </el-tab-pane>
+          </el-tabs>
         </div>
         <div id="icons">
           <a :href="profile.github">
@@ -65,16 +73,20 @@
   import time from '@/utils/time'
   import api from '@oj/api'
   import UserAvatar from '@/shared/ui/UserAvatar.vue'
+  import ProfileProblemList from './ProfileProblemList.vue'
 
   export default {
     components: {
-      UserAvatar
+      UserAvatar,
+      ProfileProblemList
     },
     data () {
       return {
         username: '',
         profile: {},
-        problems: []
+        activeTab: 'solved',
+        // Bumped after the display IDs are regenerated so the lists reload.
+        refreshCount: 0
       }
     },
     mounted () {
@@ -87,41 +99,29 @@
         api.getUserInfo(this.username).then(res => {
           this.changeDomTitle({title: res.data.data.user.username})
           this.profile = res.data.data
-          this.getSolvedProblems()
+          if (this.activeTab === 'favorites' && !this.isOwnProfile) this.activeTab = 'solved'
           let registerTime = time.utcToLocal(this.profile.user.create_time, 'YYYY-MM-D')
           console.log('The guy registered at ' + registerTime + '.')
         })
       },
-      getSolvedProblems () {
-        let ACMProblems = this.profile.acm_problems_status.problems || {}
-        let OIProblems = this.profile.oi_problems_status.problems || {}
-        // todo oi problems
-        let ACProblems = []
-        for (let problems of [ACMProblems, OIProblems]) {
-          Object.keys(problems).forEach(problemID => {
-            if (problems[problemID]['status'] === 0) {
-              ACProblems.push(problems[problemID]['_id'])
-            }
-          })
-        }
-        ACProblems.sort()
-        this.problems = ACProblems
-      },
-      goProblem (problemID) {
-        this.$router.push({name: 'problem-details', params: {problemID: problemID}})
-      },
       freshProblemDisplayID () {
         api.freshDisplayID().then(res => {
           this.$success('Update successfully')
+          this.refreshCount += 1
           this.init()
         })
       }
     },
     computed: {
       refreshVisible () {
+        return this.isOwnProfile
+      },
+      isOwnProfile () {
         if (!this.username) return true
-        if (this.username && this.username === this.$store.getters.user.username) return true
-        return false
+        return this.username === this.$store.getters.user.username
+      },
+      profileKey () {
+        return `${this.username || 'me'}-${this.refreshCount}`
       }
     },
     watch: {
@@ -184,14 +184,8 @@
       margin-top: 40px;
       padding-left: 30px;
       padding-right: 30px;
-      font-size: 18px;
-      .btns {
-        margin-top: 15px;
-        .problem-btn {
-          display: inline-block;
-          margin: 5px;
-        }
-      }
+      text-align: left;
+      .profile-tab-tools { display: flex; justify-content: flex-end; margin-bottom: 4px; color: var(--color-text-faint); }
     }
     #icons {
       position: absolute;

@@ -56,6 +56,10 @@ import {
   Camera,
   Shuffle,
   Expand,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Star,
   X
 } from 'lucide-vue-next'
 
@@ -120,6 +124,10 @@ const iconMap = {
   'list-ol': ListOrdered,
   'info-circle': Info,
   users: Users,
+  star: Star,
+  eye: Eye,
+  'eye-off': EyeOff,
+  grip: GripVertical,
   'fa-trophy': Trophy,
   'fa-bars': List,
   'fa-server': ServerCog,

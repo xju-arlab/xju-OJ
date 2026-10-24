@@ -22,6 +22,15 @@
             <Icon type="arrow-left" />
             <span>{{$t('m.Problems_List')}}</span>
           </button>
+          <button v-else-if="isAuthenticated"
+                  type="button"
+                  :class="['problem-header-action', 'problem-favorite', { 'is-active': problem.favorited }]"
+                  :aria-pressed="problem.favorited ? 'true' : 'false'"
+                  :disabled="favoriting"
+                  @click="toggleFavorite">
+            <Icon type="star" />
+            <span>{{ problem.favorited ? $t('m.Favorited') : $t('m.Favorite') }}</span>
+          </button>
         </div></template>
         <div id="problem-content" class="markdown-body" v-katex v-highlight>
           <div class="problem-brief" aria-label="Problem information">
@@ -163,7 +172,33 @@
           </div>
           <div v-if="!recentSubmissions.length" class="recent-submission-empty">{{ $t('m.No_Recent_Submissions') }}</div>
         </div>
+        <button v-if="acceptedCodeAvailable" type="button" class="my-accepted-code-link" @click="openAcceptedCode">
+          <Icon type="file-text" />
+          <span>{{ $t('m.My_Accepted_Code') }}</span>
+        </button>
       </section>
+
+      <LegacyDialog :title="$t('m.My_Accepted_Code')" width="760px"
+                    :visible="acceptedDialogVisible" @update:visible="acceptedDialogVisible = $event">
+        <p v-if="acceptedLoading" class="accepted-code-empty">{{ $t('m.Loading') }}</p>
+        <p v-else-if="!acceptedSubmissions.length" class="accepted-code-empty">{{ $t('m.No_Accepted_Code') }}</p>
+        <template v-else>
+          <div class="accepted-code-picker" role="tablist">
+            <button v-for="item in acceptedSubmissions" :key="item.id" type="button" role="tab"
+                    :aria-selected="acceptedCode.id === item.id ? 'true' : 'false'"
+                    :class="{ 'is-active': acceptedCode.id === item.id }"
+                    @click="loadAcceptedCode(item)">
+              {{ item.language }} · {{ formatSubmissionTime(item.create_time) }}
+            </button>
+          </div>
+          <Highlight v-if="acceptedCode.code" :code="acceptedCode.code" :language="acceptedCode.language" />
+        </template>
+        <template #footer>
+          <el-button v-if="acceptedCode.id" @click="handleRoute('/status/' + acceptedCode.id)">{{ $t('m.Submission_Details') }}</el-button>
+          <el-button v-if="acceptedCode.code" @click="copySample(acceptedCode.code)">{{ $t('m.Copy') }}</el-button>
+          <el-button v-if="acceptedCode.code" type="primary" @click="loadAcceptedIntoEditor">{{ $t('m.Load_Into_Editor') }}</el-button>
+        </template>
+      </LegacyDialog>
 
     </div>
 
@@ -209,6 +244,7 @@
   import { dispatchRemoteSubmission, isRemoteBridgeInstalled, subscribeRemoteBridgeEvents } from '@oj/remoteBridge'
   import { submissionStatus as presentSubmissionStatus } from '@oj/submissionStatus'
   import RemoteSubmissionNotice from '@oj/components/RemoteSubmissionNotice.vue'
+  import Highlight from '@oj/components/Highlight.vue'
   import { applyDevelopmentProblemFixture, cloneFixtures, MOCK_PROBLEMS, MOCK_SUBMISSIONS } from '@oj/mocks/fixtures'
 
   const DEFAULT_PROBLEM_LANGUAGE = 'C++'
@@ -222,7 +258,7 @@
   export default {
     name: 'Problem',
     components: {
-      CodeMirror, ContestAnnouncementBanner, RemoteSubmissionNotice
+      CodeMirror, ContestAnnouncementBanner, RemoteSubmissionNotice, Highlight
     },
     mixins: [FormMixin],
     data () {
@@ -252,6 +288,11 @@
         disposed: false,
         refreshStatus: null,
         recentSubmissions: [],
+        favoriting: false,
+        acceptedDialogVisible: false,
+        acceptedLoading: false,
+        acceptedSubmissions: [],
+        acceptedCode: {},
         result: {
           result: 9
         },
@@ -593,6 +634,53 @@
         this.acceptedCelebrationResolve = null
         if (resolve) resolve()
       },
+      toggleFavorite () {
+        const favorited = !this.problem.favorited
+        this.favoriting = true
+        const request = favorited ? api.favoriteProblem(this.problem.id) : api.unfavoriteProblem(this.problem.id)
+        request.then(() => {
+          this.problem.favorited = favorited
+        }).catch(() => {}).finally(() => {
+          this.favoriting = false
+        })
+      },
+      openAcceptedCode () {
+        const generation = this.pageGeneration
+        this.acceptedDialogVisible = true
+        this.acceptedLoading = true
+        this.acceptedSubmissions = []
+        this.acceptedCode = {}
+        // The submission lists only return the caller's own rows with myself=1.
+        const params = { problem_id: this.problem._id, myself: '1', result: '0' }
+        const method = this.contestID ? 'getContestSubmissionList' : 'getSubmissionList'
+        if (this.contestID) params.contest_id = this.contestID
+        api[method](0, 10, params).then(res => {
+          if (this.disposed || generation !== this.pageGeneration) return
+          const results = (res.data.data && res.data.data.results) || []
+          this.acceptedSubmissions = results
+          if (results.length) this.loadAcceptedCode(results[0])
+        }).catch(() => {}).finally(() => {
+          if (generation === this.pageGeneration) this.acceptedLoading = false
+        })
+      },
+      loadAcceptedCode (submission) {
+        api.getSubmission(submission.id).then(res => {
+          const data = res.data.data || {}
+          this.acceptedCode = { id: data.id, code: data.code, language: data.language }
+        }).catch(() => {})
+      },
+      loadAcceptedIntoEditor () {
+        const apply = () => {
+          if (this.problem.languages.includes(this.acceptedCode.language)) this.language = this.acceptedCode.language
+          this.code = this.acceptedCode.code
+          this.acceptedDialogVisible = false
+        }
+        if (!this.code.trim() || this.code === this.acceptedCode.code) return apply()
+        this.$Modal.confirm({
+          content: this.$t('m.Load_Into_Editor_Confirm'),
+          onOk: apply
+        })
+      },
       finishSubmissionStatus (result, submissionId) {
         if (this.disposed) return
         if (String(submissionId) !== String(this.submissionId)) return
@@ -620,6 +708,10 @@
       },
       submissionStatus () {
         return presentSubmissionStatus(this.result, this.$t)
+      },
+      acceptedCodeAvailable () {
+        // Keep OI results hidden while a non-real-time contest is running.
+        return this.isAuthenticated && (!this.contestID || this.OIContestRealTimePermission)
       },
       submissionRoute () {
         if (this.contestID) {
@@ -977,6 +1069,39 @@
   .recent-submission-main small, .recent-submission-row time { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
   .recent-submission-row time { flex: none; color: var(--color-text-faint); }
   .recent-submission-empty { padding: 14px 0 10px; color: var(--color-text-faint); font-size: 12px; }
+  .problem-favorite.is-active { color: #c58a00; }
+  .problem-favorite.is-active :deep(svg) { fill: currentColor; }
+  .my-accepted-code-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-link);
+    font-size: 13px;
+    cursor: pointer;
+    :deep(.legacy-icon) { display: inline-flex; }
+    &:hover, &:focus-visible { text-decoration: underline; }
+  }
+  .accepted-code-empty { padding: 18px 0; color: var(--color-text-faint); text-align: center; }
+  .accepted-code-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    button {
+      padding: 4px 10px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg);
+      color: var(--color-text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      &.is-active { border-color: var(--color-link); color: var(--color-link); }
+    }
+  }
 
   @import "@/styles/judge-status.less";
   .submission-status-link {

@@ -122,8 +122,25 @@ export default {
   getLanguages () {
     return ajax('languages', 'get')
   },
-  getProblemTagList () {
-    return ajax('problem/tags', 'get')
+  getProblemTagList (params) {
+    return ajax('problem/tags', 'get', {
+      params
+    })
+  },
+  favoriteProblem (problemId) {
+    return ajax('problem/favorite', 'post', {
+      data: { problem_id: problemId }
+    })
+  },
+  unfavoriteProblem (problemId) {
+    return ajax('problem/favorite', 'delete', {
+      params: { problem_id: problemId }
+    })
+  },
+  getProfileProblems (params) {
+    return ajax('profile/problems', 'get', {
+      params
+    })
   },
   getProblemList (offset, limit, searchParams) {
     let params = {
@@ -292,6 +309,88 @@ export default {
   getContestRank (params) {
     return ajax('contest_rank', 'get', {
       params
+    })
+  },
+  // Contest preparation workspace (creator, problem setters and verifiers).
+  // Creating one is an admin action, so it reuses the admin contest endpoint.
+  createPrepContest (data) {
+    return ajax('admin/contest', 'post', {
+      data: { ...data, preparation: true }
+    })
+  },
+  setPrepContestState (contestId, state) {
+    return ajax('contest/prep/state', 'put', {
+      data: { contest_id: contestId, state }
+    })
+  },
+  getPrepMembers (contestId) {
+    return ajax('contest/prep/members', 'get', {
+      params: { contest_id: contestId }
+    })
+  },
+  addPrepMember (contestId, username, role) {
+    return ajax('contest/prep/members', 'post', {
+      data: { contest_id: contestId, username, role }
+    })
+  },
+  updatePrepMember (contestId, userId, role) {
+    return ajax('contest/prep/members', 'put', {
+      data: { contest_id: contestId, user_id: userId, role }
+    })
+  },
+  removePrepMember (contestId, userId) {
+    return ajax('contest/prep/members', 'delete', {
+      params: { contest_id: contestId, user_id: userId }
+    })
+  },
+  searchPrepUsers (contestId, keyword) {
+    return ajax('contest/prep/members/search', 'get', {
+      params: { contest_id: contestId, keyword }
+    })
+  },
+  getPrepProblems (contestId) {
+    return ajax('contest/prep/problem', 'get', {
+      params: { contest_id: contestId }
+    })
+  },
+  getPrepProblem (contestId, problemId) {
+    return ajax('contest/prep/problem', 'get', {
+      params: { contest_id: contestId, id: problemId }
+    })
+  },
+  createPrepProblem (data) {
+    return ajax('contest/prep/problem', 'post', {
+      data
+    })
+  },
+  editPrepProblem (data) {
+    return ajax('contest/prep/problem', 'put', {
+      data
+    })
+  },
+  deletePrepProblem (contestId, problemId) {
+    return ajax('contest/prep/problem', 'delete', {
+      params: { contest_id: contestId, id: problemId }
+    })
+  },
+  setPrepProblemVisible (contestId, problemId, visible) {
+    return ajax('contest/prep/problem/visible', 'put', {
+      data: { contest_id: contestId, id: problemId, visible }
+    })
+  },
+  reorderPrepProblems (contestId, problemIds) {
+    return ajax('contest/prep/problem/order', 'put', {
+      data: { contest_id: contestId, problem_ids: problemIds }
+    })
+  },
+  compilePrepSPJ (data) {
+    return ajax('contest/prep/compile_spj', 'post', {
+      data
+    })
+  },
+  publishPrepContest (data) {
+    return ajax('contest/prep/publish', 'post', {
+      data
     })
   },
   getACMACInfo (params) {

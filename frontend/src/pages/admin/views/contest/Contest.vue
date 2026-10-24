@@ -71,7 +71,21 @@
               </span>
               <el-switch v-model="contest.real_time_rank"></el-switch>
             </div>
-            <div class="setting-card">
+            <div v-if="isCreate && contest.rule_type !== 'AI'" class="setting-card">
+              <span class="setting-copy">
+                <strong>{{ $t('m.Contest_Preparation_Mode') }}</strong>
+                <small>仅创建者、出题人和验题人可见，在 OJ 比赛页分配人员、上传题目，发布时生成正式比赛</small>
+              </span>
+              <el-switch v-model="preparation"></el-switch>
+            </div>
+            <div v-else-if="contest.prep_state" class="setting-card">
+              <span class="setting-copy">
+                <strong>{{ $t('m.Contest_Preparation_Mode') }}</strong>
+                <small>{{ contest.prep_state === 'Preview' ? '预览中' : '筹备中' }} · 在 OJ 比赛页管理人员、题目并发布</small>
+              </span>
+              <a class="prep-open-link" :href="`/contest/${$route.params.contestId}/`">打开筹备页</a>
+            </div>
+            <div v-if="!(isCreate && preparation && contest.rule_type !== 'AI')" class="setting-card">
               <span class="setting-copy">
                 <strong>{{ $t('m.Contest_Status') }}</strong>
                 <small>允许用户看到并进入比赛</small>
@@ -123,6 +137,8 @@
       return {
         title: '创建比赛',
         disableRuleType: false,
+        // New contests start as private preparation workspaces by default.
+        preparation: true,
         problemPlan: [],
         saving: false,
         contest: {
@@ -158,6 +174,7 @@
         let funcName = this.$route.name === 'edit-contest' ? 'editContest' : 'createContest'
         let data = Object.assign({}, this.contest)
         data.allowed_ip_ranges = Array.isArray(data.allowed_ip_ranges) ? data.allowed_ip_ranges : []
+        if (this.isCreate) data.preparation = this.preparation && this.contest.rule_type !== 'AI'
         try {
           if (this.contest.rule_type === 'AI') this.$refs.aiSettings.validate()
           const res = await api[funcName](data)
@@ -211,6 +228,7 @@
   .time-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .full-control { width: 100%; }
   .setting-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .prep-open-link { flex: none; color: var(--color-link); font-size: 13px; }
   .setting-card { display: flex; min-height: 66px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-subtle); }
   .setting-copy, .setting-copy strong, .setting-copy small { display: block; }
   .setting-copy { min-width: 0; flex: 1; }

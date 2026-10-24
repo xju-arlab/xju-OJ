@@ -127,3 +127,12 @@ export function buildProblemCodeKey (problemID, contestID = null) {
 }
 
 export const GOOGLE_ANALYTICS_ID = 'UA-111499601-1'
+
+// Contest problems are labelled A..Z, AA, AB...; compare by length first so
+// AA sorts after Z, matching the backend ordering.
+export function compareContestDisplayId (a, b) {
+  const left = String(a._id || '')
+  const right = String(b._id || '')
+  if (left.length !== right.length) return left.length - right.length
+  return left === right ? 0 : (left > right ? 1 : -1)
+}

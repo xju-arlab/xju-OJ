@@ -132,6 +132,27 @@ export default [
         name: 'acm-helper',
         path: 'helper',
         component: Contest.ACMContestHelper
+      },
+      // Preparation workspace: problem setting (tab 2) and roles (tab 1).
+      {
+        name: 'contest-prep-problems',
+        path: 'prep/problems',
+        component: Contest.ContestPrepProblems
+      },
+      {
+        name: 'contest-prep-problem-create',
+        path: 'prep/problems/create',
+        component: Contest.ContestPrepProblemEdit
+      },
+      {
+        name: 'contest-prep-problem-edit',
+        path: 'prep/problems/:problemId/edit',
+        component: Contest.ContestPrepProblemEdit
+      },
+      {
+        name: 'contest-prep-roles',
+        path: 'prep/roles',
+        component: Contest.ContestPrepRoles
       }
     ]
   },

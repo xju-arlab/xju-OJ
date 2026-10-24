@@ -2,11 +2,14 @@
   <Row type="flex">
     <Col :span="24">
     <Panel id="contest-card" shadow>
-      <template #title><div >{{query.rule_type === '' ? this.$t('m.All') : query.rule_type}} {{$t('m.Contests')}}</div></template>
+      <template #title><div>{{ listTitle }}</div></template>
       <template #extra><div class="contest-filters">
+        <el-button v-if="isAdminRole" type="primary" class="contest-create" @click="createVisible = true">
+          <Icon type="plus" />{{ $t('m.Create_Contest') }}
+        </el-button>
         <Dropdown @on-click="onRuleChange">
           <button type="button" class="contest-filter-control">
-            <span>{{query.rule_type === '' ? this.$t('m.Rule') : this.$t('m.' + query.rule_type)}}</span>
+            <span>{{ ruleFilterLabel }}</span>
             <Icon type="arrow-down-b"></Icon>
           </button>
           <template #list><Dropdown-menu>
@@ -14,6 +17,7 @@
             <Dropdown-item name="OI">{{$t('m.OI')}}</Dropdown-item>
             <Dropdown-item name="ACM">{{$t('m.ACM')}}</Dropdown-item>
             <Dropdown-item name="AI">AI</Dropdown-item>
+            <Dropdown-item v-if="isAuthenticated" :name="PREP_FILTER">{{$t('m.Contest_Preparation')}}</Dropdown-item>
           </Dropdown-menu></template>
         </Dropdown>
         <Dropdown @on-click="onStatusChange">
@@ -47,29 +51,36 @@
                 <li><span :class="['contest-rule', ruleClass(contest.rule_type)]">{{contest.rule_type}}</span></li>
               </ul>
             </div>
-            <span :class="['contest-status', statusClass(contest.status)]">{{statusLabel(contest.status)}}</span>
+            <span v-if="contest.prep_state" class="contest-status status-prep">{{ prepStateLabel(contest.prep_state) }}</span>
+            <span v-else :class="['contest-status', statusClass(contest.status)]">{{statusLabel(contest.status)}}</span>
           </div>
         </li>
       </ol>
     </Panel>
     <Pagination :total="total" :page-size="limit" @update:page-size="limit = $event" @on-change="changeRoute" :current="page" @update:current="page = $event" :show-sizer="true" @on-page-size-change="changeRoute"></Pagination>
     </Col>
+    <PrepContestCreateDialog v-if="isAdminRole" :visible="createVisible" @update:visible="createVisible = $event" @created="onPrepContestCreated" />
   </Row>
 
 </template>
 <script>
   import api from '@oj/api'
   import utils from '@/utils/utils'
+  import { mapGetters } from '@/store/compat'
   import Pagination from '@/pages/oj/components/Pagination'
+  import PrepContestCreateDialog from './PrepContestCreateDialog.vue'
   import { CONTEST_STATUS_REVERSE } from '@/utils/constants'
   import { applyDevelopmentContestFixtures, cloneFixtures, filterMockContests, MOCK_CONTESTS } from '@oj/mocks/fixtures'
 
   const limit = 10
+  // Rule filter entry for the private preparation contests the user belongs to.
+  const PREP_FILTER = 'PREP'
 
   export default {
     name: 'contest-list',
     components: {
-      Pagination
+      Pagination,
+      PrepContestCreateDialog
     },
     data () {
       return {
@@ -78,8 +89,11 @@
         query: {
           status: '',
           keyword: '',
-          rule_type: ''
+          rule_type: '',
+          prep: ''
         },
+        PREP_FILTER,
+        createVisible: false,
         limit: limit,
         total: 0,
         rows: '',
@@ -98,6 +112,7 @@
         this.query.status = route.status || ''
         this.query.rule_type = route.rule_type || ''
         this.query.keyword = route.keyword || ''
+        this.query.prep = route.prep === '1' ? '1' : ''
         this.page = parseInt(route.page) || 1
         this.limit = parseInt(route.limit) || 10
         this.getContestList(this.page)
@@ -111,12 +126,13 @@
           const payload = res.data.data || {}
           const results = payload.results || []
           const normalized = applyDevelopmentContestFixtures(results)
-          const fallback = filterMockContests(query)
+          // Preparation contests never fall back to sample data.
+          const fallback = query.prep ? [] : filterMockContests(query)
           this.contests = normalized.length ? this.withContestProblems(normalized) : cloneFixtures(fallback).slice(offset, offset + this.limit)
           this.total = payload.total || normalized.length || fallback.length
         }, () => {
           if (generation !== this.requestGeneration) return
-          const fallback = filterMockContests(query)
+          const fallback = query.prep ? [] : filterMockContests(query)
           this.contests = cloneFixtures(fallback).slice(offset, offset + this.limit)
           this.total = fallback.length
         })
@@ -132,7 +148,8 @@
         })
       },
       onRuleChange (rule) {
-        this.query.rule_type = rule
+        this.query.prep = rule === PREP_FILTER ? '1' : ''
+        this.query.rule_type = rule === PREP_FILTER ? '' : rule
         this.page = 1
         this.changeRoute()
       },
@@ -142,6 +159,7 @@
         this.changeRoute()
       },
       goContest (contest) {
+        if (contest.prep_state) return this.$router.push({ name: 'contest-details', params: { contestID: contest.id } })
         if (contest.rule_type === 'AI') return this.$router.push({ name: 'ai-contest', params: { contestID: contest.id } })
         this.cur_contest_id = contest.id
         this.$router.push({name: 'contest-problem-list', params: {contestID: contest.id}})
@@ -162,6 +180,12 @@
         if (value === '1') return 'status-not-started'
         if (value === '-1') return 'status-ended'
         return 'status-underway'
+      },
+      prepStateLabel (state) {
+        return this.$t(state === 'Preview' ? 'm.Prep_State_Preview' : 'm.Prep_State_Preparation')
+      },
+      onPrepContestCreated (contest) {
+        this.$router.push({ name: 'contest-details', params: { contestID: contest.id } })
       },
       isEnded (contest) {
         return String(contest.status) === '-1'
@@ -184,6 +208,15 @@
       }
     },
     computed: {
+      ...mapGetters(['isAdminRole', 'isAuthenticated']),
+      listTitle () {
+        if (this.query.prep) return this.$t('m.Prep_Contests_Title')
+        return `${this.query.rule_type === '' ? this.$t('m.All') : this.query.rule_type} ${this.$t('m.Contests')}`
+      },
+      ruleFilterLabel () {
+        if (this.query.prep) return this.$t('m.Contest_Preparation')
+        return this.query.rule_type === '' ? this.$t('m.Rule') : this.$t('m.' + this.query.rule_type)
+      },
       statusFilterLabel () {
         if (!this.query.status) return this.$t('m.Status')
         const item = CONTEST_STATUS_REVERSE[String(this.query.status)]
@@ -212,6 +245,7 @@
       min-height: 34px;
       white-space: nowrap;
     }
+    .contest-create { height: 34px; :deep(.legacy-icon) { display: inline-flex; margin-right: 4px; } }
     .contest-filter-control {
       display: inline-flex;
       align-items: center;
@@ -314,6 +348,7 @@
         .status-not-started { background: var(--tag-tools-bg); color: var(--cat-tools); text-decoration: none; }
         .status-ended { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); text-decoration: none; }
         .status-underway { background: var(--color-bg-subtle); color: var(--color-text-muted); text-decoration: none; }
+        .status-prep { background: var(--tag-tools-bg); color: var(--color-link); }
       }
     }
   }

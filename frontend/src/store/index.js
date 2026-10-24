@@ -4,7 +4,7 @@ import moment from 'moment'
 import storage from '@/utils/storage'
 import i18n from '@/i18n'
 import types from './types'
-import { STORAGE_KEY, USER_TYPE, PROBLEM_PERMISSION, CONTEST_STATUS, CONTEST_TYPE } from '@/utils/constants'
+import { STORAGE_KEY, USER_TYPE, PROBLEM_PERMISSION, CONTEST_STATUS, CONTEST_TYPE, compareContestDisplayId } from '@/utils/constants'
 import runtime from '@/utils/runtime'
 import { cloneFixtures, MOCK_CONTESTS, MOCK_PROBLEMS } from '@oj/mocks/fixtures'
 
@@ -63,6 +63,12 @@ const useApplicationStore = defineStore('application', {
       return CONTEST_STATUS.UNDERWAY
     },
     contestRuleType: state => state.contest.contest.rule_type || null,
+    // Preparation contests are private workspaces; every member may enter them.
+    isPrepContest: state => !!state.contest.contest.prep_state,
+    prepRole: state => state.contest.contest.prep_role || null,
+    canManagePrep () { return this.isPrepContest && this.prepRole === 'Creator' },
+    canAuthorPrep () { return this.isPrepContest && ['Creator', 'Setter'].includes(this.prepRole) },
+    canEditPrep () { return this.canAuthorPrep && this.contest.contest.prep_state === 'Preparation' },
     isContestRegistered () { return this.isContestAdmin || this.contest.contest.registered === true },
     isContestAdmin () { return this.isAuthenticated && (this.contest.contest.created_by.id === this.currentUser.id || this.currentUser.admin_type === USER_TYPE.SUPER_ADMIN) },
     contestMenuDisabled () {
@@ -70,18 +76,19 @@ const useApplicationStore = defineStore('application', {
       // submissions and rankings stay readable without registration or the
       // contest password.
       if (this.contestStatus === CONTEST_STATUS.ENDED) return false
-      if (this.isContestRegistered) return false
+      if (this.isPrepContest || this.isContestRegistered) return false
       return this.contest.contest.contest_type === CONTEST_TYPE.PUBLIC ? this.contestStatus === CONTEST_STATUS.NOT_START : !this.contest.access
     },
-    OIContestRealTimePermission () { return this.contestRuleType === 'ACM' || this.contestStatus === CONTEST_STATUS.ENDED || this.contest.contest.real_time_rank === true || this.isContestAdmin },
+    OIContestRealTimePermission () { return this.contestRuleType === 'ACM' || this.contestStatus === CONTEST_STATUS.ENDED || this.contest.contest.real_time_rank === true || this.isContestAdmin || this.isPrepContest },
     problemSubmitDisabled () {
       if (!this.isAuthenticated) return true
       if (!route().params.contestID) return false
       if (!this.contestLoaded || String(this.contest.contest.id) !== String(route().params.contestID)) return true
+      if (this.isPrepContest) return false
       if (this.contestStatus === CONTEST_STATUS.NOT_START) return !this.isContestAdmin
       return false
     },
-    passwordFormVisible () { return this.contestStatus !== CONTEST_STATUS.ENDED && this.contest.contest.contest_type !== CONTEST_TYPE.PUBLIC && !this.contest.access && !this.isContestAdmin },
+    passwordFormVisible () { return this.contestStatus !== CONTEST_STATUS.ENDED && this.contest.contest.contest_type !== CONTEST_TYPE.PUBLIC && !this.contest.access && !this.isContestAdmin && !this.isPrepContest },
     contestStartTime: state => moment(state.contest.contest.start_time),
     contestEndTime: state => moment(state.contest.contest.end_time),
     countdown () {
@@ -167,7 +174,7 @@ const useApplicationStore = defineStore('application', {
           ? mock.problem_ids.map(id => MOCK_PROBLEMS.find(problem => String(problem._id) === String(id))).filter(Boolean)
           : []
         const result = problems.length ? problems : (selected.length ? cloneFixtures(selected) : problems)
-        this.contest.contestProblems = result.sort((a, b) => a._id === b._id ? 0 : (a._id > b._id ? 1 : -1))
+        this.contest.contestProblems = result.sort(compareContestDisplayId)
         return { data: { data: result } }
       } catch (error) {
         if (!current()) return
@@ -209,7 +216,8 @@ const getterMap = {
   website: s => s.website, authProviders: s => s.authProviders, modalStatus: s => s.modalStatus, user: s => s.currentUser, profile: s => s.profile,
   isAuthenticated: s => s.isAuthenticated, isAdminRole: s => s.isAdminRole, isSuperAdmin: s => s.isSuperAdmin,
   hasProblemPermission: s => s.hasProblemPermission, contestLoaded: s => s.contestLoaded, contestStatus: s => s.contestStatus,
-  contestRuleType: s => s.contestRuleType, isContestAdmin: s => s.isContestAdmin, isContestRegistered: s => s.isContestRegistered, contestMenuDisabled: s => s.contestMenuDisabled,
+  contestRuleType: s => s.contestRuleType, isPrepContest: s => s.isPrepContest, prepRole: s => s.prepRole,
+  canManagePrep: s => s.canManagePrep, canAuthorPrep: s => s.canAuthorPrep, canEditPrep: s => s.canEditPrep, isContestAdmin: s => s.isContestAdmin, isContestRegistered: s => s.isContestRegistered, contestMenuDisabled: s => s.contestMenuDisabled,
   OIContestRealTimePermission: s => s.OIContestRealTimePermission, problemSubmitDisabled: s => s.problemSubmitDisabled,
   passwordFormVisible: s => s.passwordFormVisible, contestStartTime: s => s.contestStartTime, contestEndTime: s => s.contestEndTime,
   countdown: s => s.countdown
