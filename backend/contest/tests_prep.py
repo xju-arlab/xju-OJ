@@ -118,8 +118,11 @@ class ContestPrepVisibilityTest(ContestPrepTestBase):
             self.login(user)
             listing = self.client.get(self.reverse("contest_list_api") + "?limit=50&prep=1").data["data"]
             self.assertEqual([item["id"] for item in listing["results"]], [self.contest.id])
-            public = self.client.get(self.reverse("contest_list_api") + "?limit=50").data["data"]
-            self.assertNotIn(self.contest.id, [item["id"] for item in public["results"]])
+            # Members also find it in the full list, but not under a time status filter.
+            full = self.client.get(self.reverse("contest_list_api") + "?limit=50").data["data"]
+            self.assertIn(self.contest.id, [item["id"] for item in full["results"]])
+            ended = self.client.get(self.reverse("contest_list_api") + "?limit=50&status=-1").data["data"]
+            self.assertNotIn(self.contest.id, [item["id"] for item in ended["results"]])
             detail = self.client.get(self.reverse("contest_api") + f"?id={self.contest.id}").data["data"]
             self.assertEqual(detail["prep_role"], role)
             self.assertTrue(detail["registered"])

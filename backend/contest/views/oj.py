@@ -64,17 +64,24 @@ class ContestAPI(APIView):
         return self.success(data)
 
 
+def member_prep_contests(user):
+    """Preparation contests the user belongs to; never visible to anyone else."""
+    contests = Contest.objects.filter(visible=True, prep_state__isnull=False)
+    if not user.is_super_admin():
+        contests = contests.filter(Q(created_by=user) | Q(prep_members__user=user)).distinct()
+    return contests
+
+
 class ContestListAPI(APIView):
     def get(self, request):
+        user = request.user
         if request.GET.get("prep") == "1":
-            # Preparation contests the caller belongs to; never public.
-            user = request.user
-            if not user.is_authenticated:
-                contests = Contest.objects.none()
-            else:
-                contests = Contest.objects.filter(visible=True, prep_state__isnull=False)
-                if not user.is_super_admin():
-                    contests = contests.filter(Q(created_by=user) | Q(prep_members__user=user)).distinct()
+            contests = member_prep_contests(user) if user.is_authenticated else Contest.objects.none()
+        elif user.is_authenticated and not request.GET.get("status"):
+            # The full list also shows the caller's own preparation contests;
+            # time status filters mean nothing for them, so they stay out.
+            contests = Contest.objects.filter(Q(pk__in=Contest.objects.public().values("pk")) |
+                                              Q(pk__in=member_prep_contests(user).values("pk")))
         else:
             contests = Contest.objects.public()
         contests = contests.select_related("created_by")
