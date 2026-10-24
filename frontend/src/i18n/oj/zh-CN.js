@@ -471,6 +471,7 @@ export const m = {
   Prep_Invite_Invalid: '邀请链接无效或已失效',
   Prep_Invite_Member: '你已在这场比赛的筹备组中',
   Prep_Add_Member: '添加',
+  Prep_Real_Name: '姓名',
   Prep_Role: '身份',
   Prep_Remove: '移除',
   Prep_Remove_Confirm: '确定将 {username} 移出本比赛？',

@@ -41,6 +41,7 @@
       <thead>
         <tr>
           <th>{{ $t('m.Username') }}</th>
+          <th>{{ $t('m.Prep_Real_Name') }}</th>
           <th>{{ $t('m.Prep_Role') }}</th>
           <th v-if="canManagePrep" class="actions-column"></th>
         </tr>
@@ -48,11 +49,13 @@
       <tbody>
         <tr v-if="creator">
           <td><router-link :to="userHome(creator.username)">{{ creator.username }}</router-link></td>
+          <td class="real-name">{{ creator.real_name || '—' }}</td>
           <td><span class="role-pill role-creator">{{ roleLabel('Creator') }}</span></td>
           <td v-if="canManagePrep"></td>
         </tr>
         <tr v-for="member in members" :key="member.id">
           <td><router-link :to="userHome(member.user.username)">{{ member.user.username }}</router-link></td>
+          <td class="real-name">{{ member.user.real_name || '—' }}</td>
           <td>
             <!-- On hover the label gives way to a swap icon; both share one grid cell so the width stays put. -->
             <button v-if="canManagePrep" type="button"
@@ -71,7 +74,7 @@
           </td>
         </tr>
         <tr v-if="!loading && !members.length">
-          <td :colspan="canManagePrep ? 3 : 2" class="prep-empty">{{ $t('m.Prep_No_Members') }}</td>
+          <td :colspan="canManagePrep ? 4 : 3" class="prep-empty">{{ $t('m.Prep_No_Members') }}</td>
         </tr>
       </tbody>
     </table>
@@ -383,6 +386,7 @@ export default {
   th, td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; }
   th { color: var(--color-text-muted); font-weight: 600; }
   .actions-column { width: 90px; text-align: right; }
+  .real-name { color: var(--color-text); }
 }
 
 /* Role capsules match the review leaderboard chips. */

@@ -471,6 +471,7 @@ export const m = {
   Prep_Invite_Invalid: 'This invite link is invalid or has expired',
   Prep_Invite_Member: 'You are already on this contest team',
   Prep_Add_Member: 'Add',
+  Prep_Real_Name: 'Name',
   Prep_Role: 'Role',
   Prep_Remove: 'Remove',
   Prep_Remove_Confirm: 'Remove {username} from this contest?',
