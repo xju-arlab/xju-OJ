@@ -151,6 +151,7 @@ class ContestPrepInvite(models.Model):
     expire_time = models.DateTimeField()
     used_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
     used_time = models.DateTimeField(null=True)
+    revoked_time = models.DateTimeField(null=True)
 
     class Meta:
         db_table = "contest_prep_invite"

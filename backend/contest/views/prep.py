@@ -92,9 +92,9 @@ class ContestPrepStateAPI(APIView):
     def put(self, request):
         contest = load_prep_contest(request, request.data["contest_id"], MANAGE)
         state = request.data["state"]
-        if state == ContestPrepState.REVIEW and contest.review_started_at is None:
-            # Review starts its clock once, like a contest start time; going
-            # back to setting problems and returning keeps the board.
+        if state == ContestPrepState.REVIEW and contest.prep_state != ContestPrepState.REVIEW:
+            # Each review round runs like a fresh 5-hour contest: the clock and
+            # the review board start over every time setting switches to review.
             contest.review_started_at = now()
         contest.prep_state = state
         contest.save(update_fields=["prep_state", "review_started_at", "last_update_time"])
@@ -366,7 +366,16 @@ def invite_token_hash(token):
 
 
 def open_invites(contest):
-    return ContestPrepInvite.objects.filter(contest=contest, used_time__isnull=True, expire_time__gt=now())
+    return ContestPrepInvite.objects.filter(contest=contest, used_time__isnull=True, revoked_time__isnull=True,
+                                            expire_time__gt=now())
+
+
+def invite_status(invite, at):
+    if invite.used_time:
+        return "used"
+    if invite.revoked_time:
+        return "revoked"
+    return "expired" if invite.expire_time <= at else "active"
 
 
 class ContestPrepInviteAPI(APIView):
@@ -376,7 +385,22 @@ class ContestPrepInviteAPI(APIView):
     def get(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"), MANAGE)
         counts = open_invites(contest).values("role").annotate(count=Count("id")).values_list("role", "count")
-        return self.success({"open": dict(counts)})
+        at = now()
+        invites = ContestPrepInvite.objects.filter(contest=contest).select_related("created_by", "used_by")[:100]
+        return self.success({
+            "open": dict(counts),
+            "invites": [{
+                "id": invite.id,
+                "role": invite.role,
+                "status": invite_status(invite, at),
+                "created_by": invite.created_by.username,
+                "create_time": datetime2str(invite.create_time),
+                "expire_time": datetime2str(invite.expire_time),
+                "used_by": invite.used_by.username if invite.used_by else None,
+                "used_time": datetime2str(invite.used_time) if invite.used_time else None,
+                "revoked_time": datetime2str(invite.revoked_time) if invite.revoked_time else None,
+            } for invite in invites],
+        })
 
     @validate_serializer(CreateContestPrepInviteSerializer)
     @login_required
@@ -394,8 +418,14 @@ class ContestPrepInviteAPI(APIView):
     @login_required
     def delete(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"), MANAGE)
-        # Expire rather than delete, so redeemed and revoked links stay auditable.
-        revoked = open_invites(contest).update(expire_time=now())
+        invites = open_invites(contest)
+        invite_id = request.GET.get("id")
+        if invite_id:
+            if not invite_id.isdigit():
+                return self.error("Invalid parameter, id must be an integer")
+            invites = invites.filter(id=int(invite_id))
+        # Mark rather than delete, so redeemed and revoked links stay auditable.
+        revoked = invites.update(revoked_time=now())
         return self.success({"revoked": revoked})
 
 
@@ -412,8 +442,8 @@ class ContestPrepInviteAcceptAPI(APIView):
             invite = (ContestPrepInvite.objects.select_for_update().select_related("contest")
                       .filter(token_hash=invite_token_hash(request.data["token"])).first())
             contest = invite.contest if invite else None
-            if invite is None or invite.used_time is not None or invite.expire_time <= now() or \
-                    not contest.visible or not contest.is_preparation:
+            if invite is None or invite.used_time is not None or invite.revoked_time is not None or \
+                    invite.expire_time <= now() or not contest.visible or not contest.is_preparation:
                 cache.add(failures_key, 0, INVITE_FAILURE_WINDOW)
                 cache.incr(failures_key)
                 return self.error("This invite link is invalid or has expired")

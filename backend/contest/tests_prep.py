@@ -113,6 +113,8 @@ class ContestPrepVisibilityTest(ContestPrepTestBase):
                 self.reverse("contest_announcement_api") + f"?contest_id={cid}"))
             self.assertFailed(self.client.get(
                 self.reverse("contest_submission_list_api") + f"?contest_id={cid}&limit=10"))
+        self.assertFailed(self.client.get(self.reverse("contest_access_api") + f"?contest_id={cid}"),
+                          "Contest does not exist")
         self.assertFailed(self.client.post(self.reverse("contest_password_api"),
                                            data={"contest_id": cid, "password": "secret"}))
         self.assertFailed(self.client.post(self.reverse("contest_registration_api"),
@@ -134,6 +136,9 @@ class ContestPrepVisibilityTest(ContestPrepTestBase):
             self.assertEqual(detail["prep_role"], role)
             self.assertTrue(detail["registered"])
             self.assertEqual("password" in detail, role == "Creator")
+            # The contest has a password; members are never asked for it.
+            access = self.client.get(self.reverse("contest_access_api") + f"?contest_id={self.contest.id}")
+            self.assertEqual(access.data["data"], {"access": True})
 
     def test_tags_of_preparation_problems_stay_private(self):
         problem = self.add_problem(self.contest)
@@ -513,14 +518,18 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.assertEqual([(item["_id"], item["my_status"], item["submission_number"], item["accepted_number"])
                           for item in problems], [("A", 0, 3, 1)])
 
-    def test_review_clock_starts_once(self):
+    def test_each_review_round_restarts_the_clock(self):
         self.start_review()
         started = self.contest.review_started_at
-        for state in ("Preparation", "Review"):
-            self.assertSuccess(self.client.put(self.reverse("contest_prep_state_api"),
-                                               data={"contest_id": self.contest.id, "state": state}))
+        url = self.reverse("contest_prep_state_api")
+        # Staying in review keeps the running clock.
+        self.assertSuccess(self.client.put(url, data={"contest_id": self.contest.id, "state": "Review"}))
         self.contest.refresh_from_db()
         self.assertEqual(self.contest.review_started_at, started)
+        for state in ("Preparation", "Review"):
+            self.assertSuccess(self.client.put(url, data={"contest_id": self.contest.id, "state": state}))
+        self.contest.refresh_from_db()
+        self.assertGreater(self.contest.review_started_at, started)
 
 
 class ContestPrepPublicProblemTest(ContestPrepTestBase):
@@ -602,10 +611,19 @@ class ContestPrepInviteTest(ContestPrepTestBase):
         self.assertFailed(self.accept(self.newcomer, expired), "This invite link is invalid or has expired")
 
         revoked = self.create_invite()
-        self.login(self.creator)
-        response = self.client.delete(self.reverse("contest_prep_invite_api") + f"?contest_id={self.contest.id}")
-        self.assertEqual(response.data["data"], {"revoked": 1})
+        kept = self.create_invite("Verifier")
+        url = self.reverse("contest_prep_invite_api") + f"?contest_id={self.contest.id}"
+        listing = self.client.get(url).data["data"]["invites"]
+        self.assertEqual([item["status"] for item in listing], ["active", "active", "expired"])
+        revoked_id = ContestPrepInvite.objects.get(role="Setter", expire_time__gt=timezone.now()).id
+        self.assertEqual(self.client.delete(url + f"&id={revoked_id}").data["data"], {"revoked": 1})
         self.assertFailed(self.accept(self.newcomer, revoked), "This invite link is invalid or has expired")
+        self.login(self.creator)
+        self.assertEqual(self.client.delete(url).data["data"], {"revoked": 1})
+        self.assertFailed(self.accept(self.newcomer, kept), "This invite link is invalid or has expired")
+        self.login(self.creator)
+        statuses = [item["status"] for item in self.client.get(url).data["data"]["invites"]]
+        self.assertEqual(statuses, ["revoked", "revoked", "expired"])
 
         stale = self.create_invite()
         Contest.objects.filter(id=self.contest.id).update(prep_state=None)

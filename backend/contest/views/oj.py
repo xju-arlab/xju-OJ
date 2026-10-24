@@ -131,9 +131,14 @@ class ContestAccessAPI(APIView):
         if not contest_id:
             return self.error()
         try:
-            contest = Contest.objects.public().get(id=contest_id, password__isnull=False)
+            contest = Contest.objects.get(id=contest_id, visible=True, password__isnull=False)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
+        if contest.is_preparation:
+            # Members never need the password; everyone else must not learn it exists.
+            if contest.prep_role(request.user) is None:
+                return self.error("Contest does not exist")
+            return self.success({"access": True})
         session_pass = request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(contest.id)
         return self.success({"access": check_contest_password(session_pass, contest.password)})
 
