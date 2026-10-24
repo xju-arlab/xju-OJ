@@ -81,6 +81,6 @@ def reorder_contest_problems(contest, problem_ids):
 
 
 def ensure_contest_problems_editable(contest):
-    """Problems of a preparation contest are frozen while it is in Preview."""
-    if contest.prep_state == ContestPrepState.PREVIEW:
+    """Problems of a preparation contest are frozen while it is in Review."""
+    if contest.prep_state == ContestPrepState.REVIEW:
         raise APIError("Switch the contest back to preparation before editing problems")

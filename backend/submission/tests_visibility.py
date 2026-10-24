@@ -72,7 +72,7 @@ class ContestCodeVisibilityTest(APITestCase):
         self.assertSuccess(self.detail(submission))
 
     def test_preparation_runs_are_for_creator_and_setters_only(self):
-        contest = self.make_contest(ended=True, prep_state=ContestPrepState.PREVIEW)
+        contest = self.make_contest(ended=True, prep_state=ContestPrepState.REVIEW)
         setter = self.create_user("setter", "setter-pass", login=False)
         verifier = self.create_user("verifier", "verifier-pass", login=False)
         ContestPrepMember.objects.create(contest=contest, user=setter, role=ContestPrepRole.SETTER)

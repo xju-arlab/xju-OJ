@@ -3,8 +3,8 @@ from django.db.models import Q, Count
 from utils.api import APIView, validate_serializer
 from account.decorators import check_contest_permission, login_required
 from account.models import User
-from submission.models import JudgeStatus
-from utils.constants import ContestPrepRole
+from submission.models import JudgeStatus, Submission
+from utils.constants import ContestPrepRole, ContestPrepState
 from ..contest_authoring import order_contest_problems
 from ..models import ProblemFavorite, ProblemTag, Problem, ProblemRuleType
 from ..serializers import (ProblemFavoriteSerializer, ProblemSerializer, ProfileProblemSerializer,
@@ -105,6 +105,25 @@ class ContestProblemAPI(APIView):
             for problem in queryset_values:
                 problem["my_status"] = problems_status.get(str(problem["id"]), {}).get("status")
 
+    def _add_prep_facts(self, request, problems):
+        """Preparation contests keep no statistics; derive them from verification runs."""
+        runs = Submission.objects.filter(contest=self.contest).exclude(
+            result__in=(JudgeStatus.PENDING, JudgeStatus.JUDGING))
+        if self.contest.review_started_at and self.contest.prep_state == ContestPrepState.REVIEW:
+            runs = runs.filter(create_time__gte=self.contest.review_started_at)
+        counts = {item["problem_id"]: item for item in runs.values("problem_id").annotate(
+            total=Count("id"), accepted=Count("id", filter=Q(result=JudgeStatus.ACCEPTED)))}
+        my_status = {}
+        for problem_id, result in runs.filter(user_id=request.user.id).order_by("create_time", "id") \
+                .values_list("problem_id", "result"):
+            if my_status.get(problem_id) != JudgeStatus.ACCEPTED:
+                my_status[problem_id] = result
+        for problem in problems:
+            facts = counts.get(problem["id"], {})
+            problem["submission_number"] = facts.get("total", 0)
+            problem["accepted_number"] = facts.get("accepted", 0)
+            problem["my_status"] = my_status.get(problem["id"])
+
     @check_contest_permission(check_type="problem_list")
     def get(self, request):
         problem_id = request.GET.get("problem_id")
@@ -132,6 +151,8 @@ class ContestProblemAPI(APIView):
                 self._add_problem_status(request, [problem_data, ])
             else:
                 problem_data = ProblemSafeSerializer(problem).data
+            if self.contest.is_preparation:
+                self._add_prep_facts(request, [problem_data])
             return self.success(problem_data)
 
         contest_problems = order_contest_problems(
@@ -141,6 +162,8 @@ class ContestProblemAPI(APIView):
             self._add_problem_status(request, data)
         else:
             data = ProblemSafeSerializer(contest_problems, many=True).data
+        if self.contest.is_preparation:
+            self._add_prep_facts(request, data)
         return self.success(data)
 
 

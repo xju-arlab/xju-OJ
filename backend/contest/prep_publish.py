@@ -10,15 +10,13 @@ from django.db import transaction
 from problem.contest_authoring import alphabetic_display_id, order_contest_problems
 from problem.models import Problem
 from utils.api import APIError
-from utils.constants import ContestPrepState
 from .models import Contest, ContestAnnouncement
 
 
 @transaction.atomic
 def publish_prep_contest(prep_contest, overrides):
+    # The row lock serializes concurrent publish clicks.
     prep = Contest.objects.select_for_update().get(pk=prep_contest.pk)
-    if prep.prep_state != ContestPrepState.PREVIEW:
-        raise APIError("Switch the contest to preview before publishing")
     problems = list(order_contest_problems(Problem.objects.filter(contest=prep, visible=True)))
     if not problems:
         raise APIError("Publishing needs at least one visible problem")

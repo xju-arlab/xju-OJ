@@ -35,6 +35,9 @@ class Contest(models.Model):
     prep_state = models.TextField(null=True)
     published_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL,
                                        related_name="published_contests")
+    # When Review first started; the review leaderboard counts submissions
+    # from this moment, like a contest start time.
+    review_started_at = models.DateTimeField(null=True, blank=True)
 
     objects = ContestQuerySet.as_manager()
 
@@ -103,6 +106,20 @@ class Contest(models.Model):
         if user.is_contest_admin(self):
             return True
         return ContestParticipation.objects.filter(contest=self, user=user).exists()
+
+
+class ContestProblemFeedback(models.Model):
+    """A reviewer's note on a problem of a preparation contest, read by the setters."""
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="problem_feedback")
+    problem = models.ForeignKey("problem.Problem", on_delete=models.CASCADE, related_name="feedback")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content = models.TextField()
+    resolved = models.BooleanField(default=False)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "contest_problem_feedback"
+        ordering = ("-create_time", "-id")
 
 
 class ContestPrepMember(models.Model):

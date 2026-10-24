@@ -1,7 +1,7 @@
 from utils.api import UsernameSerializer, serializers
 
 from utils.constants import ContestPrepRole, ContestPrepState
-from .models import Contest, ContestAnnouncement, ContestPrepMember, ContestRuleType
+from .models import Contest, ContestAnnouncement, ContestPrepMember, ContestProblemFeedback, ContestRuleType
 from .models import ACMContestRank, OIContestRank
 
 
@@ -160,3 +160,27 @@ class ContestPrepPublishSerializer(serializers.Serializer):
     end_time = serializers.DateTimeField(required=False)
     password = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
     real_time_rank = serializers.BooleanField(required=False)
+
+
+class ContestProblemFeedbackSerializer(serializers.ModelSerializer):
+    user = UsernameSerializer()
+    problem = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContestProblemFeedback
+        fields = ("id", "user", "problem", "content", "resolved", "create_time")
+
+    def get_problem(self, obj):
+        return {"id": obj.problem_id, "_id": obj.problem._id, "title": obj.problem.title}
+
+
+class CreateContestProblemFeedbackSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    problem_id = serializers.IntegerField()
+    content = serializers.CharField(max_length=2000)
+
+
+class EditContestProblemFeedbackSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    id = serializers.IntegerField()
+    resolved = serializers.BooleanField()

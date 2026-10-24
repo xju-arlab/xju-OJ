@@ -23,9 +23,12 @@ class ContestRuleType(Choices):
 
 
 class ContestPrepState(Choices):
-    """States of a private contest preparation workspace; null means a normal contest."""
+    """States of a private contest preparation workspace; null means a normal contest.
+
+    Preparation is for setting problems; Review runs the contest for verifiers.
+    """
     PREPARATION = "Preparation"
-    PREVIEW = "Preview"
+    REVIEW = "Review"
 
 
 class ContestPrepRole(Choices):
