@@ -7,7 +7,7 @@
 .gitignore[FS6T]: F:排除环境配置、凭据、评测数据、运行资产和机器绑定的MCP配置 | R:code:.env.example | A:Git ignore patterns | S:忽略.env及其变体但保留.env.example；已跟踪文件仍须独立审查
 AGENTS.md[SG7S]: F:规定前端开发桥、提交校验与AOCI认知和维护合同 | R:code:compose.dev.yaml,code:deploy.sh | A:./deploy.sh --dev frontend；AOCI MCP工作流 | S:生产不得加载开发覆盖；压缩恢复必须重新完整交付索引；语义只能由模型依据源码创作
 README.en.md[SG5S]: F:英文说明产品能力、宿主要求、部署配置和日常运维入口 | R:code:.env.example,code:deploy.sh | A:安装与运维文档 | S:默认监听回环；拉取源码后须执行部署；Java和文件IO要求宿主Landlock ABI3以上，Ubuntu22.04默认内核不足
-README.md[SG6M]: F:说明宿主要求、统一部署、OIDC关联、前端发布及AI工作台运维入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md,code:ai/README.md | A:部署与运维说明 | S:仅前端发布需既有完整发布且变更限frontend；Java和文件IO需Landlock ABI3；AI计算服务另行部署且不自动创建正式考试
+README.md[SG6M]: F:说明宿主要求、统一部署、OIDC关联、前端发布、自托管字体及AI工作台运维入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md,code:ai/README.md,code:deploy/ops/fetch-fonts.py | A:部署与运维说明 | S:仅前端发布需既有完整发布且变更限frontend；Java和文件IO需Landlock ABI3；AI计算服务另行部署；站点字体须在服务器运行fetch-fonts生成，不进Git和镜像
 compose.dev.yaml[OR7T]: F:为宿主Vite开放仅回环可用的后端端口和开发CSRF来源 | R:code:deploy.sh,code:backend/oj/production_settings.py | A:backend-api开发覆盖 | S:仅由--dev frontend加载；直接Compose调用可绕过部署脚本对绑定地址的校验
 compose.yaml[OR9M]: F:编排OJ数据、API与Worker、判题、前端及初始化服务并挂接AI认证文件 | R:code:deploy.sh,code:backend/deploy/entrypoint.sh,code:server/judge-server/server/entrypoint.sh,code:ai/compose.yaml | A:Compose服务；init profile；RUNTIME_ROOT；TRUSTED_PROXY_CIDRS；AI_WORKER_TOKEN_FILE | S:生产仅frontend公开端口；AI计算另行编排，后端令牌来自私有data/config文件；项目名决定网络卷身份；判题只读rootfs保留降权能力；Worker健康不等于消费成功
 deploy.sh[OV9L]: F:验证源码配置与宿主能力，复用或构建组件镜像并备份迁移发布和验证服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl,code:deploy/ops/check-judge-host.py | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按镜像真实修订复用；全栈及开发构建前检查Landlock，frontend-only与config-only跳过；私有pg_dump成功才迁移，备份不含文件和Redis；HTTP、Worker与新鲜心跳均通过才更新发布指针
@@ -320,6 +320,7 @@ backup-fixture.sh[OD7T]: F:导出数据库Redis及公开测试文件和私有AI�
 inventory.sh[OO6T]: F:记录运行文件规模、数据库版本迁移和Redis队列身份及校验摘要 | R:code:compose.yaml | A:ENV_FILE；BACKUP_ROOT；inventory目录 | S:无法访问文件时明确标记unavailable；直接source环境文件；不输出运行密钥但生成的路径及元数据应保留在私有备份目录
 seed-demo-problems.py[OD7L]: F:校验或创建两个公开验收示例题及固定测试数据 | R:code:backend/problem/models.py,code:docs/operations/demo-problems.md | A:DEMO_PROBLEMS_MODE；SEED_DEMO_PROBLEMS_CREATOR；manage.py shell | S:默认check零业务写入；apply只创建缺失对象，现有不匹配立即失败；异常删除本次创建目录；示例测试ID含连字符，清理逻辑不能假定全部为十六进制ID
 check-judge-host.py[OR8T]: F:探测Linux宿主Landlock能力并拒绝不满足Java和文件IO沙箱要求的部署 | R:code:deploy.sh,code:server/judger/src/filesystem.c | A:probe_landlock_abi；main；退出码0或1 | S:只读查询无需root且仅支持x86_64和aarch64；ABI低于3或探测被拒均失败；不会自动升级内核或关闭隔离
+fetch-fonts.py[OU6S]: F:把Geist、Source Serif 4、Noto Sans/Serif SC和JetBrains Mono的Google Fonts分片镜像到公开数据目录并生成fonts.css | R:code:frontend/nginx/nginx.conf,code:frontend/index.html,code:compose.yaml | A:--output；--url-prefix；FAMILIES | S:宿主无写权限，须在backend-api容器内以backend用户运行；只接受fonts.gstatic.com的woff2并校验字段与魔数；文件按内容哈希命名，新目录整体替换旧目录
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/contracts/===
 api-compatibility.md[SG6S]: F:记录单仓库迁移前的前后端API、上传包装和持久化身份约束 | R:code:backend/oj/urls.py,code:frontend/src/pages/oj/api.js | A:历史API兼容清单 | S:包含旧源码路径和阶段零事实，不能据此推断新增远程判题、报名和OIDC的当前契约
@@ -442,7 +443,7 @@ execution-log.md[SO6S]: F:记录统一化基线、模块拆分及huawei1首次OI
 Dockerfile[OV8T]: F:以固定Node和Nginx构建锁定依赖、双SPA及浏览器判题脚本镜像 | R:code:frontend/package.json,code:frontend/nginx/nginx.conf,code:frontend/docker-entrypoint.d/20-runtime-config.sh | A:frontend-base；frontend-deps；frontend-build；frontend-runtime | S:实际依赖阶段从外部FRONTEND_BASE_IMAGE开始，本地同名基础stage不会自动被采用；只构建build未执行测试；userscript额外复制并检查存在
 LICENSE[SG2T]: F:保留前端及附带上游组件的MIT许可和版权归属 | R:- | A:前端许可文本 | S:清理依赖时保留上游授权
 README.md[SV5T]: F:说明Vue3双入口前端栈、构建和全栈Vite开发入口 | R:code:frontend/package.json,code:docs/operations/dev-frontend.md | A:前端开发说明 | S:仅支持当前现代浏览器，不支持IE；旧上游徽标属于归属信息
-index.html[EU6T]: F:加载用户端运行配置、初始加载动画并挂载Vite应用 | R:code:frontend/src/pages/oj/index.js,code:frontend/static/css/loader.css | A:/入口HTML | S:配置脚本同步先加载；旧IE提示不表示框架支持IE
+index.html[EU6T]: F:加载用户端运行配置、自托管字体、初始加载动画并挂载Vite应用 | R:code:frontend/src/pages/oj/index.js,code:frontend/static/css/loader.css,code:deploy/ops/fetch-fonts.py | A:/入口HTML | S:配置脚本同步先加载；字体样式表来自运行数据，构建时原样保留链接；旧IE提示不表示框架支持IE
 package.json[FV7T]: F:声明Vue3依赖与固定pnpm并提供构建和自动化回归命令 | R:code:frontend/pnpm-lock.yaml,code:frontend/playwright.config.mjs | A:dev；build；lint:modern；test:browser；test:remote-bridge；test:contest-submissions | S:生产DOMPurify与测试Playwright精确锁定；lint:modern只是栈扫描，不代替构建和浏览器测试
 pnpm-lock.yaml[FV7L]: F:固定前端生产及浏览器测试依赖图、分发摘要和peer组合 | R:code:frontend/package.json,code:frontend/Dockerfile | A:pnpm frozen-lockfile | S:包括DOMPurify和Playwright；升级必须由包管理器解析验证，不能手改摘要
 pnpm-workspace.yaml[FV6T]: F:限制前端依赖安装脚本并禁止特殊来源的传递依赖 | R:code:frontend/pnpm-lock.yaml | A:allowBuilds；blockExoticSubdeps | S:仅显式允许core-js、esbuild和highlight.js构建脚本，不再保留未使用的Tiptap例外
@@ -451,7 +452,7 @@ vite.config.mjs[OV7M]: F:配置双SPA构建、受限本地资源及同源开发�
 playwright.config.mjs[TQ6T]: F:配置单Worker的真实浏览器组件回归与独立Vite测试服务 | R:code:frontend/tests/browser/runtime.spec.mjs,code:frontend/vite.config.mjs | A:Playwright配置；CHROME_PATH | S:测试服务仅监听127.0.0.1:18173且端口冲突即失败；不使用生产会话
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/admin/===
-index.html[EU5T]: F:加载管理端运行配置并挂载Vite管理应用 | R:code:frontend/src/pages/admin/index.js | A:/admin/入口HTML | S:runtime-config必须先于模块入口执行
+index.html[EU5T]: F:加载管理端运行配置与自托管字体并挂载Vite管理应用 | R:code:frontend/src/pages/admin/index.js,code:deploy/ops/fetch-fonts.py | A:/admin/入口HTML | S:runtime-config必须先于模块入口执行；字体样式表来自运行数据，构建时原样保留链接
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/deploy/===
 Dockerfile[OV2T]: F:保留Node6挂载源码现场构建的旧前端容器定义 | R:code:frontend/deploy/run.sh | A:旧/OJ_FE镜像 | S:不参与当前frontend/Dockerfile构建
@@ -464,7 +465,7 @@ sentry_release.sh[OV3T]: F:保留旧Sentry源码映射上传脚本 | R:- | A:USE
 25-trusted-proxies.sh[ON8T]: F:生成Nginx可信代理地址及真实客户端IP和协议映射配置 | R:code:frontend/nginx/nginx.conf,code:deploy.sh | A:TRUSTED_PROXY_CIDRS；trusted-proxies.conf | S:默认不信任转发头；用原始连接对端识别代理，仅可信入口可指定http或https；地址还由deploy校验且禁止全网CIDR
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/nginx/===
-nginx.conf[RN8S]: F:提供双SPA静态路由、可信同源API代理及公开文件服务 | R:code:frontend/docker-entrypoint.d/25-trusted-proxies.sh,code:compose.yaml | A:/admin/；/api/；/public/；/static/；/runtime-config.js | S:缺失public和static返回404而不回SPA；实际IP与协议取可信代理规则；普通公开附件带sandbox及nosniff，头像走独立缓存路径
+nginx.conf[RN8S]: F:提供双SPA静态路由、可信同源API代理及公开文件和自托管字体服务 | R:code:frontend/docker-entrypoint.d/25-trusted-proxies.sh,code:compose.yaml,code:deploy/ops/fetch-fonts.py | A:/admin/；/api/；/public/；/public/fonts/；/static/；/runtime-config.js | S:缺失public和static返回404而不回SPA；实际IP与协议取可信代理规则；普通公开附件带sandbox及nosniff，头像走独立缓存路径；字体文件按哈希长缓存而fonts.css每次校验
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/assets/===
 logo.svg[EU2T]: F:保存前端矢量标志图形资源 | R:- | A:SVG图像 | S:-
@@ -483,7 +484,7 @@ zh-CN.js[FL5L]: F:提供题库、比赛、筹备验题、邀请与链接管理�
 zh-TW.js[FL4M]: F:提供题库、比赛、账户和AI工作台命名的繁体中文文案 | R:code:frontend/src/i18n/index.js | A:m繁体中文键值表 | S:远程恢复提示尚未补齐，缺失项回退英文
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/===
-App.vue[EU4T]: F:提供管理端根路由视图和页面基础字体布局 | R:code:frontend/src/pages/admin/index.js | A:管理端根组件 | S:不设antialiased字体平滑，避免macOS文字发细
+App.vue[EU4T]: F:提供管理端根路由视图和页面基础字体布局 | R:code:frontend/src/pages/admin/index.js,code:frontend/src/styles/tokens.css | A:管理端根组件 | S:字体取共享界面无衬线变量；不设antialiased字体平滑，避免macOS文字发细
 api.js[IN7M]: F:封装后台业务API及CSRF、错误提示和失效登录跳转 | R:code:frontend/src/utils/apiError.js,code:backend/oj/urls.py | A:默认API对象 | S:依据JSON error判断业务成功；网络和非字符串错误统一提取，避免错误处理再次抛异常
 index.html[EU2T]: F:保留旧构建器的管理端HTML模板 | R:code:frontend/admin/index.html | A:旧自动注入入口模板 | S:当前Vite使用frontend/admin/index.html
 index.js[EU7T]: F:启动管理SPA并注册路由、状态、国际化和兼容UI组件 | R:code:frontend/src/pages/admin/router.js,code:frontend/src/store/index.js,code:frontend/src/shared/ui/legacy-ui.js | A:Vue应用挂载#app | S:入口固定初始语言zh-CN；旧消息方法经全局属性适配
@@ -547,7 +548,7 @@ ContestAnnouncementBanner.vue[EU7S]: F:在比赛页轮询并展示最近发布�
 Highlight.vue[EU4T]: F:按提交语言显示带语法高亮的只读代码块 | R:code:frontend/src/plugins/highlight.js | A:language；code | S:源码经指令写入文本，非直接v-html
 NavBar.vue[EU6S]: F:提供主导航搜索账号认证及AI题目Notebook纯享开关 | R:code:frontend/src/pages/oj/App.vue,code:frontend/src/store/index.js,code:frontend/src/utils/runtime.js | A:showNotebookMode；notebookOnly；update:notebookOnly | S:布局由父组件持有，开关放菜单外避免窄屏折叠；开发登录受配置限制；慢网络不预取，导航小屏保留溢出入口
 Pagination.vue[IU4T]: F:封装用户端分页及页大小切换事件 | R:code:frontend/src/shared/ui/legacy-ui.js | A:total；pageSize；current；on-change；on-page-size-change | S:页码小于1归一为1，页大小最多200
-Panel.vue[EU3T]: F:封装用户端卡片标题、辅助区与内容插槽 | R:code:frontend/src/shared/ui/legacy-ui.js | A:shadow；padding；disHover；bordered；插槽 | S:无title和extra插槽时不渲染头部
+Panel.vue[EU3T]: F:封装用户端卡片标题、辅助区与内容插槽 | R:code:frontend/src/shared/ui/legacy-ui.js | A:shadow；padding；disHover；bordered；插槽 | S:无title和extra插槽时不渲染头部；正文按单词换行，仅超长词断开
 RemoteSubmissionNotice.vue[EU6T]: F:显示远程待判同步提示并允许原提交者继续或同步任务 | R:code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/pages/oj/submissionStatus.js | A:submission；updated事件；recover | S:要求助手1.1.0；恢复权限由后端再次核验；卸载清理事件监听，已有远程ID只恢复查询
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/components/mixins/===
@@ -605,7 +606,7 @@ RemoteBridge.vue[EU6S]: F:引导安装浏览器远程判题助手并检测版本
 index.js[EU5T]: F:导出用户端常用及懒加载路由组件 | R:code:frontend/src/pages/oj/router/routes.js | A:用户页面命名导出 | S:首页与404直接导入，其余主要视图按需加载
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/problem/===
-Problem.vue[EU8L]: F:展示题面、隔离保存草稿并提交及轮询本地或浏览器远程判题，并提供收藏、本人提交代码查看和筹备审题反馈 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/utils/constants.js,code:frontend/src/styles/judge-status.less | A:题目详情提交页；checkSubmissionStatus；submitCode；openSubmissionCode；toggleFavorite；sendFeedback | S:请求绑定页面代次与提交ID，切题卸载取消旧轮询；迟到远程任务仍交助手但不改新页；草稿按题目比赛隔离；非实时OI保留结果隐藏策略；登录后提交卡只列本人提交并可按AC筛选；lint:modern固定代码、语言、主题watcher顺序
+Problem.vue[EU8L]: F:展示题面、隔离保存草稿并提交及轮询本地或浏览器远程判题，并提供收藏、本人提交代码查看和筹备审题反馈 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/utils/constants.js,code:frontend/src/styles/judge-status.less | A:题目详情提交页；checkSubmissionStatus；submitCode；openSubmissionCode；toggleFavorite；sendFeedback | S:请求绑定页面代次与提交ID，切题卸载取消旧轮询；迟到远程任务仍交助手但不改新页；草稿按题目比赛隔离；非实时OI保留结果隐藏策略；登录后提交卡只列本人提交并可按AC筛选；题面继承衬线正文而限制信息栏用无衬线；lint:modern固定代码、语言、主题watcher顺序
 ProblemList.vue[EU6M]: F:按难度标签关键词及页大小检索题库和个人题目状态 | R:code:frontend/src/pages/oj/api.js | A:题库列表与URL筛选 | S:offset与请求limit使用同一query.limit；生产空标签不再回退样例
 chartData.js[FU4S]: F:定义题目结果分布的汇总及详细饼图初始配置 | R:code:frontend/src/shared/charts/LegacyECharts.js | A:pie；largePie | S:颜色查表未包含系统错误等所有结果，调用方应限制类别
 
@@ -657,13 +658,13 @@ index.js[AD8M]: F:以Pinia管理资料、认证入口、比赛与筹备角色状
 types.js[FD4T]: F:声明旧状态修改事件的自映射字符串常量 | R:code:frontend/src/store/index.js | A:types默认导出 | S:-
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/styles/===
-common.less[FU4T]: F:提供用户端布局、验证码、富文本和过渡的共享样式 | R:code:frontend/src/styles/markdown.less | A:公共Less类 | S:-
+common.less[FU4T]: F:提供用户端布局、验证码、富文本和过渡的共享样式 | R:code:frontend/src/styles/markdown.less | A:公共Less类 | S:富文本容器统一用衬线正文常规字重
 feiyue-theme.less[FU5T]: F:将共享设计令牌映射到Element Plus变量和控件外观 | R:code:frontend/src/styles/tokens.css | A:全局Element主题 | S:全局覆盖影响两个SPA，修改需同时验证后台和OJ
-global.less[FU5T]: F:定义字体、基础布局、输入光标、焦点和减少动态效果规则 | R:code:frontend/src/styles/tokens.css | A:全局样式 | S:外部Google字体不可用时使用系统回退；字体平滑保持auto且正文字重450，强制antialiased会使macOS文字发细；reduced-motion压缩所有动画与过渡
+global.less[FU5T]: F:定义字体、基础布局、输入光标、焦点和减少动态效果规则 | R:code:frontend/src/styles/tokens.css | A:全局样式 | S:字体来自自托管fonts.css，缺失时回退系统字体；禁止浏览器合成粗体斜体；字体平滑保持auto且正文字重450；reduced-motion压缩所有动画与过渡
 index.less[FU3T]: F:聚合用户端全局、主题、通用及兼容控件样式 | R:code:frontend/src/styles/global.less,code:frontend/src/styles/feiyue-theme.less | A:OJ样式入口 | S:-
 iview-custom.less[FU4T]: F:调整兼容表格、卡片、弹窗及比赛通过状态样式 | R:code:frontend/src/shared/ui/legacy-ui.js | A:排名单元格与Element样式 | S:通用table宽度被强制100%，会影响嵌套题面表格
 markdown.less[FU4S]: F:规定题面和公告富文本标题、列表、公式附近内容与代码块外观 | R:code:frontend/src/styles/common.less | A:markdown-body子样式 | S:应在容器内导入，避免把富文本规则扩成全局排版
-tokens.css[FU6T]: F:集中定义双入口颜色、字体、尺寸、状态和兼容别名 | R:code:frontend/src/styles/feiyue-theme.less | A:根CSS自定义属性 | S:保留旧变量别名，清理前须核对所有消费组件
+tokens.css[FU6T]: F:集中定义双入口颜色、字体、尺寸、状态和兼容别名 | R:code:frontend/src/styles/feiyue-theme.less,code:deploy/ops/fetch-fonts.py | A:根CSS自定义属性 | S:保留旧变量别名，清理前须核对所有消费组件；字体栈首选自托管的Geist、Source Serif 4、Noto SC与JetBrains Mono
 judge-status.less[FU5T]: F:共享OJ题目与AI评测状态胶囊的尺寸、配色及非成功状态动效 | R:code:frontend/src/styles/tokens.css | A:.judge-status-badge；is-success/error/warning/info；prefers-reduced-motion | S:由消费组件以scoped样式导入，不作为全局主题加载
 contest-detail.less[FU5S]: F:共享ACM/OI与AI比赛标题卡片、元信息、页签和概览侧栏的响应式外观 | R:code:frontend/src/pages/oj/views/contest/ContestDetail.vue,code:frontend/src/pages/oj/views/ai/AIContest.vue,code:frontend/src/styles/tokens.css | A:.contest-hero；.contest-tabs；.contest-meta；.contest-overview-grid；.contest-guide | S:由消费组件以scoped样式导入；通用section-heading等选择器不能直接作为全局主题加载
 contest-problems.less[FU5T]: F:共享比赛题目面板、编号与行交互以及报名遮罩和空列表的样式 | R:code:frontend/src/pages/oj/views/contest/children/ContestProblemList.vue,code:frontend/src/pages/oj/views/ai/AIContest.vue | A:.contest-problem-panel；.contest-problem-table；.contest-registration-gate；.problem-empty | S:需在消费组件scoped样式中导入；报名遮罩只控制显示和指针交互，不执行权限验证
