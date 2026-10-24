@@ -209,6 +209,15 @@ docker compose --env-file .env -f compose.yaml ps
 ./deploy/ops/backup-fixture.sh
 ```
 
+站点字体（Geist、Source Serif 4、Noto Sans/Serif SC、JetBrains Mono，均为 SIL OFL）自托管在 `runtime/backend/public/fonts`，不进入 Git 和镜像。首次部署或需要更新字体时，在服务器上执行一次（文件按内容哈希命名并整体替换）：
+
+```bash
+docker exec -i -u backend "$(docker compose -p xju-oj ps -q backend-api)" \
+  python3 - --output /data/public/fonts < deploy/ops/fetch-fonts.py
+```
+
+未执行时页面回退到系统字体，功能不受影响。
+
 停止服务但保留数据与 Secret：
 
 ```bash
