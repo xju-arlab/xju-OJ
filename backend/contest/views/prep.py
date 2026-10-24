@@ -108,9 +108,11 @@ class ContestPrepMemberAPI(APIView):
     @login_required
     def get(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"))
-        members = ContestPrepMember.objects.filter(contest=contest).select_related("user")
+        members = ContestPrepMember.objects.filter(contest=contest).select_related("user__userprofile")
+        creator = contest.created_by
         return self.success({
-            "creator": {"id": contest.created_by.id, "username": contest.created_by.username},
+            "creator": {"id": creator.id, "username": creator.username,
+                        "real_name": getattr(getattr(creator, "userprofile", None), "real_name", None)},
             "members": ContestPrepMemberSerializer(members, many=True).data,
         })
 

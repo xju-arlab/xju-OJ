@@ -122,6 +122,34 @@ class ContestPrepVisibilityTest(ContestPrepTestBase):
         prep_list = self.client.get(self.reverse("contest_list_api") + "?limit=50&prep=1").data["data"]
         self.assertEqual(prep_list["total"], 0)
 
+    def test_admins_outside_the_team_cannot_reach_it(self):
+        from account.models import AdminType, ProblemPermission
+        problem = self.add_problem(self.contest, visible=False)
+        run = Submission.objects.create(user_id=self.verifier.id, username="verifier", code="int main(){}",
+                                        language="C", problem=problem, contest=self.contest)
+        outsider = self.create_user("outsider", "outsider-pass", admin_type=AdminType.ADMIN,
+                                    problem_permission=ProblemPermission.ALL, login=False)
+        root = self.create_super_admin(login=False)
+        cid = self.contest.id
+        self.login(outsider)
+        self.assertFailed(self.client.get(self.reverse("contest_api") + f"?id={cid}"))
+        self.assertFailed(self.client.get(self.reverse("contest_admin_api") + f"?id={cid}"))
+        self.assertFailed(self.client.get(self.reverse("contest_problem_admin_api") + f"?contest_id={cid}"))
+        self.assertFailed(self.client.get(self.reverse("problem_admin_api") + f"?id={problem.id}"),
+                          "Problem does not exist")
+        self.assertFailed(self.client.get(self.reverse("submission_api") + f"?id={run.id}"),
+                          "No permission for this submission")
+        prep_list = self.client.get(self.reverse("contest_list_api") + "?limit=50&prep=1").data["data"]
+        self.assertEqual(prep_list["total"], 0)
+        # Super admins and the creator keep full access; verifiers read their own runs only.
+        for user in (root, self.creator):
+            self.login(user)
+            self.assertSuccess(self.client.get(self.reverse("problem_admin_api") + f"?id={problem.id}"))
+            self.assertSuccess(self.client.get(self.reverse("submission_api") + f"?id={run.id}"))
+        self.login(self.setter)
+        self.assertSuccess(self.client.get(self.reverse("submission_api") + f"?id={run.id}"))
+        self.assertFailed(self.client.get(self.reverse("problem_admin_api") + f"?id={problem.id}"))
+
     def test_members_find_it_in_the_preparation_list(self):
         for user, role in ((self.creator, "Creator"), (self.setter, "Setter"), (self.verifier, "Verifier")):
             self.login(user)
@@ -203,8 +231,13 @@ class ContestPrepManagementTest(ContestPrepTestBase):
         self.login(self.setter)
         self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "username": "newcomer",
                                                       "role": "Verifier"}), "Only the contest creator can do this")
+        self.setter.userprofile.real_name = "李出题"
+        self.setter.userprofile.save()
         members = self.client.get(url + f"?contest_id={self.contest.id}").data["data"]
         self.assertEqual(members["creator"]["username"], "creator")
+        self.assertIn("real_name", members["creator"])
+        self.assertEqual({item["user"]["username"]: item["user"]["real_name"] for item in members["members"]}["setter"],
+                         "李出题")
         self.assertEqual({item["user"]["username"] for item in members["members"]}, {"setter", "verifier"})
 
         self.login(self.creator)

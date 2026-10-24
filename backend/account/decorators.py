@@ -5,7 +5,7 @@ import time
 from problem.models import Problem
 from contest.models import Contest, ContestType, ContestStatus, ContestRuleType
 from utils.api import JSONResponse, APIError
-from utils.constants import CONTEST_PASSWORD_SESSION_KEY
+from utils.constants import CONTEST_PASSWORD_SESSION_KEY, ContestPrepRole
 from .models import ProblemPermission
 
 
@@ -168,6 +168,12 @@ def ensure_created_by(obj, user):
     if user.is_super_admin():
         return
     if isinstance(obj, Problem):
+        # A preparation contest's problems stay with its creator here, whatever
+        # the problem permission; setters and verifiers use the prep API.
+        if obj.contest_id and obj.contest.is_preparation:
+            if obj.contest.prep_role(user) != ContestPrepRole.CREATOR:
+                raise e
+            return
         if not user.can_mgmt_all_problem() and obj.created_by != user:
             raise e
     elif obj.created_by != user:

@@ -123,7 +123,8 @@ class ContestPrepStateSerializer(serializers.Serializer):
 
 
 class ContestPrepMemberSerializer(serializers.ModelSerializer):
-    user = UsernameSerializer()
+    # The team sees each other's real names on the members tab.
+    user = UsernameSerializer(need_real_name=True)
 
     class Meta:
         model = ContestPrepMember

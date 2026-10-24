@@ -67,14 +67,17 @@ class Submission(models.Model):
     remote_update_time = models.DateTimeField(null=True)
 
     def check_user_permission(self, user, check_share=True):
+        if self.contest_id and self.contest.is_preparation:
+            # Verification runs stay inside the preparation team whatever the
+            # admin rights: the author, plus the creator and setters reviewing them.
+            return self.user_id == user.id or \
+                self.contest.prep_role(user) in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER)
+
         if self.user_id == user.id or user.is_super_admin() or user.can_mgmt_all_problem() or self.problem.created_by_id == user.id:
             return True
 
         if check_share:
             if self.contest:
-                if self.contest.is_preparation:
-                    # Creator and setters review every verification run.
-                    return self.contest.prep_role(user) in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER)
                 # Once a contest has ended, all of its code is open to read.
                 return self.contest.status == ContestStatus.CONTEST_ENDED
             if self.problem.share_submission or self.shared:
