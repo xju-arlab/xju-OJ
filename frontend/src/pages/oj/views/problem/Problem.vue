@@ -1047,6 +1047,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: #fcfbf9;
+    font-family: var(--font-sans);
   }
   .problem-brief > div { display: flex; min-width: 0; min-height: 58px; justify-content: center; flex-direction: column; padding: 10px 13px; border-right: 1px solid var(--color-border); }
   .problem-brief > div:last-child { border-right: 0; }

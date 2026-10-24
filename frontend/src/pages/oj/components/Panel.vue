@@ -63,7 +63,7 @@
     }
   }
   .panel-body {
-    word-break: break-all;
-    word-wrap: break-word;
+    /* Wrap at word boundaries; only words too long for the line are split. */
+    overflow-wrap: anywhere;
   }
 </style>
