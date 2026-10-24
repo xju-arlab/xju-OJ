@@ -1,9 +1,10 @@
 <template>
   <Card class="feiyue-panel" :padding="padding" :shadow="shadow" :dis-hover="disHover" :bordered="bordered">
-    <template #title><div  class="panel-title">
+    <!-- Without a title or extra content the card renders no header bar. -->
+    <template v-if="$slots.title" #title><div class="panel-title">
       <slot name="title"></slot>
     </div></template>
-    <template #extra><div  class="panel-extra">
+    <template v-if="$slots.extra" #extra><div class="panel-extra">
       <slot name="extra"></slot>
     </div></template>
     <div class="panel-body">

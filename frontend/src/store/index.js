@@ -69,6 +69,7 @@ const useApplicationStore = defineStore('application', {
     canManagePrep () { return this.isPrepContest && this.prepRole === 'Creator' },
     canAuthorPrep () { return this.isPrepContest && ['Creator', 'Setter'].includes(this.prepRole) },
     canEditPrep () { return this.canAuthorPrep && this.contest.contest.prep_state === 'Preparation' },
+    isPrepReview: state => state.contest.contest.prep_state === 'Review',
     isContestRegistered () { return this.isContestAdmin || this.contest.contest.registered === true },
     isContestAdmin () { return this.isAuthenticated && (this.contest.contest.created_by.id === this.currentUser.id || this.currentUser.admin_type === USER_TYPE.SUPER_ADMIN) },
     contestMenuDisabled () {
@@ -217,7 +218,7 @@ const getterMap = {
   isAuthenticated: s => s.isAuthenticated, isAdminRole: s => s.isAdminRole, isSuperAdmin: s => s.isSuperAdmin,
   hasProblemPermission: s => s.hasProblemPermission, contestLoaded: s => s.contestLoaded, contestStatus: s => s.contestStatus,
   contestRuleType: s => s.contestRuleType, isPrepContest: s => s.isPrepContest, prepRole: s => s.prepRole,
-  canManagePrep: s => s.canManagePrep, canAuthorPrep: s => s.canAuthorPrep, canEditPrep: s => s.canEditPrep, isContestAdmin: s => s.isContestAdmin, isContestRegistered: s => s.isContestRegistered, contestMenuDisabled: s => s.contestMenuDisabled,
+  canManagePrep: s => s.canManagePrep, canAuthorPrep: s => s.canAuthorPrep, canEditPrep: s => s.canEditPrep, isPrepReview: s => s.isPrepReview, isContestAdmin: s => s.isContestAdmin, isContestRegistered: s => s.isContestRegistered, contestMenuDisabled: s => s.contestMenuDisabled,
   OIContestRealTimePermission: s => s.OIContestRealTimePermission, problemSubmitDisabled: s => s.problemSubmitDisabled,
   passwordFormVisible: s => s.passwordFormVisible, contestStartTime: s => s.contestStartTime, contestEndTime: s => s.contestEndTime,
   countdown: s => s.countdown

@@ -99,7 +99,6 @@
     overflow: auto;
     font-weight: 400;
     height: 100%;
-    -webkit-font-smoothing: antialiased;
     background-color: var(--color-bg);
     overflow-y: auto;
     min-width: 760px;

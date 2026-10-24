@@ -140,9 +140,9 @@ export default [
         component: Contest.ContestPrepProblems
       },
       {
-        name: 'contest-prep-problem-create',
-        path: 'prep/problems/create',
-        component: Contest.ContestPrepProblemEdit
+        name: 'contest-prep-upload',
+        path: 'prep/upload',
+        component: Contest.ContestPrepUpload
       },
       {
         name: 'contest-prep-problem-edit',

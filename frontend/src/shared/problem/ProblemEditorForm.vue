@@ -303,7 +303,7 @@
         return {...(this.service.testCaseUploadData || {}), spj: this.problem.spj}
       },
       visibleHint () {
-        if (this.contest.prep_state) return '对验题人可见；发布比赛时只包含可见题目'
+        if (this.contest.prep_state) return '对验题人可见'
         return '允许普通用户在题库中看到该题'
       }
     },

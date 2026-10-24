@@ -1,4 +1,4 @@
-@import (css) url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..800&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+@import (css) url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..800&family=Inter+Tight:wght@400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
 @import './tokens.css';
 
 html, body, #app { min-height: 100%; background: var(--color-bg); }
@@ -10,9 +10,12 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: 15px;
+  font-weight: 450;
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Keep the platform's default smoothing: forcing grayscale antialiasing
+     drops macOS stroke thickening and makes text look thin. */
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }
 *, *::before, *::after { box-sizing: border-box; }
 button, input, textarea, select { font: inherit; }

@@ -1,6 +1,5 @@
 <template>
   <Panel shadow>
-    <template #title><div class="rank-title">{{ contest.title }}</div></template>
     <div class="rank-settings-row" aria-label="Ranking settings">
       <label class="rank-setting"><span>{{$t('m.Chart')}}</span><i-switch v-model="showChart"></i-switch></label>
       <label class="rank-setting"><span>{{$t('m.Auto_Refresh')}} (10s)</span><i-switch v-model="autoRefresh" :disabled="refreshDisabled" @on-change="handleAutoRefresh"></i-switch></label>
@@ -80,23 +79,12 @@
           },
           {
             className: 'rank-hover-cell',
-            title: 'AC / ' + this.$t('m.Total'),
+            title: this.$t('m.Rank_Solved_Problems'),
             align: 'center',
             width: 100,
             render: (h, params) => {
-              return h('span', {}, [
-                h('span', {}, params.row.accepted_number + ' / '),
-                h('a', {
-                  on: {
-                    click: () => {
-                      this.$router.push({
-                        name: 'contest-submission-list',
-                        query: {username: params.row.user.username}
-                      })
-                    }
-                  }
-                }, params.row.submission_number)
-              ])
+              // Problems solved out of the contest's problems.
+              return h('span', { class: 'rank-solved' }, `${params.row.accepted_number} / ${this.contestProblems.length}`)
             }
           },
           {
@@ -321,7 +309,7 @@
     width: 100%;
     border-bottom: 1px solid var(--color-border);
   }
-  .rank-title { color: var(--color-text); font-size: 15px; font-weight: 650; }
+  :deep(.rank-solved) { color: var(--color-text); font-weight: 600; font-variant-numeric: tabular-nums; }
   .rank-settings-row { display: flex; min-height: 52px; align-items: center; gap: 18px; flex-wrap: wrap; margin: 0; padding: 0 16px; border-bottom: 1px solid var(--color-border); box-sizing: border-box; }
   .rank-setting { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 12px; white-space: nowrap; }
   .rank-download { display: inline-flex; min-height: 32px; align-items: center; gap: 7px; margin-left: auto; padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; transition: color var(--transition), border-color var(--transition), background-color var(--transition); }

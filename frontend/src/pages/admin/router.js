@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { recoverFromStaleChunks } from '@/utils/chunkRecovery'
 
 const Home = () => import('./views/Home.vue')
 const Login = () => import('./views/general/Login.vue')
@@ -13,7 +14,7 @@ const ProblemImportOrExport = () => import('./views/problem/ImportAndExport.vue'
 const Contest = () => import('./views/contest/Contest.vue')
 const ContestList = () => import('./views/contest/ContestList.vue')
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory('/admin/'),
   scrollBehavior: () => ({top: 0}),
   routes: [
@@ -115,3 +116,7 @@ export default createRouter({
     }
   ]
 })
+
+recoverFromStaleChunks(router)
+
+export default router

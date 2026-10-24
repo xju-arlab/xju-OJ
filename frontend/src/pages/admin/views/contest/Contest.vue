@@ -74,14 +74,14 @@
             <div v-if="isCreate && contest.rule_type !== 'AI'" class="setting-card">
               <span class="setting-copy">
                 <strong>{{ $t('m.Contest_Preparation_Mode') }}</strong>
-                <small>仅创建者、出题人和验题人可见，在 OJ 比赛页分配人员、上传题目，发布时生成正式比赛</small>
+                <small>仅出题组可见，发布后生成正式比赛</small>
               </span>
               <el-switch v-model="preparation"></el-switch>
             </div>
             <div v-else-if="contest.prep_state" class="setting-card">
               <span class="setting-copy">
                 <strong>{{ $t('m.Contest_Preparation_Mode') }}</strong>
-                <small>{{ contest.prep_state === 'Preview' ? '预览中' : '筹备中' }} · 在 OJ 比赛页管理人员、题目并发布</small>
+                <small>{{ contest.prep_state === 'Review' ? '审题中' : '出题中' }}</small>
               </span>
               <a class="prep-open-link" :href="`/contest/${$route.params.contestId}/`">打开筹备页</a>
             </div>

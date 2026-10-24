@@ -393,6 +393,31 @@ export default {
       data
     })
   },
+  getPrepRank (contestId) {
+    return ajax('contest/prep/rank', 'get', {
+      params: { contest_id: contestId }
+    })
+  },
+  getPrepFeedback (contestId, problemId) {
+    return ajax('contest/prep/feedback', 'get', {
+      params: { contest_id: contestId, problem_id: problemId }
+    })
+  },
+  addPrepFeedback (contestId, problemId, content) {
+    return ajax('contest/prep/feedback', 'post', {
+      data: { contest_id: contestId, problem_id: problemId, content }
+    })
+  },
+  setPrepFeedbackResolved (contestId, id, resolved) {
+    return ajax('contest/prep/feedback', 'put', {
+      data: { contest_id: contestId, id, resolved }
+    })
+  },
+  deletePrepFeedback (contestId, id) {
+    return ajax('contest/prep/feedback', 'delete', {
+      params: { contest_id: contestId, id }
+    })
+  },
   getACMACInfo (params) {
     return ajax('admin/contest/acm_helper', 'get', {
       params

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { recoverFromStaleChunks } from '@/utils/chunkRecovery'
 import routes from './routes'
 import storage from '@/utils/storage'
 import { STORAGE_KEY } from '@/utils/constants'
@@ -20,5 +21,7 @@ router.beforeEach(to => {
     return { name: 'home', query }
   }
 })
+
+recoverFromStaleChunks(router)
 
 export default router

@@ -9,6 +9,7 @@
   import { types } from '../../../../../store'
   import ACMContestRank from './ACMContestRank.vue'
   import OIContestRank from './OIContestRank.vue'
+  import ContestPrepRank from './ContestPrepRank.vue'
 
   const NullComponent = {
     name: 'null-component',
@@ -20,14 +21,17 @@
     components: {
       ACMContestRank,
       OIContestRank,
+      ContestPrepRank,
       NullComponent
     },
     computed: {
-      ...mapGetters(['contestRuleType']),
+      ...mapGetters(['contestRuleType', 'isPrepContest']),
       currentView () {
         if (this.contestRuleType === null) {
           return 'NullComponent'
         }
+        // Review boards are computed from verification runs and tag the setters.
+        if (this.isPrepContest) return 'ContestPrepRank'
         return this.contestRuleType === 'ACM' ? 'ACMContestRank' : 'OIContestRank'
       }
     },

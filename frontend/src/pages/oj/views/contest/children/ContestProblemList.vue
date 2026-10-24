@@ -1,10 +1,7 @@
 <template>
   <section class="contest-problem-panel" aria-labelledby="contest-problem-title">
     <header class="problem-panel-header">
-      <div>
-        <p>{{$t('m.Problems')}}</p>
-        <h2 id="contest-problem-title">{{$t('m.Problems_List')}}</h2>
-      </div>
+      <h2 id="contest-problem-title">{{$t('m.Problems_List')}}</h2>
       <span class="problem-count">{{problems.length}}</span>
     </header>
 

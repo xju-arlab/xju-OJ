@@ -182,7 +182,7 @@
         return 'status-underway'
       },
       prepStateLabel (state) {
-        return this.$t(state === 'Preview' ? 'm.Prep_State_Preview' : 'm.Prep_State_Preparation')
+        return this.$t(state === 'Review' ? 'm.Prep_State_Review' : 'm.Prep_State_Preparation')
       },
       onPrepContestCreated (contest) {
         this.$router.push({ name: 'contest-details', params: { contestID: contest.id } })

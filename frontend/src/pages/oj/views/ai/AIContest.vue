@@ -46,7 +46,7 @@
           <section class="contest-overview" aria-labelledby="ai-contest-overview-title">
             <div class="section-heading">
               <span class="section-icon" aria-hidden="true"><Icon type="file-text" /></span>
-              <div><p>{{ $t('m.Contests') }}</p><h2 id="ai-contest-overview-title">{{ $t('m.Overview') }}</h2></div>
+              <h2 id="ai-contest-overview-title">{{ $t('m.Overview') }}</h2>
             </div>
             <div class="contest-description ai-contest-description">
               <div class="markdown-body" v-html="description"></div>
@@ -63,7 +63,7 @@
           <aside class="contest-guide" aria-labelledby="ai-contest-guide-title">
             <div class="section-heading compact">
               <span class="section-icon" aria-hidden="true"><Icon type="info-circle" /></span>
-              <div><p>XJU-OJ</p><h2 id="ai-contest-guide-title">比赛规则</h2></div>
+              <h2 id="ai-contest-guide-title">比赛规则</h2>
             </div>
             <dl>
               <div><dt>赛制</dt><dd class="contest-rule rule-ai">AI</dd></div>
@@ -86,7 +86,7 @@
 
         <section v-else-if="tab === 'problems'" class="contest-problem-panel" aria-labelledby="ai-contest-problems-title">
           <header class="problem-panel-header">
-            <div><p>{{ $t('m.Problems') }}</p><h2 id="ai-contest-problems-title">{{ $t('m.Problems_List') }}</h2></div>
+            <h2 id="ai-contest-problems-title">{{ $t('m.Problems_List') }}</h2>
             <span class="problem-count">{{ contestProblems.length }}</span>
           </header>
           <div v-if="contestProblems.length" class="problem-table-wrap">
@@ -110,7 +110,7 @@
         </section>
 
         <section v-else class="contest-problem-panel" aria-labelledby="ai-contest-scores-title">
-          <header class="problem-panel-header"><div><p>AI</p><h2 id="ai-contest-scores-title">成绩</h2></div></header>
+          <header class="problem-panel-header"><h2 id="ai-contest-scores-title">成绩</h2></header>
           <div v-if="!scores.length" class="ai-contest-empty">
             <BarChart3 :size="30" aria-hidden="true" /><h3>暂无正式成绩</h3>
             <p>{{ scoreError || '正式比赛提交评测完成后，将在这里显示成绩。' }}</p>

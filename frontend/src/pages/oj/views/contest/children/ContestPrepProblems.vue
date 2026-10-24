@@ -1,26 +1,5 @@
 <template>
-  <section class="prep-panel" aria-labelledby="prep-problems-title">
-    <header class="prep-panel-heading">
-      <div>
-        <h2 id="prep-problems-title">{{ $t('m.Prep_Problem_Setting') }}</h2>
-        <p>{{ $t(canEditPrep ? 'm.Prep_Problem_Setting_Intro' : 'm.Prep_Problem_Locked') }}</p>
-      </div>
-      <div v-if="canEditPrep" class="prep-problem-actions">
-        <el-upload :action="importAction"
-                   :headers="csrfHeaders()"
-                   :data="{ contest_id: contestID }"
-                   name="file"
-                   accept=".zip"
-                   :show-file-list="false"
-                   :before-upload="() => { importing = true; return true }"
-                   :on-success="importSucceeded"
-                   :on-error="importFailed">
-          <el-button :loading="importing"><Icon type="upload" />{{ $t('m.Prep_Import_Zip') }}</el-button>
-        </el-upload>
-        <el-button type="primary" @click="createProblem"><Icon type="plus" />{{ $t('m.Prep_New_Problem') }}</el-button>
-      </div>
-    </header>
-
+  <section class="prep-panel" :aria-label="$t('m.Prep_Problem_List')">
     <table class="prep-problem-table">
       <thead>
         <tr>
@@ -28,6 +7,7 @@
           <th class="label-column">#</th>
           <th>{{ $t('m.Title') }}</th>
           <th class="visible-column">{{ $t('m.Visible') }}</th>
+          <th class="feedback-column">{{ $t('m.Prep_Feedback') }}</th>
           <th class="author-column">{{ $t('m.Prep_Author') }}</th>
           <th class="actions-column"></th>
         </tr>
@@ -59,6 +39,11 @@
             <el-switch :model-value="problem.visible" :disabled="!canEditPrep"
                        @change="value => setVisible(problem, value)"></el-switch>
           </td>
+          <td class="feedback-column">
+            <router-link v-if="problem.feedback_count" class="feedback-count"
+                         :to="{ name: 'contest-problem-details', params: { contestID, problemID: problem._id } }">{{ problem.feedback_count }}</router-link>
+            <span v-else class="feedback-none">—</span>
+          </td>
           <td class="author-column">{{ problem.created_by && problem.created_by.username }}</td>
           <td class="actions-column">
             <el-button v-if="canEditPrep" text size="small" @click="editProblem(problem)">{{ $t('m.Edit') }}</el-button>
@@ -67,7 +52,7 @@
           </td>
         </tr>
         <tr v-if="!loading && !problems.length">
-          <td :colspan="canEditPrep ? 6 : 5" class="prep-empty">{{ $t('m.Prep_No_Problems') }}</td>
+          <td :colspan="canEditPrep ? 7 : 6" class="prep-empty">{{ $t('m.Prep_No_Problems') }}</td>
         </tr>
       </tbody>
     </table>
@@ -77,7 +62,6 @@
 <script>
 import api from '@oj/api'
 import { mapGetters } from '@/store/compat'
-import { csrfHeaders } from '@/utils/csrf'
 
 export default {
   name: 'ContestPrepProblems',
@@ -85,7 +69,6 @@ export default {
     return {
       loading: false,
       saving: false,
-      importing: false,
       problems: [],
       dragIndex: null,
       dropIndex: null
@@ -95,16 +78,12 @@ export default {
     ...mapGetters(['canEditPrep']),
     contestID () {
       return this.$route.params.contestID
-    },
-    importAction () {
-      return '/api/contest/prep/import_problem'
     }
   },
   mounted () {
     this.load()
   },
   methods: {
-    csrfHeaders,
     async load () {
       this.loading = true
       try {
@@ -118,9 +97,6 @@ export default {
     },
     testCaseUrl (problem) {
       return `/api/contest/prep/test_case?contest_id=${this.contestID}&problem_id=${problem.id}`
-    },
-    createProblem () {
-      this.$router.push({ name: 'contest-prep-problem-create', params: { contestID: this.contestID } })
     },
     editProblem (problem) {
       this.$router.push({ name: 'contest-prep-problem-edit', params: { contestID: this.contestID, problemId: problem.id } })
@@ -167,19 +143,6 @@ export default {
       } finally {
         this.saving = false
       }
-    },
-    importSucceeded (response) {
-      this.importing = false
-      if (response.error) {
-        this.$error(response.data)
-        return
-      }
-      this.$success(this.$t('m.Prep_Imported', { count: response.data.import_count }))
-      this.load()
-    },
-    importFailed () {
-      this.importing = false
-      this.$error(this.$t('m.Prep_Import_Failed'))
     }
   }
 }
@@ -188,7 +151,6 @@ export default {
 <style scoped lang="less">
 @import "@/styles/contest-prep.less";
 
-.prep-problem-actions { display: flex; align-items: center; gap: 10px; :deep(.legacy-icon) { display: inline-flex; margin-right: 4px; } }
 .prep-problem-table {
   width: 100%;
   border-collapse: collapse;
@@ -216,6 +178,21 @@ export default {
 .title-column a { color: var(--color-text); font-weight: 600; }
 .problem-warning { margin-left: 8px; color: var(--oj-danger); font-size: 12px; }
 .visible-column { width: 90px; }
+.feedback-column { width: 80px; }
+.feedback-count {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--tag-research-bg);
+  color: var(--cat-research);
+  font-size: 12px;
+  font-weight: 650;
+}
+.feedback-none { color: var(--color-text-faint); }
 .author-column { width: 130px; color: var(--color-text-muted); }
 .actions-column { width: 200px; text-align: right; white-space: nowrap; }
 .download-link { margin: 0 8px; color: var(--color-link); font-size: 12px; }
