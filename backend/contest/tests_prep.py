@@ -206,9 +206,12 @@ class ContestPrepManagementTest(ContestPrepTestBase):
                                                       "role": "Setter"}))
         self.assertEqual(self.contest.prep_members.get(user=newcomer).role, "Setter")
         self.assertSuccess(self.client.delete(url + f"?contest_id={self.contest.id}&user_id={newcomer.id}"))
-        search = self.client.get(self.reverse("contest_prep_user_search_api") +
-                                 f"?contest_id={self.contest.id}&keyword=new").data["data"]
-        self.assertEqual(search, [{"id": newcomer.id, "username": "newcomer"}])
+        newcomer.userprofile.real_name = "张三"
+        newcomer.userprofile.save()
+        for keyword in ("new", "张"):
+            search = self.client.get(self.reverse("contest_prep_user_search_api") +
+                                     f"?contest_id={self.contest.id}&keyword={keyword}").data["data"]
+            self.assertEqual(search, [{"id": newcomer.id, "username": "newcomer", "real_name": "张三"}])
 
     def test_setter_uploads_hidden_problems_and_preview_freezes_them(self):
         url = self.reverse("contest_prep_problem_api")
@@ -323,7 +326,8 @@ class ContestPrepPackageTest(ContestPrepTestBase):
                                     format="multipart")
         self.assertSuccess(response)
         problem = Problem.objects.get(id=response.data["data"]["imported"][0]["id"])
-        self.assertEqual((problem.contest_id, problem._id, problem.visible), (self.contest.id, "B", False))
+        self.assertEqual((problem.contest_id, problem._id, problem.visible, problem.share_submission),
+                         (self.contest.id, "B", False, True))
 
         response = self.client.post(url, data={"contest_id": self.contest.id, "file": self.package("OI")},
                                     format="multipart")
@@ -510,3 +514,25 @@ class ContestPrepReviewTest(ContestPrepTestBase):
                                                data={"contest_id": self.contest.id, "state": state}))
         self.contest.refresh_from_db()
         self.assertEqual(self.contest.review_started_at, started)
+
+
+class ContestPrepPublicProblemTest(ContestPrepTestBase):
+    def test_setter_copies_a_library_problem_as_a_hidden_draft(self):
+        url = self.reverse("contest_prep_public_problem_api")
+        library = self.add_problem(None, _id="1001", title="library")
+        hidden = self.add_problem(None, _id="1002", visible=False)
+        oi_problem = self.add_problem(None, _id="1003", rule_type="OI")
+        self.login(self.verifier)
+        self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "problem_id": library.id}))
+        self.login(self.setter)
+        response = self.client.post(url, data={"contest_id": self.contest.id, "problem_id": library.id})
+        self.assertSuccess(response)
+        copy = Problem.objects.get(id=response.data["data"]["id"])
+        self.assertEqual((copy.contest_id, copy._id, copy.visible, copy.title, copy.created_by_id),
+                         (self.contest.id, "A", False, "library", self.setter.id))
+        self.assertEqual(list(copy.tags.values_list("name", flat=True)), ["test"])
+        library.refresh_from_db()
+        self.assertIsNone(library.contest_id)
+        self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "problem_id": hidden.id}),
+                          "Problem does not exist")
+        self.assertFailed(self.client.post(url, data={"contest_id": self.contest.id, "problem_id": oi_problem.id}))

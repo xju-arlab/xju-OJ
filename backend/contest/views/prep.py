@@ -24,7 +24,8 @@ from ..models import Contest, ContestPrepMember, ContestProblemFeedback
 from ..prep_publish import publish_prep_contest
 from ..prep_rank import review_rank
 from ..serializers import (ContestPrepMemberSerializer, ContestPrepProblemOrderSerializer,
-                           ContestPrepProblemVisibleSerializer, ContestPrepPublishSerializer,
+                           ContestPrepProblemVisibleSerializer, ContestPrepPublicProblemSerializer,
+                           ContestPrepPublishSerializer,
                            ContestPrepStateSerializer, ContestProblemFeedbackSerializer,
                            CreateContestPrepMemberSerializer, CreateContestProblemFeedbackSerializer,
                            EditContestPrepMemberSerializer, EditContestProblemFeedbackSerializer)
@@ -149,9 +150,12 @@ class ContestPrepUserSearchAPI(APIView):
         keyword = request.GET.get("keyword", "").strip()
         if not keyword:
             return self.success([])
-        users = (User.objects.filter(username__icontains=keyword, is_disabled=False)
-                 .exclude(id=contest.created_by_id).order_by("username")[:10])
-        return self.success([{"id": user.id, "username": user.username} for user in users])
+        users = (User.objects.filter(Q(username__icontains=keyword) | Q(userprofile__real_name__icontains=keyword),
+                                     is_disabled=False)
+                 .exclude(id=contest.created_by_id).select_related("userprofile").order_by("username")[:10])
+        return self.success([{"id": user.id, "username": user.username,
+                              "real_name": getattr(getattr(user, "userprofile", None), "real_name", None)}
+                             for user in users])
 
 
 class ContestPrepProblemAPI(ProblemBase):
@@ -317,3 +321,32 @@ class ContestPrepRankAPI(APIView):
     def get(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"))
         return self.success(review_rank(contest))
+
+
+class ContestPrepPublicProblemAPI(APIView):
+    """Copy a released library problem into the contest, hidden like any new draft."""
+
+    @validate_serializer(ContestPrepPublicProblemSerializer)
+    @login_required
+    def post(self, request):
+        contest = load_prep_contest(request, request.data["contest_id"], EDIT)
+        try:
+            problem = Problem.objects.get(id=request.data["problem_id"], contest_id__isnull=True, visible=True)
+        except Problem.DoesNotExist:
+            return self.error("Problem does not exist")
+        if problem.rule_type != contest.rule_type:
+            return self.error(f"This is a {problem.rule_type} problem, but the contest uses {contest.rule_type}")
+        tags = list(problem.tags.all())
+        problem.pk = None
+        problem.contest = contest
+        problem._id = next_contest_display_id(contest)
+        problem.created_by = request.user
+        problem.is_public = True
+        problem.visible = False
+        problem.publish_after_contest = False
+        problem.post_contest_display_id = None
+        problem.submission_number = problem.accepted_number = 0
+        problem.statistic_info = {}
+        problem.save()
+        problem.tags.set(tags)
+        return self.success(ProblemAdminSerializer(problem).data)

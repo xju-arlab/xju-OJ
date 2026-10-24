@@ -872,8 +872,10 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                 spj_version=rand_str(8) if spj else "",
                 languages=problem_info.get("languages", SysOptions.language_names),
                 created_by=request.user,
-                # Problems imported into a contest start hidden as drafts.
+                # Problems imported into a contest start hidden as drafts and
+                # share submissions, which open once the contest has ended.
                 visible=False if contest is not None else problem_info["visible"],
+                share_submission=contest is not None,
                 difficulty=problem_info["difficulty"],
                 total_score=sum(item["score"] for item in test_case_score)
                 if rule_type == ProblemRuleType.OI else 0,

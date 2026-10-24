@@ -184,3 +184,8 @@ class EditContestProblemFeedbackSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     id = serializers.IntegerField()
     resolved = serializers.BooleanField()
+
+
+class ContestPrepPublicProblemSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    problem_id = serializers.IntegerField()
