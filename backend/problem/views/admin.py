@@ -28,6 +28,9 @@ from ..models import (Problem, ProblemRuleType, ProblemTag, ProblemJudgeMode,
                       ProblemIOMode)
 from ..remote import RemoteProblemError, fetch_remote_problem
 from ..remote.common import markdown_to_html
+from ..contest_authoring import (alphabetic_display_id, create_contest_problem,
+                                 ensure_contest_problems_editable, next_contest_display_id,
+                                 order_contest_problems, update_contest_problem)
 from ..publication import publish_due_contest_problems
 from ..tasks import schedule_contest_problem_publication
 from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
@@ -39,24 +42,8 @@ from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
 from ..utils import TEMPLATE_BASE, build_problem_template
 
 
-def _alphabetic_display_id(index):
-    value = index + 1
-    label = ""
-    while value > 0:
-        value -= 1
-        label = chr(ord("A") + value % 26) + label
-        value //= 26
-    return label
-
-
-def _next_contest_display_id(contest):
-    used = set(Problem.objects.filter(contest=contest).values_list("_id", flat=True))
-    index = 0
-    while True:
-        candidate = _alphabetic_display_id(index)
-        if candidate not in used:
-            return candidate
-        index += 1
+_alphabetic_display_id = alphabetic_display_id
+_next_contest_display_id = next_contest_display_id
 
 
 def _next_public_display_id():
@@ -190,7 +177,9 @@ class TestCaseAPI(APIView, TestCaseZipProcessor):
             ensure_created_by(problem.contest, request.user)
         else:
             ensure_created_by(problem, request.user)
+        return self.test_case_response(problem)
 
+    def test_case_response(self, problem):
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         if not os.path.isdir(test_case_dir):
             return self.error("Test case does not exists")
@@ -386,7 +375,8 @@ class RemoteProblemImportAPI(APIView):
                 ensure_created_by(contest, request.user)
             except Contest.DoesNotExist:
                 return self.error("Contest does not exist")
-            if contest.status == ContestStatus.CONTEST_ENDED:
+            ensure_contest_problems_editable(contest)
+            if contest.status == ContestStatus.CONTEST_ENDED and not contest.is_preparation:
                 return self.error("Contest has ended")
             if contest.rule_type != ProblemRuleType.ACM:
                 return self.error("Remote problems only support ACM contests")
@@ -411,9 +401,12 @@ class RemoteProblemImportAPI(APIView):
 
         display_id = contest_display_id if contest is not None else remote["default_display_id"]
         future_public_id = remote["default_display_id"]
+        # A preparation contest is never published into the public library;
+        # only the contest copies created by its publish step may be.
+        publish_after_contest = contest is not None and not contest.is_preparation
         if contest is None and Problem.objects.filter(_id=display_id, contest_id__isnull=True).exists():
             return self.error("Display ID already exists")
-        if contest is not None and public_problem is None and Problem.objects.filter(
+        if publish_after_contest and public_problem is None and Problem.objects.filter(
             _id=future_public_id, contest_id__isnull=True
         ).exists():
             return self.error("Future public display ID already exists")
@@ -466,12 +459,12 @@ class RemoteProblemImportAPI(APIView):
                 remote_oj=data["provider"],
                 remote_problem_id=remote["remote_id"],
                 remote_problem_data=remote["metadata"],
-                publish_after_contest=contest is not None,
-                post_contest_display_id=future_public_id if contest is not None else None,
+                publish_after_contest=publish_after_contest,
+                post_contest_display_id=future_public_id if publish_after_contest else None,
             )
             tag, _ = ProblemTag.objects.get_or_create(name=remote["tag"])
             problem.tags.add(tag)
-            if contest is not None:
+            if publish_after_contest:
                 transaction.on_commit(lambda: schedule_contest_problem_publication(
                     contest.id, contest.end_time
                 ))
@@ -490,6 +483,7 @@ class ContestProblemAPI(ProblemBase):
 
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
+        ensure_contest_problems_editable(contest)
 
         _id = _next_contest_display_id(contest)
         data["_id"] = _id
@@ -502,17 +496,7 @@ class ContestProblemAPI(ProblemBase):
             return self.error(error_info)
 
         # todo check filename and score info
-        data["contest"] = contest
-        tags = data.pop("tags")
-        data["created_by"] = request.user
-        problem = Problem.objects.create(**data)
-
-        for item in tags:
-            try:
-                tag = ProblemTag.objects.get(name=item)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=item)
-            problem.tags.add(tag)
+        problem = create_contest_problem(contest, data, request.user)
         return self.success(ProblemAdminSerializer(problem).data)
 
     def get(self, request):
@@ -534,7 +518,7 @@ class ContestProblemAPI(ProblemBase):
             ensure_created_by(contest, user)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
-        problems = Problem.objects.filter(contest=contest).order_by("_id")
+        problems = order_contest_problems(Problem.objects.filter(contest=contest))
         if user.is_admin():
             problems = problems.filter(contest__created_by=user)
         keyword = request.GET.get("keyword")
@@ -555,6 +539,7 @@ class ContestProblemAPI(ProblemBase):
 
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
+        ensure_contest_problems_editable(contest)
 
         problem_id = data.pop("id")
 
@@ -569,20 +554,7 @@ class ContestProblemAPI(ProblemBase):
         if error_info:
             return self.error(error_info)
         # todo check filename and score info
-        tags = data.pop("tags")
-        data["languages"] = list(data["languages"])
-
-        for k, v in data.items():
-            setattr(problem, k, v)
-        problem.save()
-
-        problem.tags.remove(*problem.tags.all())
-        for tag in tags:
-            try:
-                tag = ProblemTag.objects.get(name=tag)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=tag)
-            problem.tags.add(tag)
+        update_contest_problem(problem, data)
         return self.success()
 
     def delete(self, request):
@@ -594,7 +566,10 @@ class ContestProblemAPI(ProblemBase):
         except Problem.DoesNotExist:
             return self.error("Problem does not exists")
         ensure_created_by(problem.contest, request.user)
-        if Submission.objects.filter(problem=problem).exists():
+        ensure_contest_problems_editable(problem.contest)
+        # Submissions to a preparation contest are verification runs that never
+        # reach any statistics; they are removed together with the problem.
+        if not problem.contest.is_preparation and Submission.objects.filter(problem=problem).exists():
             return self.error("Can't delete the problem as it has submissions")
         # d = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         # if os.path.isdir(d):
@@ -617,6 +592,8 @@ class MakeContestProblemPublicAPIView(APIView):
         if not problem.contest or problem.is_public:
             return self.error("Already be a public problem")
         ensure_created_by(problem.contest, request.user)
+        if problem.contest.is_preparation:
+            return self.error("Problems of a preparation contest can't be made public")
         display_id = (
             _remote_problem_display_id(problem)
             if problem.judge_mode == ProblemJudgeMode.REMOTE
@@ -657,7 +634,8 @@ class AddContestProblemAPI(APIView):
         if problem.contest_id is not None:
             return self.error("Only public library problems can be added")
 
-        if contest.status == ContestStatus.CONTEST_ENDED:
+        ensure_contest_problems_editable(contest)
+        if contest.status == ContestStatus.CONTEST_ENDED and not contest.is_preparation:
             return self.error("Contest has ended")
         display_id = _next_contest_display_id(contest)
         if Problem.objects.filter(contest=contest, _id=display_id).exists():
@@ -843,7 +821,11 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
             )
         return problem_info
 
-    def _create_problem(self, request, zip_file, prefix, problem_info):
+    def _create_problem(self, request, zip_file, prefix, problem_info, contest=None):
+        rule_type = problem_info["rule_type"]
+        if contest is not None and rule_type != contest.rule_type:
+            raise APIError(f"{prefix or 'The package'} is a {rule_type} problem, "
+                           f"but the contest uses {contest.rule_type}")
         spj = problem_info["spj"] is not None
         processed_cases, test_case_id = self.process_zip(
             zip_file, spj=spj, dir=f"{prefix}testcase/"
@@ -868,10 +850,10 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
             case["score"] = supplied_scores.get(key, 100)
             test_case_score.append(case)
 
-        rule_type = problem_info["rule_type"]
         try:
             problem_obj = Problem.objects.create(
                 _id=problem_info["display_id"],
+                contest=contest,
                 title=problem_info["title"],
                 description=problem_info["description"],
                 input_description=problem_info["input_description"],
@@ -890,7 +872,8 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                 spj_version=rand_str(8) if spj else "",
                 languages=problem_info.get("languages", SysOptions.language_names),
                 created_by=request.user,
-                visible=problem_info["visible"],
+                # Problems imported into a contest start hidden as drafts.
+                visible=False if contest is not None else problem_info["visible"],
                 difficulty=problem_info["difficulty"],
                 total_score=sum(item["score"] for item in test_case_score)
                 if rule_type == ProblemRuleType.OI else 0,
@@ -904,8 +887,16 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
             raise
         return problem_obj, test_case_id
 
+    @staticmethod
+    def _next_display_id(contest):
+        return _next_contest_display_id(contest) if contest is not None else _next_public_display_id()
+
     @problem_permission_required
     def post(self, request):
+        return self.import_upload(request)
+
+    def import_upload(self, request, contest=None):
+        """Import an uploaded package into the public library or, given a contest, into it."""
         form = UploadProblemForm(request.POST, request.FILES)
         if not form.is_valid():
             return self.error("Upload failed")
@@ -948,10 +939,11 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                                                 problem_zip, prefixes[0]
                                             )
                                             problem_info["display_id"] = (
-                                                _next_public_display_id()
+                                                self._next_display_id(contest)
                                             )
                                             problem, test_case_id = self._create_problem(
-                                                request, problem_zip, prefixes[0], problem_info
+                                                request, problem_zip, prefixes[0], problem_info,
+                                                contest=contest,
                                             )
                                     except zipfile.BadZipFile:
                                         raise APIError(f"Bad nested zip file: {entry}")
@@ -964,9 +956,9 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                             else:
                                 for prefix in entries:
                                     problem_info = self._load_problem_info(zip_file, prefix)
-                                    problem_info["display_id"] = _next_public_display_id()
+                                    problem_info["display_id"] = self._next_display_id(contest)
                                     problem, test_case_id = self._create_problem(
-                                        request, zip_file, prefix, problem_info
+                                        request, zip_file, prefix, problem_info, contest=contest
                                     )
                                     created_test_case_ids.append(test_case_id)
                                     imported.append({

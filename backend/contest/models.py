@@ -3,9 +3,15 @@ from django.db import models
 from django.utils.timezone import now
 from utils.models import JSONField
 
-from utils.constants import ContestStatus, ContestType
+from utils.constants import ContestPrepRole, ContestPrepState, ContestStatus, ContestType
 from account.models import User
 from utils.models import RichTextField
+
+
+class ContestQuerySet(models.QuerySet):
+    def public(self):
+        """Contests anyone may discover: not soft-deleted and not a private preparation workspace."""
+        return self.filter(visible=True, prep_state__isnull=True)
 
 
 class Contest(models.Model):
@@ -24,6 +30,13 @@ class Contest(models.Model):
     # 是否可见 false的话相当于删除
     visible = models.BooleanField(default=True)
     allowed_ip_ranges = JSONField(default=list)
+    # enum of ContestPrepState; null for a normal contest. A preparation
+    # contest is a private workspace that is only ever published as a copy.
+    prep_state = models.TextField(null=True)
+    published_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL,
+                                       related_name="published_contests")
+
+    objects = ContestQuerySet.as_manager()
 
     @property
     def status(self):
@@ -43,12 +56,40 @@ class Contest(models.Model):
             return ContestType.PASSWORD_PROTECTED_CONTEST
         return ContestType.PUBLIC_CONTEST
 
+    @property
+    def is_preparation(self):
+        return self.prep_state is not None
+
+    def prep_role(self, user):
+        """Return the user's ContestPrepRole in a preparation contest, or None.
+
+        Super admins act as the creator. Normal contests have no prep roles.
+        """
+        if not self.is_preparation or not user or not user.is_authenticated:
+            return None
+        cache = self.__dict__.setdefault("_prep_role_cache", {})
+        if user.id not in cache:
+            if self.created_by_id == user.id or user.is_super_admin():
+                cache[user.id] = ContestPrepRole.CREATOR
+            else:
+                member = ContestPrepMember.objects.filter(contest=self, user=user).first()
+                cache[user.id] = member.role if member else None
+        return cache[user.id]
+
+    def prep_can_edit(self, user):
+        return (self.prep_state == ContestPrepState.PREPARATION and
+                self.prep_role(user) in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER))
+
+    def prep_can_manage(self, user):
+        return self.prep_role(user) == ContestPrepRole.CREATOR
+
     # 是否有权查看problem 的一些统计信息 诸如submission_number, accepted_number 等
     def problem_details_permission(self, user):
         return self.rule_type == ContestRuleType.ACM or \
                self.status == ContestStatus.CONTEST_ENDED or \
                user.is_authenticated and user.is_contest_admin(self) or \
-               self.real_time_rank
+               self.real_time_rank or \
+               self.prep_role(user) is not None
 
     class Meta:
         db_table = "contest"
@@ -57,9 +98,25 @@ class Contest(models.Model):
     def is_registered(self, user):
         if not user or not user.is_authenticated:
             return False
+        if self.is_preparation:
+            return self.prep_role(user) is not None
         if user.is_contest_admin(self):
             return True
         return ContestParticipation.objects.filter(contest=self, user=user).exists()
+
+
+class ContestPrepMember(models.Model):
+    """A problem setter or verifier of a preparation contest; the creator is Contest.created_by."""
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="prep_members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # ContestPrepRole.SETTER or ContestPrepRole.VERIFIER
+    role = models.TextField()
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "contest_prep_member"
+        unique_together = (("contest", "user"),)
+        ordering = ("create_time", "id")
 
 
 class ContestParticipation(models.Model):

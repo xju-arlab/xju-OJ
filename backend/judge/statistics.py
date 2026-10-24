@@ -114,7 +114,9 @@ def refresh_submission_statistics(submission):
     if submission.contest_id:
         # Serialize contest projections and first-AC changes across workers.
         contest = Contest.objects.select_for_update().get(pk=submission.contest_id)
-        if submission.create_time < contest.start_time:
+        # Verification runs in a private preparation contest never touch ranks,
+        # personal marks or problem counters.
+        if contest.is_preparation or submission.create_time < contest.start_time:
             return
     problem = Problem.objects.select_for_update().get(pk=submission.problem_id)
     user = User.objects.select_for_update().get(pk=submission.user_id)

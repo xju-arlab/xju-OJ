@@ -124,3 +124,15 @@ class Problem(models.Model):
     def add_ac_number(self):
         self.accepted_number = models.F("accepted_number") + 1
         self.save(update_fields=["accepted_number"])
+
+
+class ProblemFavorite(models.Model):
+    """A user's bookmark on a public library problem."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "problem_favorite"
+        unique_together = (("user", "problem"),)
+        ordering = ("-create_time", "-id")

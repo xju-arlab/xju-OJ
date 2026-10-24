@@ -114,6 +114,15 @@ class EditContestProblemSerializer(CreateOrEditProblemSerializer):
     contest_id = serializers.IntegerField()
 
 
+class CreatePrepContestProblemSerializer(CreateContestProblemSerializer):
+    # Problems uploaded while preparing a contest start hidden as drafts.
+    visible = serializers.BooleanField(required=False, default=False)
+
+
+class EditPrepContestProblemSerializer(EditContestProblemSerializer):
+    pass
+
+
 class RemoteProblemImportSerializer(serializers.Serializer):
     provider = serializers.ChoiceField(choices=RemoteOJ.choices())
     remote_id = serializers.CharField(max_length=512)
@@ -317,3 +326,16 @@ class FPSProblemSerializer(serializers.Serializer):
     template = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
     append = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
     prepend = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
+
+
+class ProblemFavoriteSerializer(serializers.Serializer):
+    problem_id = serializers.IntegerField()
+
+
+class ProfileProblemSerializer(serializers.ModelSerializer):
+    tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+
+    class Meta:
+        model = Problem
+        fields = ("id", "_id", "title", "difficulty", "rule_type", "tags",
+                  "submission_number", "accepted_number", "create_time")

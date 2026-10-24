@@ -19,7 +19,7 @@ from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem
 
 def contest_access(request, contest_id, *, content=True, write=False):
     require(str(contest_id).isdigit(), "Invalid contest")
-    contest = Contest.objects.filter(pk=contest_id, rule_type=ContestRuleType.AI, visible=True).first()
+    contest = Contest.objects.public().filter(pk=contest_id, rule_type=ContestRuleType.AI).first()
     require(contest is not None, "AI contest does not exist")
     config = AIContestConfig.objects.filter(contest=contest).first()
     require(config is not None, "AI contest is not configured")

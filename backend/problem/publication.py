@@ -26,6 +26,8 @@ def publish_due_contest_problems(contest_ids=None):
         .filter(
             contest_id__isnull=False,
             contest__end_time__lt=timezone.now(),
+            # A private preparation contest never feeds the public library.
+            contest__prep_state__isnull=True,
             publish_after_contest=True,
         )
         .order_by("id")

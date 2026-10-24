@@ -109,6 +109,14 @@ def check_contest_permission(check_type="details"):
             except Contest.DoesNotExist:
                 return self.error("Contest %s doesn't exist" % contest_id)
 
+            # A preparation contest is private to its creator, setters and
+            # verifiers, who pass every window, registration and password gate.
+            # Everyone else, including anonymous users, cannot tell it exists.
+            if self.contest.is_preparation:
+                if self.contest.prep_role(user) is None:
+                    return self.error("Contest %s doesn't exist" % contest_id)
+                return func(*args, **kwargs)
+
             # Anonymous
             if not user.is_authenticated:
                 return self.error("Please login first.")

@@ -2,17 +2,19 @@ import io
 
 import xlsxwriter
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils.timezone import now
 from django.core.cache import cache
 
+from problem.contest_authoring import order_contest_problems
 from problem.models import Problem
 from utils.api import APIView, validate_serializer
 from utils.constants import CacheKey, CONTEST_PASSWORD_SESSION_KEY
 from utils.shortcuts import datetime2str, check_is_id
 from account.decorators import login_required, check_contest_permission, check_contest_password
 
-from utils.constants import ContestRuleType, ContestStatus
+from utils.constants import ContestPrepRole, ContestRuleType, ContestStatus
 from ..models import (ACMContestRank, Contest, ContestAnnouncement,
                       ContestParticipation, OIContestRank)
 from ..serializers import ContestAnnouncementSerializer
@@ -40,19 +42,42 @@ class ContestAPI(APIView):
         if not id or not check_is_id(id):
             return self.error("Invalid parameter, id is required")
         try:
-            contest = Contest.objects.get(id=id, visible=True)
+            contest = Contest.objects.select_related("created_by").get(id=id, visible=True)
         except Contest.DoesNotExist:
+            return self.error("Contest does not exist")
+        prep_role = contest.prep_role(request.user)
+        if contest.is_preparation and prep_role is None:
             return self.error("Contest does not exist")
         data = ContestSerializer(contest).data
         data["now"] = datetime2str(now())
         data["registered"] = contest.is_registered(request.user)
         data["participant_count"] = ContestParticipation.objects.filter(contest=contest).count()
+        if contest.is_preparation:
+            data["prep_role"] = prep_role
+            data["published_contests"] = [
+                {"id": item.id, "title": item.title, "create_time": datetime2str(item.create_time)}
+                for item in contest.published_contests.filter(visible=True).order_by("-create_time")
+            ]
+            if prep_role == ContestPrepRole.CREATOR:
+                # The creator prefills the publish form from these settings.
+                data["password"] = contest.password
         return self.success(data)
 
 
 class ContestListAPI(APIView):
     def get(self, request):
-        contests = Contest.objects.select_related("created_by").filter(visible=True)
+        if request.GET.get("prep") == "1":
+            # Preparation contests the caller belongs to; never public.
+            user = request.user
+            if not user.is_authenticated:
+                contests = Contest.objects.none()
+            else:
+                contests = Contest.objects.filter(visible=True, prep_state__isnull=False)
+                if not user.is_super_admin():
+                    contests = contests.filter(Q(created_by=user) | Q(prep_members__user=user)).distinct()
+        else:
+            contests = Contest.objects.public()
+        contests = contests.select_related("created_by")
         keyword = request.GET.get("keyword")
         rule_type = request.GET.get("rule_type")
         status = request.GET.get("status")
@@ -77,7 +102,7 @@ class ContestPasswordVerifyAPI(APIView):
     def post(self, request):
         data = request.data
         try:
-            contest = Contest.objects.get(id=data["contest_id"], visible=True, password__isnull=False)
+            contest = Contest.objects.public().get(id=data["contest_id"], password__isnull=False)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
         if not check_contest_password(data["password"], contest.password):
@@ -99,7 +124,7 @@ class ContestAccessAPI(APIView):
         if not contest_id:
             return self.error()
         try:
-            contest = Contest.objects.get(id=contest_id, visible=True, password__isnull=False)
+            contest = Contest.objects.public().get(id=contest_id, password__isnull=False)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
         session_pass = request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(contest.id)
@@ -112,7 +137,7 @@ class ContestRegistrationAPI(APIView):
     def post(self, request):
         data = request.data
         try:
-            contest = Contest.objects.get(id=data["contest_id"], visible=True)
+            contest = Contest.objects.public().get(id=data["contest_id"])
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
         if contest.status == ContestStatus.CONTEST_ENDED:
@@ -187,7 +212,7 @@ class ContestRankAPI(APIView):
 
         if download_csv:
             data = serializer(qs, many=True, is_contest_admin=is_contest_admin).data
-            contest_problems = Problem.objects.filter(contest=self.contest, visible=True).order_by("_id")
+            contest_problems = order_contest_problems(Problem.objects.filter(contest=self.contest, visible=True))
             problem_columns = {str(item.id): index for index, item in enumerate(contest_problems)}
 
             f = io.BytesIO()

@@ -3,6 +3,7 @@ import logging
 
 from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
+from utils.constants import ContestPrepRole
 from django.db import transaction
 from django.utils import timezone
 from judge.tasks import judge_task
@@ -50,7 +51,8 @@ class SubmissionAPI(APIView):
             # Ended password contests retain the existing public-practice
             # policy. Registration, password and venue IP restrictions end.
             return
-        if not request.user.is_contest_admin(contest):
+        # Venue IP ranges restrict contestants, not the people preparing it.
+        if not request.user.is_contest_admin(contest) and not contest.is_preparation:
             user_ip = ipaddress.ip_address(request.ip)
             if contest.allowed_ip_ranges:
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
@@ -61,6 +63,7 @@ class SubmissionAPI(APIView):
     def post(self, request):
         data = request.data
         hide_id = False
+        contest = None
         if data.get("contest_id"):
             error = self.check_contest_permission(request)
             if error:
@@ -76,8 +79,13 @@ class SubmissionAPI(APIView):
         if error:
             return self.error(error)
 
+        problems = Problem.objects.filter(contest_id=data.get("contest_id"))
+        # Setters may test their hidden drafts in a preparation contest.
+        authors = (ContestPrepRole.CREATOR, ContestPrepRole.SETTER)
+        if contest is None or contest.prep_role(request.user) not in authors:
+            problems = problems.filter(visible=True)
         try:
-            problem = Problem.objects.get(id=data["problem_id"], contest_id=data.get("contest_id"), visible=True)
+            problem = problems.get(id=data["problem_id"])
         except Problem.DoesNotExist:
             return self.error("Problem not exist")
         if data["language"] not in problem.languages:
@@ -133,6 +141,9 @@ class SubmissionAPI(APIView):
             submission_data = SubmissionModelSerializer(submission).data
         else:
             submission_data = SubmissionSafeModelSerializer(submission).data
+        # Ended contests open everyone's code; the submitter's IP stays private.
+        if submission.user_id != request.user.id and not request.user.is_admin_role():
+            submission_data.pop("ip", None)
         # 是否有权限取消共享
         submission_data["can_unshare"] = submission.check_user_permission(request.user, check_share=False)
         return self.success(submission_data)
@@ -198,8 +209,11 @@ class ContestSubmissionListAPI(APIView):
         result = request.GET.get("result")
         username = request.GET.get("username")
         if problem_id:
+            problems = Problem.objects.filter(contest_id=contest.id)
+            if contest.prep_role(request.user) not in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER):
+                problems = problems.filter(visible=True)
             try:
-                problem = Problem.objects.get(_id=problem_id, contest_id=contest.id, visible=True)
+                problem = problems.get(_id=problem_id)
             except Problem.DoesNotExist:
                 return self.error("Problem doesn't exist")
             submissions = submissions.filter(problem=problem)
@@ -211,12 +225,13 @@ class ContestSubmissionListAPI(APIView):
         if result:
             submissions = submissions.filter(result=result)
 
-        # filter the test submissions submitted before contest start
-        if contest.status != ContestStatus.CONTEST_NOT_START:
+        # filter the test submissions submitted before contest start; in a
+        # preparation contest every submission is a verification run.
+        if contest.status != ContestStatus.CONTEST_NOT_START and not contest.is_preparation:
             submissions = submissions.filter(create_time__gte=contest.start_time)
 
         # 封榜的时候只能看到自己的提交
-        if contest.rule_type == ContestRuleType.ACM:
+        if contest.rule_type == ContestRuleType.ACM and not contest.is_preparation:
             if not contest.real_time_rank and not request.user.is_contest_admin(contest):
                 submissions = submissions.filter(user_id=request.user.id)
 

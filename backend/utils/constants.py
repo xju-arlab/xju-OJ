@@ -22,6 +22,18 @@ class ContestRuleType(Choices):
     AI = "AI"
 
 
+class ContestPrepState(Choices):
+    """States of a private contest preparation workspace; null means a normal contest."""
+    PREPARATION = "Preparation"
+    PREVIEW = "Preview"
+
+
+class ContestPrepRole(Choices):
+    CREATOR = "Creator"
+    SETTER = "Setter"
+    VERIFIER = "Verifier"
+
+
 class CacheKey:
     waiting_queue = "waiting_queue"
     contest_rank_cache = "contest_rank_cache"

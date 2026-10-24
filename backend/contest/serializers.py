@@ -1,12 +1,13 @@
 from utils.api import UsernameSerializer, serializers
 
-from .models import Contest, ContestAnnouncement, ContestRuleType
+from utils.constants import ContestPrepRole, ContestPrepState
+from .models import Contest, ContestAnnouncement, ContestPrepMember, ContestRuleType
 from .models import ACMContestRank, OIContestRank
 
 
 class CreateConetestSeriaizer(serializers.Serializer):
     title = serializers.CharField(max_length=128)
-    description = serializers.CharField()
+    description = serializers.CharField(allow_blank=True)
     start_time = serializers.DateTimeField()
     end_time = serializers.DateTimeField()
     rule_type = serializers.ChoiceField(choices=[ContestRuleType.ACM, ContestRuleType.OI, ContestRuleType.AI])
@@ -14,12 +15,14 @@ class CreateConetestSeriaizer(serializers.Serializer):
     visible = serializers.BooleanField()
     real_time_rank = serializers.BooleanField()
     allowed_ip_ranges = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=True)
+    # Create a private preparation workspace instead of a normal contest.
+    preparation = serializers.BooleanField(required=False, default=False)
 
 
 class EditConetestSeriaizer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField(max_length=128)
-    description = serializers.CharField()
+    description = serializers.CharField(allow_blank=True)
     start_time = serializers.DateTimeField()
     end_time = serializers.DateTimeField()
     password = serializers.CharField(allow_blank=True, allow_null=True, max_length=32)
@@ -41,7 +44,7 @@ class ContestAdminSerializer(serializers.ModelSerializer):
 class ContestSerializer(ContestAdminSerializer):
     class Meta:
         model = Contest
-        exclude = ("password", "visible", "allowed_ip_ranges")
+        exclude = ("password", "visible", "allowed_ip_ranges", "published_from")
 
 
 class ContestAnnouncementSerializer(serializers.ModelSerializer):
@@ -111,3 +114,49 @@ class ACMContesHelperSerializer(serializers.Serializer):
     problem_id = serializers.CharField()
     rank_id = serializers.IntegerField()
     checked = serializers.BooleanField()
+
+
+class ContestPrepStateSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    state = serializers.ChoiceField(choices=ContestPrepState.choices())
+
+
+class ContestPrepMemberSerializer(serializers.ModelSerializer):
+    user = UsernameSerializer()
+
+    class Meta:
+        model = ContestPrepMember
+        fields = ("id", "user", "role", "create_time")
+
+
+class CreateContestPrepMemberSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    username = serializers.CharField(max_length=32)
+    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
+
+
+class EditContestPrepMemberSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
+
+
+class ContestPrepProblemOrderSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    problem_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False, max_length=500)
+
+
+class ContestPrepProblemVisibleSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    id = serializers.IntegerField()
+    visible = serializers.BooleanField()
+
+
+class ContestPrepPublishSerializer(serializers.Serializer):
+    """Optional overrides; omitted fields keep the preparation contest's values."""
+    contest_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=128, required=False)
+    start_time = serializers.DateTimeField(required=False)
+    end_time = serializers.DateTimeField(required=False)
+    password = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
+    real_time_rank = serializers.BooleanField(required=False)

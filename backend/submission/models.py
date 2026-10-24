@@ -1,6 +1,6 @@
 from django.db import models
 
-from utils.constants import ContestStatus
+from utils.constants import ContestPrepRole, ContestStatus
 from utils.models import JSONField
 from problem.models import Problem
 from contest.models import Contest
@@ -71,8 +71,12 @@ class Submission(models.Model):
             return True
 
         if check_share:
-            if self.contest and self.contest.status != ContestStatus.CONTEST_ENDED:
-                return False
+            if self.contest:
+                if self.contest.is_preparation:
+                    # Creator and setters review every verification run.
+                    return self.contest.prep_role(user) in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER)
+                # Once a contest has ended, all of its code is open to read.
+                return self.contest.status == ContestStatus.CONTEST_ENDED
             if self.problem.share_submission or self.shared:
                 return True
         return False

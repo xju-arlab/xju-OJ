@@ -243,7 +243,7 @@ class DashboardInfoAPI(APIView):
         today = datetime.today()
         today_submission_count = Submission.objects.filter(
             create_time__gte=datetime(today.year, today.month, today.day, 0, 0, tzinfo=pytz.UTC)).count()
-        recent_contest_count = Contest.objects.exclude(end_time__lt=timezone.now()).count()
+        recent_contest_count = Contest.objects.public().exclude(end_time__lt=timezone.now()).count()
         judge_server_count = len(list(filter(lambda x: x.status == "normal", JudgeServer.objects.all())))
         return self.success({
             "user_count": User.objects.count(),

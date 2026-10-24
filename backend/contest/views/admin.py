@@ -12,7 +12,7 @@ from account.models import User
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
-from utils.constants import CacheKey
+from utils.constants import CacheKey, ContestPrepState, ContestRuleType
 from utils.shortcuts import rand_str
 from utils.tasks import delete_files
 from ..models import Contest, ContestAnnouncement, ACMContestRank
@@ -34,6 +34,12 @@ class ContestAPI(APIView):
         data["created_by"] = request.user
         if data["end_time"] <= data["start_time"]:
             return self.error("Start time must occur earlier than end time")
+        if data.pop("preparation", False):
+            # AI contests keep their grading setup in tables a publish would not copy.
+            if data["rule_type"] not in (ContestRuleType.ACM, ContestRuleType.OI):
+                return self.error("Preparation contests support ACM and OI only")
+            data["prep_state"] = ContestPrepState.PREPARATION
+            data["visible"] = True
         if data.get("password") and data["password"] == "":
             data["password"] = None
         for ip_range in data["allowed_ip_ranges"]:
