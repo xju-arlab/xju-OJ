@@ -398,8 +398,7 @@ class RemoteProblemImportAPI(APIView):
                 public_problem.contest = contest
                 public_problem._id = display_id
                 public_problem.is_public = True
-                # A preparation contest picks its problems separately.
-                public_problem.visible = not contest.is_preparation
+                public_problem.visible = True
                 public_problem.publish_after_contest = False
                 public_problem.post_contest_display_id = None
                 public_problem.submission_number = 0
@@ -432,7 +431,7 @@ class RemoteProblemImportAPI(APIView):
                 spj_code=None,
                 spj_compile_ok=False,
                 rule_type=ProblemRuleType.ACM,
-                visible=contest is None or not contest.is_preparation,
+                visible=True,
                 difficulty=remote["difficulty"],
                 source=remote["source"],
                 share_submission=False,
@@ -465,8 +464,8 @@ class ContestProblemAPI(ProblemBase):
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
         if contest.is_preparation:
-            # New problems join the candidates; the contest picks them separately.
-            data["visible"] = False
+            # Every problem of a preparation contest belongs to it.
+            data["visible"] = True
 
         _id = _next_contest_display_id(contest)
         data["_id"] = _id
@@ -532,8 +531,8 @@ class ContestProblemAPI(ProblemBase):
 
         data["_id"] = problem._id
         if contest.is_preparation:
-            # Selection is kept by the preparation workspace, not this form.
-            data["visible"] = problem.visible
+            # Every problem of a preparation contest belongs to it.
+            data["visible"] = True
 
         error_info = self.common_checks(request)
         if error_info:
@@ -628,7 +627,7 @@ class AddContestProblemAPI(APIView):
         problem.pk = None
         problem.contest = contest
         problem.is_public = True
-        problem.visible = not contest.is_preparation
+        problem.visible = True
         problem._id = display_id
         problem.submission_number = problem.accepted_number = 0
         problem.statistic_info = {}
@@ -855,9 +854,9 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                 spj_version=rand_str(8) if spj else "",
                 languages=problem_info.get("languages", SysOptions.language_names),
                 created_by=request.user,
-                # Problems imported into a contest start hidden as drafts and
+                # Problems imported into a (preparation) contest belong to it and
                 # share submissions, which open once the contest has ended.
-                visible=False if contest is not None else problem_info["visible"],
+                visible=True if contest is not None else problem_info["visible"],
                 share_submission=contest is not None,
                 difficulty=problem_info["difficulty"],
                 total_score=sum(item["score"] for item in test_case_score)

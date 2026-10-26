@@ -7,8 +7,8 @@ from ..views.oj import ContestListAPI, ContestAPI
 from ..views.oj import ContestRankAPI
 from ..views.prep import (ContestPrepCompileSPJAPI, ContestPrepFeedbackAPI, ContestPrepImportProblemAPI,
                           ContestPrepInviteAcceptAPI, ContestPrepInviteAPI, ContestPrepMemberAPI,
-                          ContestPrepProblemAPI, ContestPrepProblemCountAPI, ContestPrepProblemMetaAPI,
-                          ContestPrepProblemOrderAPI, ContestPrepProblemSelectAPI, ContestPrepPublicProblemAPI,
+                          ContestPrepPlanAPI, ContestPrepProblemAPI, ContestPrepProblemCountAPI,
+                          ContestPrepProblemOrderAPI, ContestPrepPublicProblemAPI,
                           ContestPrepPublishAPI, ContestPrepRankAPI, ContestPrepReviewAPI,
                           ContestPrepTestCaseAPI, ContestPrepUserSearchAPI)
 
@@ -26,10 +26,7 @@ urlpatterns = [
     re_path(r"^contest/prep/members/search/?$", ContestPrepUserSearchAPI.as_view(),
             name="contest_prep_user_search_api"),
     re_path(r"^contest/prep/problem/?$", ContestPrepProblemAPI.as_view(), name="contest_prep_problem_api"),
-    re_path(r"^contest/prep/problem/select/?$", ContestPrepProblemSelectAPI.as_view(),
-            name="contest_prep_problem_select_api"),
-    re_path(r"^contest/prep/problem/meta/?$", ContestPrepProblemMetaAPI.as_view(),
-            name="contest_prep_problem_meta_api"),
+    re_path(r"^contest/prep/plan/?$", ContestPrepPlanAPI.as_view(), name="contest_prep_plan_api"),
     re_path(r"^contest/prep/problem_count/?$", ContestPrepProblemCountAPI.as_view(),
             name="contest_prep_problem_count_api"),
     re_path(r"^contest/prep/problem/order/?$", ContestPrepProblemOrderAPI.as_view(),

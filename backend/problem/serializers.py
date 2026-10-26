@@ -115,9 +115,8 @@ class EditContestProblemSerializer(CreateOrEditProblemSerializer):
 
 
 class CreatePrepContestProblemSerializer(CreateContestProblemSerializer):
-    # In a preparation contest visible means selected for the contest; the
-    # workspace sets it, so new problems always start as candidates.
-    visible = serializers.BooleanField(required=False, default=False)
+    # Every problem of a preparation contest belongs to it; the view sets visible.
+    visible = serializers.BooleanField(required=False, default=True)
 
 
 class EditPrepContestProblemSerializer(EditContestProblemSerializer):

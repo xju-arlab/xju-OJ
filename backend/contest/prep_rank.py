@@ -2,9 +2,8 @@
 
 Judge statistics skip preparation contests, so the board is derived from the
 verification runs made since the current review round started, using the
-normal ACM (solved, then penalty) or OI (latest score per problem) rules. Only
-the selected problems count. Every member appears, and authors carry the
-labels of the problems they wrote.
+normal ACM (solved, then penalty) or OI (latest score per problem) rules.
+Every member appears, and authors carry the labels of the problems they wrote.
 """
 from account.models import User
 from problem.contest_authoring import order_contest_problems
@@ -20,9 +19,11 @@ UNFINISHED = (JudgeStatus.PENDING, JudgeStatus.JUDGING)
 
 
 def review_runs(contest):
+    """Finished runs of the latest review round, which ends early when the creator stops it."""
     runs = Submission.objects.filter(contest=contest).exclude(result__in=UNFINISHED)
-    if contest.review_started_at:
-        runs = runs.filter(create_time__gte=contest.review_started_at)
+    window = contest.review_window()
+    if window:
+        runs = runs.filter(create_time__gte=window[0], create_time__lt=window[1])
     return runs
 
 

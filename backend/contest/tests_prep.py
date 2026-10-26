@@ -19,7 +19,8 @@ from problem.tests import DEFAULT_PROBLEM_DATA
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 from utils.constants import CacheKey, ContestPrepRole, ContestPrepState
-from .models import ACMContestRank, Contest, ContestAnnouncement, ContestPrepInvite, ContestPrepMember
+from .models import (ACMContestRank, Contest, ContestAnnouncement, ContestPrepInvite, ContestPrepMember,
+                     ContestPrepPlanItem)
 
 PREP_CONTEST_DATA = {"title": "Regional prep", "description": "<p>prep</p>", "rule_type": "ACM",
                      "password": "secret", "real_time_rank": True, "allowed_ip_ranges": ["10.0.0.0/8"]}
@@ -48,7 +49,7 @@ class ContestPrepTestBase(APITestCase):
         tags = data.pop("tags") if tagged else []
         data.pop("tags", None)
         data.update(_id=extra.pop("_id", None) or self.next_label(contest), contest=contest,
-                    created_by=self.organizer, visible=visible, **extra)
+                    created_by=extra.pop("created_by", self.organizer), visible=visible, **extra)
         problem = Problem.objects.create(**data)
         for name in tags:
             problem.tags.add(ProblemTag.objects.get_or_create(name=name)[0])
@@ -167,9 +168,14 @@ class ContestPrepVisibilityTest(ContestPrepTestBase):
             self.assertEqual((detail["prep_role"], detail["prep_problem_count"]), (role, 13))
             self.assertTrue(detail["registered"])
             self.assertEqual("password" in detail, role == "Creator")
-            # The contest has a password; members are never asked for it.
-            access = self.client.get(self.reverse("contest_access_api") + f"?contest_id={self.contest.id}")
-            self.assertEqual(access.data["data"], {"access": True})
+            # The review view asks the whole team for the contest password, like the real contest.
+            access_url = self.reverse("contest_access_api") + f"?contest_id={self.contest.id}"
+            self.assertEqual(self.client.get(access_url).data["data"], {"access": False})
+            self.assertFailed(self.client.post(self.reverse("contest_password_api"),
+                                               data={"contest_id": self.contest.id, "password": "wrong"}))
+            self.assertSuccess(self.client.post(self.reverse("contest_password_api"),
+                                                data={"contest_id": self.contest.id, "password": "secret"}))
+            self.assertEqual(self.client.get(access_url).data["data"], {"access": True})
 
     def test_tags_of_preparation_problems_stay_private(self):
         problem = self.add_problem(self.contest)
@@ -183,32 +189,31 @@ class ContestPrepVerificationTest(ContestPrepTestBase):
     def setUp(self):
         super().setUp()
         self.contest = self.make_prep_contest(start_offset=timedelta(days=3))
-        self.selected = self.add_problem(self.contest, visible=True)
-        self.candidate = self.add_problem(self.contest, visible=False)
+        self.first = self.add_problem(self.contest)
+        self.second = self.add_problem(self.contest, created_by=self.teammate)
 
     def submit(self, problem):
         return self.client.post(self.reverse("submission_api"), data={
             "problem_id": problem.id, "language": "C", "code": "int main(){}", "contest_id": self.contest.id})
 
-    def test_the_team_tests_every_candidate_without_registration(self, judge_send):
+    def test_the_team_tests_every_problem_without_registration(self, judge_send):
         self.login(self.teammate)
-        # The contest view lists the selected problems only, like the published contest will.
         listing = self.client.get(self.reverse("contest_problem_api") + f"?contest_id={self.contest.id}")
-        self.assertEqual([item["id"] for item in listing.data["data"]], [self.selected.id])
+        self.assertEqual([item["id"] for item in listing.data["data"]], [self.first.id, self.second.id])
         self.assertSuccess(self.client.get(self.reverse("contest_problem_api") +
-                                           f"?contest_id={self.contest.id}&problem_id={self.candidate._id}"))
+                                           f"?contest_id={self.contest.id}&problem_id={self.second._id}"))
         # Outside the window, without password and outside the venue IP ranges.
-        response = self.submit(self.selected)
+        response = self.submit(self.first)
         self.assertSuccess(response)
         self.assertIn("submission_id", response.data["data"])
-        self.assertSuccess(self.submit(self.candidate))
+        self.assertSuccess(self.submit(self.second))
         submissions = self.client.get(self.reverse("contest_submission_list_api") +
                                       f"?contest_id={self.contest.id}&limit=10").data["data"]
         self.assertEqual(submissions["total"], 2)
         workspace = self.client.get(self.reverse("contest_prep_problem_api") + f"?contest_id={self.contest.id}")
         self.assertEqual(len(workspace.data["data"]), 2)
         self.login(self.stranger)
-        self.assertFailed(self.submit(self.selected))
+        self.assertFailed(self.submit(self.first))
 
     def test_statistics_ignore_verification_runs(self, judge_send):
         contest = self.make_prep_contest()
@@ -255,25 +260,23 @@ class ContestPrepManagementTest(ContestPrepTestBase):
                                      f"?contest_id={self.contest.id}&keyword={keyword}").data["data"]
             self.assertEqual(search, [{"id": newcomer.id, "username": "newcomer", "real_name": "张三"}])
 
-    def test_organizers_add_candidates_and_keep_editing_during_review(self):
+    def test_organizers_add_problems_and_keep_editing_during_review(self):
         url = self.reverse("contest_prep_problem_api")
         self.login(self.stranger)
         self.assertFailed(self.client.post(url, data=self.problem_payload()), "Contest does not exist")
 
         self.login(self.organizer)
-        # Asking for a selected problem still yields a candidate: picking is a separate step.
-        response = self.client.post(url, data=self.problem_payload(visible=True))
+        # Every problem belongs to the contest, whatever the form sends.
+        response = self.client.post(url, data=self.problem_payload(visible=False))
         self.assertSuccess(response)
         problem = Problem.objects.get(id=response.data["data"]["id"])
-        self.assertEqual((problem._id, problem.visible, problem.contest_id), ("A", False, self.contest.id))
+        self.assertEqual((problem._id, problem.visible, problem.contest_id), ("A", True, self.contest.id))
 
-        problem.visible = True
-        problem.save()
         self.login(self.creator)
         self.assertSuccess(self.client.post(self.reverse("contest_prep_review_api"),
                                             data={"contest_id": self.contest.id}))
         self.login(self.teammate)
-        # The workspace stays open while a review round runs; the form never changes the selection.
+        # The workspace stays open while a review round runs.
         edit = self.problem_payload(id=problem.id, visible=False, title="renamed")
         self.assertSuccess(self.client.put(url, data=edit))
         problem.refresh_from_db()
@@ -292,8 +295,8 @@ class ContestPrepManagementTest(ContestPrepTestBase):
         second.refresh_from_db()
         self.assertEqual(second._id, "A")
 
-    def test_reorder_relabels_problems_and_keeps_selected_ones_first(self):
-        first, second, third = (self.add_problem(self.contest, visible=False) for _ in range(3))
+    def test_reorder_relabels_problems(self):
+        first, second, third = (self.add_problem(self.contest) for _ in range(3))
         url = self.reverse("contest_prep_problem_order_api")
         self.login(self.organizer)
         response = self.client.put(url, data={"contest_id": self.contest.id,
@@ -301,10 +304,6 @@ class ContestPrepManagementTest(ContestPrepTestBase):
         self.assertSuccess(response)
         self.assertEqual([(item["id"], item["_id"]) for item in response.data["data"]],
                          [(third.id, "A"), (first.id, "B"), (second.id, "C")])
-        Problem.objects.filter(id=second.id).update(visible=True)
-        response = self.client.put(url, data={"contest_id": self.contest.id,
-                                              "problem_ids": [third.id, first.id, second.id]})
-        self.assertEqual([item["id"] for item in response.data["data"]], [second.id, third.id, first.id])
         self.assertFailed(self.client.put(url, data={"contest_id": self.contest.id,
                                                      "problem_ids": [third.id, first.id]}))
         self.assertFailed(self.client.put(url, data={"contest_id": self.contest.id,
@@ -330,18 +329,14 @@ class ContestPrepManagementTest(ContestPrepTestBase):
         self.assertFalse(Problem.objects.filter(contest__isnull=True, title=problem.title).exists())
 
 
-class ContestPrepSelectionTest(ContestPrepTestBase):
+class ContestPrepPlanTest(ContestPrepTestBase):
     def setUp(self):
         super().setUp()
-        self.first = self.add_problem(self.contest, visible=False, title="first")
-        self.untagged = self.add_problem(self.contest, visible=False, tagged=False, title="untagged")
-        self.third = self.add_problem(self.contest, visible=False, title="third")
-        self.select_url = self.reverse("contest_prep_problem_select_api")
+        self.url = self.reverse("contest_prep_plan_api")
         self.count_url = self.reverse("contest_prep_problem_count_api")
 
-    def select(self, problem, selected=True):
-        return self.client.put(self.select_url, data={"contest_id": self.contest.id, "id": problem.id,
-                                                      "selected": selected})
+    def add(self, difficulty="Low", **extra):
+        return self.client.post(self.url, data={"contest_id": self.contest.id, "difficulty": difficulty, **extra})
 
     def test_only_the_creator_sets_the_problem_count(self):
         self.login(self.organizer)
@@ -355,40 +350,52 @@ class ContestPrepSelectionTest(ContestPrepTestBase):
         self.assertSuccess(self.client.put(self.count_url, data={"contest_id": self.contest.id,
                                                                  "problem_count": None}))
 
-    def test_organizers_pick_up_to_the_count_and_selected_problems_lead(self):
+    def test_organizers_plan_problems_up_to_the_count(self):
         self.contest.prep_problem_count = 2
         self.contest.save()
         self.login(self.teammate)
-        response = self.select(self.third)
-        self.assertSuccess(response)
-        # The selected problem becomes A: review and publish show the contest as A, B, C...
-        self.assertEqual([(item["title"], item["_id"], item["visible"]) for item in response.data["data"]],
-                         [("third", "A", True), ("first", "B", False), ("untagged", "C", False)])
-        self.assertFailed(self.select(self.untagged),
-                          "Fill in the difficulty and knowledge points before selecting this problem")
+        self.assertFailed(self.add("Mid", assignee_id=self.stranger.id),
+                          "Only the creator or an organizer can take this problem")
+        first = self.add("Low", assignee_id=self.organizer.id, tags=["图论", "图论", " 最短路 "])
+        self.assertSuccess(first)
+        item = first.data["data"]
+        self.assertEqual((item["difficulty"], item["assignee"]["username"], item["tags"]),
+                         ("Low", "organizer", ["图论", "最短路"]))
+        second = self.add("High")
+        self.assertSuccess(second)
+        self.assertIsNone(second.data["data"]["assignee"])
+        self.assertFailed(self.add("Mid"), "This contest takes 2 problems and the plan is full")
 
-        meta_url = self.reverse("contest_prep_problem_meta_api")
-        self.assertFailed(self.client.put(meta_url, data={"contest_id": self.contest.id, "id": self.untagged.id,
-                                                          "difficulty": "High", "tags": []}))
-        response = self.client.put(meta_url, data={"contest_id": self.contest.id, "id": self.untagged.id,
-                                                   "difficulty": "High", "tags": ["图论", "图论", "最短路"]})
-        self.assertSuccess(response)
-        self.assertEqual((response.data["data"]["difficulty"], sorted(response.data["data"]["tags"])),
-                         ("High", ["图论", "最短路"]))
-        self.assertSuccess(self.select(self.untagged))
-        self.assertFailed(self.select(self.first), "This contest takes 2 problems; unselect one first")
+        # Anyone on the team edits any item: claim it, move it, retag it.
+        edit = self.client.put(self.url, data={"contest_id": self.contest.id, "id": second.data["data"]["id"],
+                                               "assignee_id": self.teammate.id, "difficulty": "Mid", "tags": ["DP"]})
+        self.assertSuccess(edit)
+        self.assertEqual((edit.data["data"]["assignee"]["username"], edit.data["data"]["difficulty"]),
+                         ("teammate", "Mid"))
+        self.assertFailed(self.client.put(self.url, data={"contest_id": self.contest.id, "id": item["id"],
+                                                          "assignee_id": self.stranger.id}))
 
         self.login(self.creator)
         self.assertFailed(self.client.put(self.count_url, data={"contest_id": self.contest.id, "problem_count": 1}),
-                          "2 problems are selected; unselect some before lowering the count")
+                          "2 problems are planned; remove some before lowering the count")
         self.login(self.organizer)
-        response = self.select(self.third, selected=False)
-        self.assertSuccess(response)
-        self.assertEqual([(item["title"], item["_id"]) for item in response.data["data"]],
-                         [("untagged", "A"), ("third", "B"), ("first", "C")])
+        self.assertSuccess(self.client.delete(self.url + f"?contest_id={self.contest.id}&id={item['id']}"))
+        listing = self.client.get(self.url + f"?contest_id={self.contest.id}").data["data"]
+        self.assertEqual([entry["difficulty"] for entry in listing["items"]], ["Mid"])
 
         self.login(self.stranger)
-        self.assertFailed(self.select(self.first), "Contest does not exist")
+        self.assertFailed(self.client.get(self.url + f"?contest_id={self.contest.id}"), "Contest does not exist")
+
+    def test_progress_counts_uploads_against_assignments(self):
+        for user in (self.organizer, self.organizer, self.teammate):
+            ContestPrepPlanItem.objects.create(contest=self.contest, difficulty="Low", assignee=user)
+        ContestPrepPlanItem.objects.create(contest=self.contest, difficulty="High")
+        self.add_problem(self.contest)
+        self.add_problem(self.contest, created_by=self.creator)
+        self.login(self.teammate)
+        progress = self.client.get(self.url + f"?contest_id={self.contest.id}").data["data"]["progress"]
+        self.assertEqual([(row["username"], row["assigned"], row["uploaded"]) for row in progress],
+                         [("creator", 0, 1), ("organizer", 2, 1), ("teammate", 1, 0)])
 
 
 class ContestPrepPackageTest(ContestPrepTestBase):
@@ -418,7 +425,7 @@ class ContestPrepPackageTest(ContestPrepTestBase):
             archive.writestr("testcase/1.out", "2\n")
         return SimpleUploadedFile("problem.zip", buffer.getvalue(), content_type="application/zip")
 
-    def test_organizers_import_packages_as_candidates(self):
+    def test_organizers_import_packages_into_the_contest(self):
         self.add_problem(self.contest)
         url = self.reverse("contest_prep_import_problem_api")
         self.login(self.stranger)
@@ -430,7 +437,7 @@ class ContestPrepPackageTest(ContestPrepTestBase):
         self.assertSuccess(response)
         problem = Problem.objects.get(id=response.data["data"]["imported"][0]["id"])
         self.assertEqual((problem.contest_id, problem._id, problem.visible, problem.share_submission),
-                         (self.contest.id, "B", False, True))
+                         (self.contest.id, "B", True, True))
 
         response = self.client.post(url, data={"contest_id": self.contest.id, "file": self.package("OI")},
                                     format="multipart")
@@ -459,7 +466,6 @@ class ContestPrepPackageTest(ContestPrepTestBase):
 class ContestPrepPublishTest(ContestPrepTestBase):
     def setUp(self):
         super().setUp()
-        self.draft = self.add_problem(self.contest, visible=False, title="draft")
         self.second = self.add_problem(self.contest, title="second")
         self.first = self.add_problem(self.contest, title="first", accepted_number=3, submission_number=5)
         ContestAnnouncement.objects.create(contest=self.contest, title="Welcome", content="<p>hi</p>",
@@ -478,19 +484,19 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.contest.save()
         self.login(self.creator)
         self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
-                          "This contest takes 3 problems, but 2 are selected")
-        Problem.objects.filter(contest=self.contest).update(visible=False)
+                          "This contest takes 3 problems, but 2 are uploaded")
+        Problem.objects.filter(contest=self.contest).delete()
         self.contest.prep_problem_count = None
         self.contest.save()
         self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
-                          "Select the contest problems before publishing")
+                          "Upload the contest problems before publishing")
 
     @mock.patch("contest.prep_publish.schedule_contest_problem_publication")
-    def test_publish_copies_selected_problems_into_a_new_public_contest(self, schedule):
+    def test_publish_copies_the_problems_into_a_new_public_contest(self, schedule):
         self.login(self.creator)
         self.assertSuccess(self.client.put(self.reverse("contest_prep_problem_order_api"),
                                            data={"contest_id": self.contest.id,
-                                                 "problem_ids": [self.first.id, self.draft.id, self.second.id]}))
+                                                 "problem_ids": [self.first.id, self.second.id]}))
 
         start = timezone.now() + timedelta(days=7)
         with self.captureOnCommitCallbacks(execute=True):
@@ -551,8 +557,8 @@ class ContestPrepPublishTest(ContestPrepTestBase):
 class ContestPrepReviewTest(ContestPrepTestBase):
     def setUp(self):
         super().setUp()
-        self.released = self.add_problem(self.contest, visible=True, title="released")
-        self.draft = self.add_problem(self.contest, visible=False, title="draft")
+        self.released = self.add_problem(self.contest, title="released")
+        self.draft = self.add_problem(self.contest, title="draft")
         self.feedback_url = self.reverse("contest_prep_feedback_api")
         self.review_url = self.reverse("contest_prep_review_api")
 
@@ -609,14 +615,14 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.start_review(password="")
         self.assertIsNone(self.contest.password)
 
-        Problem.objects.filter(contest=self.contest).update(visible=False)
+        Problem.objects.filter(contest=self.contest).delete()
         self.login(self.creator)
         self.assertFailed(self.client.post(self.review_url, data={"contest_id": self.contest.id}),
-                          "Select the contest problems before starting a review")
+                          "Upload the contest problems before starting a review")
 
     def test_review_leaderboard_ranks_members_and_tags_authors(self):
         self.start_review()
-        second = self.add_problem(self.contest, visible=True, title="second")
+        second = self.add_problem(self.contest, title="second")
         before = Submission.objects.create(user_id=self.teammate.id, username="teammate", code="x", language="C",
                                            problem=self.released, contest=self.contest,
                                            result=JudgeStatus.ACCEPTED, statistic_info={})
@@ -630,11 +636,10 @@ class ContestPrepReviewTest(ContestPrepTestBase):
 
         self.login(self.teammate)
         data = self.client.get(self.reverse("contest_prep_rank_api") + f"?contest_id={self.contest.id}").data["data"]
-        # Only the selected problems make up the review contest.
-        self.assertEqual([item["_id"] for item in data["problems"]], ["A", "C"])
+        self.assertEqual([item["_id"] for item in data["problems"]], ["A", "B", "C"])
         rows = {row["user"]["username"]: row for row in data["results"]}
         self.assertEqual([row["user"]["username"] for row in data["results"]], ["organizer", "teammate", "creator"])
-        self.assertEqual((rows["organizer"]["accepted_number"], rows["organizer"]["authored"]), (2, ["A", "C"]))
+        self.assertEqual((rows["organizer"]["accepted_number"], rows["organizer"]["authored"]), (3, ["A", "B", "C"]))
         self.assertEqual((rows["teammate"]["role"], rows["teammate"]["authored"]), ("Organizer", []))
         cell = rows["teammate"]["submission_info"][str(self.released.id)]
         self.assertEqual((cell["is_ac"], cell["error_number"], cell["is_first_ac"]), (True, 1, True))
@@ -649,7 +654,7 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.login(self.teammate)
         problems = self.client.get(self.reverse("contest_problem_api") + f"?contest_id={self.contest.id}").data["data"]
         self.assertEqual([(item["_id"], item["my_status"], item["submission_number"], item["accepted_number"])
-                          for item in problems], [("A", 0, 3, 1)])
+                          for item in problems], [("A", 0, 3, 1), ("B", None, 0, 0)])
 
     def test_each_review_round_restarts_the_clock(self):
         self.start_review()
@@ -657,9 +662,33 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.start_review()
         self.assertGreater(self.contest.review_started_at, started)
 
+    def test_the_creator_ends_a_round_early(self):
+        url = self.review_url + f"?contest_id={self.contest.id}"
+        self.login(self.creator)
+        self.assertFailed(self.client.delete(url), "No review round is running")
+        self.start_review()
+        self.run_as(self.teammate, self.released, JudgeStatus.ACCEPTED, 0)
+        self.login(self.organizer)
+        self.assertFailed(self.client.delete(url), "Only the contest creator can do this")
+        self.login(self.creator)
+        self.assertSuccess(self.client.delete(url))
+        self.contest.refresh_from_db()
+        self.assertFalse(self.contest.review_running())
+        # Runs after the end no longer reach the board; the next round starts afresh.
+        late = Submission.objects.create(user_id=self.organizer.id, username="organizer", code="x", language="C",
+                                         problem=self.released, contest=self.contest,
+                                         result=JudgeStatus.ACCEPTED, statistic_info={})
+        Submission.objects.filter(id=late.id).update(create_time=self.contest.review_ended_at + timedelta(seconds=1))
+        board = self.client.get(self.reverse("contest_prep_rank_api") + f"?contest_id={self.contest.id}").data["data"]
+        self.assertEqual({row["user"]["username"]: row["accepted_number"] for row in board["results"]},
+                         {"teammate": 1, "organizer": 0, "creator": 0})
+        self.start_review()
+        self.assertIsNone(self.contest.review_ended_at)
+        self.assertTrue(self.contest.review_running())
+
 
 class ContestPrepPublicProblemTest(ContestPrepTestBase):
-    def test_organizers_copy_a_library_problem_as_a_candidate(self):
+    def test_organizers_copy_a_library_problem_into_the_contest(self):
         url = self.reverse("contest_prep_public_problem_api")
         library = self.add_problem(None, _id="1001", title="library")
         hidden = self.add_problem(None, _id="1002", visible=False)
@@ -671,7 +700,7 @@ class ContestPrepPublicProblemTest(ContestPrepTestBase):
         self.assertSuccess(response)
         copy = Problem.objects.get(id=response.data["data"]["id"])
         self.assertEqual((copy.contest_id, copy._id, copy.visible, copy.title, copy.created_by_id),
-                         (self.contest.id, "A", False, "library", self.teammate.id))
+                         (self.contest.id, "A", True, "library", self.teammate.id))
         self.assertEqual(list(copy.tags.values_list("name", flat=True)), ["test"])
         library.refresh_from_db()
         self.assertIsNone(library.contest_id)

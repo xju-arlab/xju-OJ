@@ -1,7 +1,8 @@
 from utils.api import UsernameSerializer, serializers
 
 from utils.constants import Difficulty
-from .models import Contest, ContestAnnouncement, ContestPrepMember, ContestProblemFeedback, ContestRuleType
+from .models import (Contest, ContestAnnouncement, ContestPrepMember, ContestPrepPlanItem, ContestProblemFeedback,
+                     ContestRuleType)
 from .models import ACMContestRank, OIContestRank
 
 
@@ -142,18 +143,29 @@ class ContestPrepProblemOrderSerializer(serializers.Serializer):
     problem_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False, max_length=500)
 
 
-class ContestPrepProblemSelectSerializer(serializers.Serializer):
-    contest_id = serializers.IntegerField()
-    id = serializers.IntegerField()
-    selected = serializers.BooleanField()
+class ContestPrepPlanItemSerializer(serializers.ModelSerializer):
+    assignee = UsernameSerializer(need_real_name=True, allow_null=True)
+
+    class Meta:
+        model = ContestPrepPlanItem
+        fields = ("id", "difficulty", "assignee", "tags")
 
 
-class ContestPrepProblemMetaSerializer(serializers.Serializer):
+class CreateContestPrepPlanItemSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
-    id = serializers.IntegerField()
     difficulty = serializers.ChoiceField(choices=Difficulty.choices())
-    # Knowledge points: at least one, so the problem set can be balanced.
-    tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False, max_length=12)
+    assignee_id = serializers.IntegerField(required=False, allow_null=True)
+    # Knowledge points of the planned problem.
+    tags = serializers.ListField(child=serializers.CharField(max_length=32), required=False, max_length=12)
+
+
+class EditContestPrepPlanItemSerializer(serializers.Serializer):
+    """Only the fields sent change; assignee_id null leaves the problem unclaimed."""
+    contest_id = serializers.IntegerField()
+    id = serializers.IntegerField()
+    difficulty = serializers.ChoiceField(choices=Difficulty.choices(), required=False)
+    assignee_id = serializers.IntegerField(required=False, allow_null=True)
+    tags = serializers.ListField(child=serializers.CharField(max_length=32), required=False, max_length=12)
 
 
 class ContestPrepProblemCountSerializer(serializers.Serializer):

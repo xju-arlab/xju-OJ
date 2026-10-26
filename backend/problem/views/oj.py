@@ -108,9 +108,10 @@ class ContestProblemAPI(APIView):
         """Preparation contests keep no statistics; derive them from verification runs."""
         runs = Submission.objects.filter(contest=self.contest).exclude(
             result__in=(JudgeStatus.PENDING, JudgeStatus.JUDGING))
-        # Count the current review round, like a contest counts from its start.
-        if self.contest.review_started_at:
-            runs = runs.filter(create_time__gte=self.contest.review_started_at)
+        # While a review round runs, count it like a contest; otherwise every run counts.
+        if self.contest.review_running():
+            start, end = self.contest.review_window()
+            runs = runs.filter(create_time__gte=start, create_time__lt=end)
         counts = {item["problem_id"]: item for item in runs.values("problem_id").annotate(
             total=Count("id"), accepted=Count("id", filter=Q(result=JudgeStatus.ACCEPTED)))}
         my_status = {}

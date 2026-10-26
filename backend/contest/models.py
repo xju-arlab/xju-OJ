@@ -1,9 +1,11 @@
+from datetime import timedelta
+
 from utils.constants import ContestRuleType  # noqa
 from django.db import models
 from django.utils.timezone import now
 from utils.models import JSONField
 
-from utils.constants import ContestPrepRole, ContestStatus, ContestType
+from utils.constants import PREP_REVIEW_HOURS, ContestPrepRole, ContestStatus, ContestType
 from account.models import User
 from utils.models import RichTextField
 
@@ -38,9 +40,11 @@ class Contest(models.Model):
     # When the latest review round started; the review leaderboard counts
     # submissions from this moment, like a contest start time.
     review_started_at = models.DateTimeField(null=True, blank=True)
-    # How many problems the creator plans for the contest. Review and publish
-    # use the selected problems (Problem.visible), and at most this many may be
-    # selected; publishing needs exactly this many. Null means not decided yet.
+    # Set when the creator ends that round before its PREP_REVIEW_HOURS run out.
+    review_ended_at = models.DateTimeField(null=True, blank=True)
+    # How many problems the creator plans for the contest. The plan holds at
+    # most this many items and publishing needs exactly this many problems.
+    # Null means not decided yet.
     prep_problem_count = models.PositiveIntegerField(null=True, blank=True)
 
     objects = ContestQuerySet.as_manager()
@@ -83,6 +87,19 @@ class Contest(models.Model):
                 cache[user.id] = member.role if member else None
         return cache[user.id]
 
+    def review_window(self):
+        """(start, end) of the latest review round, or None if there never was one."""
+        if not self.review_started_at:
+            return None
+        end = self.review_started_at + timedelta(hours=PREP_REVIEW_HOURS)
+        if self.review_ended_at and self.review_ended_at < end:
+            end = self.review_ended_at
+        return self.review_started_at, end
+
+    def review_running(self):
+        window = self.review_window()
+        return window is not None and window[0] <= now() < window[1]
+
     def prep_can_manage(self, user):
         return self.prep_role(user) == ContestPrepRole.CREATOR
 
@@ -120,6 +137,26 @@ class ContestProblemFeedback(models.Model):
     class Meta:
         db_table = "contest_problem_feedback"
         ordering = ("-create_time", "-id")
+
+
+class ContestPrepPlanItem(models.Model):
+    """A planned problem of a preparation contest.
+
+    The team plans the contest by difficulty: each item names the organizer
+    who writes it and its knowledge points. Items are not tied to particular
+    uploads; an organizer's part is done when the number of problems they
+    uploaded matches the items assigned to them.
+    """
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="prep_plan")
+    # enum of utils.constants.Difficulty
+    difficulty = models.TextField()
+    assignee = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    tags = JSONField(default=list)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "contest_prep_plan_item"
+        ordering = ("create_time", "id")
 
 
 class ContestPrepMember(models.Model):

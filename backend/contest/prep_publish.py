@@ -1,7 +1,7 @@
 """Publish a private preparation contest as a new, independent normal contest.
 
 The preparation contest itself never becomes public: publishing copies its
-settings, announcements and selected problems in their current order.
+settings, announcements and problems in their current order.
 Copies share test data directories by test_case_id, like AddContestProblemAPI;
 uploading new data always allocates a new directory, so edits never leak back.
 Once the published contest ends, its new problems join the public library.
@@ -21,10 +21,10 @@ def publish_prep_contest(prep_contest, overrides):
     prep = Contest.objects.select_for_update().get(pk=prep_contest.pk)
     problems = list(order_contest_problems(Problem.objects.filter(contest=prep, visible=True)))
     if not problems:
-        raise APIError("Select the contest problems before publishing")
+        raise APIError("Upload the contest problems before publishing")
     if prep.prep_problem_count and len(problems) != prep.prep_problem_count:
         raise APIError(f"This contest takes {prep.prep_problem_count} problems, "
-                       f"but {len(problems)} are selected")
+                       f"but {len(problems)} are uploaded")
 
     start_time = overrides.get("start_time", prep.start_time)
     end_time = overrides.get("end_time", prep.end_time)

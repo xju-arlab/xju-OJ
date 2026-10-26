@@ -109,8 +109,12 @@ class ContestPasswordVerifyAPI(APIView):
     def post(self, request):
         data = request.data
         try:
-            contest = Contest.objects.public().get(id=data["contest_id"], password__isnull=False)
+            contest = Contest.objects.get(id=data["contest_id"], visible=True, password__isnull=False)
         except Contest.DoesNotExist:
+            return self.error("Contest does not exist")
+        # A preparation contest's review asks its team for the password, like the
+        # real contest will; nobody else may learn that it exists.
+        if contest.is_preparation and contest.prep_role(request.user) is None:
             return self.error("Contest does not exist")
         if not check_contest_password(data["password"], contest.password):
             return self.error("Wrong password or password expired")
@@ -134,11 +138,10 @@ class ContestAccessAPI(APIView):
             contest = Contest.objects.get(id=contest_id, visible=True, password__isnull=False)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
-        if contest.is_preparation:
-            # Members never need the password; everyone else must not learn it exists.
-            if contest.prep_role(request.user) is None:
-                return self.error("Contest does not exist")
-            return self.success({"access": True})
+        # Members enter a preparation contest's password for its review view only;
+        # everyone else must not learn it exists.
+        if contest.is_preparation and contest.prep_role(request.user) is None:
+            return self.error("Contest does not exist")
         session_pass = request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(contest.id)
         return self.success({"access": check_contest_password(session_pass, contest.password)})
 
