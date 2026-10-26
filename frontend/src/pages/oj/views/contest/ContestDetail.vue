@@ -112,16 +112,9 @@
         </span>
         <strong>{{ myPlan.uploaded }} / {{ myPlan.assigned }}</strong>
       </div>
-      <!-- Review runs like the real contest, so the team enters its password too. -->
-      <section v-if="reviewGateVisible" class="prep-review-gate" aria-labelledby="prep-review-gate-title">
-        <span class="gate-icon" aria-hidden="true"><Icon type="ios-locked-outline" /></span>
-        <h2 id="prep-review-gate-title">{{ $t('m.Prep_Review_Password_Title') }}</h2>
-        <p>{{ $t('m.Prep_Review_Password_Note') }}</p>
-        <form class="gate-form" @submit.prevent="enterReview">
-          <el-input v-model="reviewGatePassword" type="password" show-password maxlength="32"
-                    :placeholder="$t('m.Contest_Password')"></el-input>
-          <el-button type="primary" native-type="submit" :loading="enteringReview">{{ $t('m.Prep_Review_Password_Enter') }}</el-button>
-        </form>
+      <!-- Review runs like the real contest, so everyone, super admins included, enters its password once. -->
+      <section v-if="reviewGateVisible" class="prep-review-locked" aria-hidden="true">
+        <Icon type="ios-locked-outline" />
       </section>
       <div v-else-if="isOverviewRoute" class="contest-overview-grid">
         <section class="contest-overview" aria-labelledby="contest-overview-title">
@@ -159,6 +152,17 @@
         <component :is="Component" />
       </router-view>
     </main>
+
+    <LegacyDialog :title="$t('m.Prep_Review_Password_Title')" width="420px" class="prep-gate-dialog"
+                  :visible="reviewGateVisible" :close-on-click-modal="false" :close-on-press-escape="false"
+                  :before-close="leaveReview" append-to-body>
+      <p class="prep-dialog-note">{{ $t('m.Prep_Review_Password_Note') }}</p>
+      <form class="gate-form" @submit.prevent="enterReview">
+        <el-input ref="gateInput" v-model="reviewGatePassword" type="password" show-password maxlength="32"
+                  :placeholder="$t('m.Contest_Password')"></el-input>
+        <el-button type="primary" native-type="submit" :loading="enteringReview">{{ $t('m.Prep_Review_Password_Enter') }}</el-button>
+      </form>
+    </LegacyDialog>
 
     <LegacyDialog v-if="canManagePrep" :title="$t('m.Prep_Review')" width="480px"
                   :visible="reviewVisible" @update:visible="reviewVisible = $event">
@@ -231,6 +235,8 @@
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
+  const PREP_CHANNEL = 'xju-oj-prep'
+  const PREP_POLL_MS = 15000
   const PREP_SETTING_ROUTES = ['contest-details', 'contest-prep-problems', 'contest-prep-problem-edit',
     'contest-prep-upload', 'contest-prep-assign', 'contest-prep-roles']
 
@@ -250,16 +256,25 @@
         myPlan: null,
         reviewGatePassword: '',
         enteringReview: false,
+        // Whether the session's password access is known yet; until then the gate stays shut.
+        accessKnown: false,
         endingReview: false,
         publishVisible: false,
         publishing: false,
         publishForm: {}
       }
     },
+    created () {
+      this.prepPoll = null
+      this.refreshingPrep = false
+      this.prepChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel(PREP_CHANNEL) : null
+      if (this.prepChannel) this.prepChannel.onmessage = this.onPrepMessage
+    },
     mounted () {
       this.syncRoute()
       this.loadContest()
-      window.addEventListener(PREP_PLAN_CHANGED_EVENT, this.loadMyPlan)
+      window.addEventListener(PREP_PLAN_CHANGED_EVENT, this.onPlanChanged)
+      document.addEventListener('visibilitychange', this.onPageVisible)
     },
     methods: {
       ...mapActions(['changeDomTitle']),
@@ -268,7 +283,9 @@
         this.contestID = this.$route.params.contestID
       },
       loadContest () {
+        this.accessKnown = false
         this.$store.dispatch('getContest').then(res => {
+          this.accessKnown = true
           const data = res.data.data
           if (data.rule_type === 'AI') return this.$router.replace({ name: 'ai-contest', params: { contestID: data.id } })
           this.changeDomTitle({ title: data.title })
@@ -276,6 +293,9 @@
           if (data.prep_state) {
             this.enterPrepWorkspace()
             this.loadMyPlan()
+            this.startPrepSync()
+          } else {
+            this.stopPrepSync()
           }
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
@@ -324,6 +344,11 @@
           this.uploadedCount = 0
         }
       },
+      onPlanChanged (event) {
+        this.loadMyPlan()
+        // Tell the other tabs too, unless this event came from a refresh.
+        if (!(event && event.detail && event.detail.remote)) this.notifyPrepChange()
+      },
       async loadMyPlan () {
         if (!this.isPrepContest || !this.prepRole || !this.user.id) return
         const contestID = this.contestID
@@ -370,6 +395,7 @@
             await api.endPrepReview(this.contestID)
             await this.$store.dispatch('getContest')
             this.syncClock()
+            this.notifyPrepChange()
             this.reviewVisible = false
             this.$success(this.$t('m.Prep_Review_Ended_Done'))
           } catch (_) {
@@ -378,6 +404,45 @@
             this.endingReview = false
           }
         }).catch(() => {})
+      },
+      // Only the close button gets here; the gate also closes by itself once the password is in.
+      leaveReview () {
+        this.$router.push({ name: 'contest-prep-problems', params: { contestID: this.contestID } })
+      },
+      // Hot update: review rounds, the password and the plan change in other tabs and
+      // on other people's screens, so preparation contests refresh themselves.
+      notifyPrepChange () {
+        if (this.prepChannel) this.prepChannel.postMessage({ contestID: String(this.contestID) })
+      },
+      onPrepMessage (event) {
+        if (event.data && event.data.contestID === String(this.contestID)) this.refreshPrep()
+      },
+      onPageVisible () {
+        if (document.visibilityState === 'visible') this.refreshPrep()
+      },
+      async refreshPrep () {
+        if (!this.isPrepContest || this.refreshingPrep || String(this.contest.id) !== String(this.contestID)) return
+        this.refreshingPrep = true
+        try {
+          await this.$store.dispatch('getContest')
+          this.syncClock()
+          // Reloads the plan board and this member's progress without echoing to other tabs.
+          window.dispatchEvent(new CustomEvent(PREP_PLAN_CHANGED_EVENT, { detail: { remote: true } }))
+        } catch (_) {
+          // A transient failure; the next tick tries again.
+        } finally {
+          this.refreshingPrep = false
+        }
+      },
+      startPrepSync () {
+        this.stopPrepSync()
+        this.prepPoll = setInterval(() => {
+          if (document.visibilityState === 'visible') this.refreshPrep()
+        }, PREP_POLL_MS)
+      },
+      stopPrepSync () {
+        clearInterval(this.prepPoll)
+        this.prepPoll = null
       },
       async enterReview () {
         const password = this.reviewGatePassword.trim()
@@ -399,9 +464,8 @@
         this.startingReview = true
         try {
           await api.startPrepReview(this.contestID, password)
-          // Whoever just set the password has entered it: the session lets the new tab in.
-          if (password) await api.checkContestPassword(this.contestID, password).catch(() => {})
           await this.$store.dispatch('getContest')
+          this.notifyPrepChange()
           this.syncClock()
           this.reviewVisible = false
           this.openReviewTab(tab)
@@ -425,7 +489,8 @@
           title: this.contest.title,
           start_time: start.toDate(),
           end_time: end.toDate(),
-          password: this.contest.password || '',
+          // The published contest's password is chosen here; the review password is not carried over.
+          password: '',
           real_time_rank: this.contest.real_time_rank !== false
         }
         this.publishVisible = true
@@ -455,6 +520,7 @@
           else window.open(href, '_blank', 'noopener')
           // Show the new "published as" link on this page.
           this.$store.dispatch('getContest').catch(() => {})
+          this.notifyPrepChange()
         } catch (_) {
           // The API client already shows the error.
           if (tab) tab.close()
@@ -485,7 +551,7 @@
       },
       reviewGateVisible () {
         // Problem pages stay open: organizers reach them from the setting list too.
-        return this.isPrepReviewView && !this.isProblemRoute && String(this.contest.id) === String(this.contestID) &&
+        return this.accessKnown && this.isPrepReviewView && !this.isProblemRoute && String(this.contest.id) === String(this.contestID) &&
           this.contest.contest_type && this.contest.contest_type !== 'Public' && !this.contestAccess
       },
       isOverviewRoute () {
@@ -625,6 +691,9 @@
       }
     },
     watch: {
+      reviewGateVisible (visible) {
+        if (visible) this.$nextTick(() => this.$refs.gateInput && this.$refs.gateInput.focus())
+      },
       '$route' (route, previous) {
         const contestChanged = String(route.params.contestID || '') !== String(previous.params.contestID || '')
         this.syncRoute()
@@ -638,7 +707,10 @@
       }
     },
     beforeUnmount () {
-      window.removeEventListener(PREP_PLAN_CHANGED_EVENT, this.loadMyPlan)
+      window.removeEventListener(PREP_PLAN_CHANGED_EVENT, this.onPlanChanged)
+      document.removeEventListener('visibilitychange', this.onPageVisible)
+      this.stopPrepSync()
+      if (this.prepChannel) this.prepChannel.close()
       clearInterval(this.timer)
       this.$store.commit(types.CLEAR_CONTEST)
     }
@@ -748,31 +820,16 @@
 @media (max-width: 760px) {
   .prep-controls { width: 100%; margin-left: 0; justify-content: flex-end; }
 }
-.prep-review-gate {
+.prep-review-locked {
   display: flex;
-  max-width: 420px;
-  flex-direction: column;
-  align-items: center;
-  margin: 24px auto;
-  padding: 32px 28px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  text-align: center;
-  h2 { margin: 12px 0 6px; color: var(--color-text); font-size: 17px; }
-  p { margin: 0 0 18px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
-}
-.gate-icon {
-  display: inline-flex;
-  width: 44px;
-  height: 44px;
+  min-height: 220px;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--tag-tools-bg);
-  color: var(--cat-tools);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-faint);
   :deep(.legacy-icon) { display: inline-flex; }
-  :deep(svg) { width: 20px; height: 20px; }
+  :deep(svg) { width: 28px; height: 28px; }
 }
 .gate-form { display: flex; width: 100%; gap: 8px; }
 .gate-form .el-button { margin-left: 0; }

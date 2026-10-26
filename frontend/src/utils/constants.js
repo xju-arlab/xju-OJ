@@ -78,7 +78,8 @@ export const CONTEST_STATUS = {
 
 // Every review of a preparation contest runs as a 5-hour contest (backend PREP_REVIEW_HOURS).
 export const PREP_REVIEW_HOURS = 5
-// Fired on window when the problem plan changes, so the workspace can refresh its progress.
+// Fired on window when the problem plan or the preparation contest changes (detail.remote marks
+// a periodic or cross-tab refresh), so the workspace and the review view refresh themselves.
 export const PREP_PLAN_CHANGED_EVENT = 'xju-prep-plan-changed'
 
 export const CONTEST_STATUS_REVERSE = {

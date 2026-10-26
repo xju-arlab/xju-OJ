@@ -95,7 +95,7 @@
 <script>
   import { mapActions, mapState, mapGetters } from '@/store/compat'
   import utils from '@/utils/utils'
-  import { CONTEST_STATUS, CONTEST_TYPE } from '@/utils/constants'
+  import { CONTEST_STATUS, CONTEST_TYPE, PREP_PLAN_CHANGED_EVENT } from '@/utils/constants'
 
   export default {
     name: 'ContestProblemList',
@@ -108,8 +108,16 @@
     },
     mounted () {
       this.getContestProblems().catch(() => {})
+      // A preparation contest's review refreshes itself, so counts and statuses stay current.
+      window.addEventListener(PREP_PLAN_CHANGED_EVENT, this.refreshPrepProblems)
+    },
+    beforeUnmount () {
+      window.removeEventListener(PREP_PLAN_CHANGED_EVENT, this.refreshPrepProblems)
     },
     methods: {
+      refreshPrepProblems () {
+        if (this.contest.prep_state) this.getContestProblems().catch(() => {})
+      },
       ...mapActions(['changeModalStatus', 'getContestProblems', 'registerContest']),
       getACRate (accepted, total) {
         return utils.getACRate(accepted, total)
