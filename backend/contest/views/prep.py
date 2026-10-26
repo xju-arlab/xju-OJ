@@ -1,8 +1,10 @@
 """Contest preparation workspace API.
 
-These views live outside /api/admin/ because problem setters and verifiers may
-be regular users. Every view resolves its contest through load_prep_contest,
-which hides the contest from everyone without a preparation role.
+These views live outside /api/admin/ because organizers may be regular users.
+Every view resolves its contest through load_prep_contest, which hides the
+contest from everyone outside the team (the creator, organizers and super
+admins). The workspace is always open for setting problems; review rounds run
+beside it as 5-hour mock contests of the selected problems.
 """
 import hashlib
 import secrets
@@ -18,25 +20,25 @@ from account.models import User
 from problem.contest_authoring import (create_contest_problem, next_contest_display_id,
                                        order_contest_problems, reorder_contest_problems,
                                        update_contest_problem)
-from problem.models import Problem
+from problem.models import Problem, ProblemTag
 from problem.serializers import (CreatePrepContestProblemSerializer, EditPrepContestProblemSerializer,
                                  ProblemAdminSerializer)
 from problem.views.admin import CompileSPJAPI, ImportProblemAPI, ProblemBase, TestCaseAPI
 from utils.api import APIError, APIView, validate_serializer
-from utils.constants import CacheKey, ContestPrepRole, ContestPrepState, PREP_INVITE_DAYS
+from utils.constants import CacheKey, ContestPrepRole, PREP_INVITE_DAYS
 from utils.shortcuts import datetime2str
 from ..models import Contest, ContestPrepInvite, ContestPrepMember, ContestProblemFeedback
 from ..prep_publish import publish_prep_contest
 from ..prep_rank import review_rank
 from ..serializers import (AcceptContestPrepInviteSerializer, ContestPrepMemberSerializer,
-                           ContestPrepProblemOrderSerializer, CreateContestPrepInviteSerializer,
-                           ContestPrepProblemVisibleSerializer, ContestPrepPublicProblemSerializer,
-                           ContestPrepPublishSerializer,
-                           ContestPrepStateSerializer, ContestProblemFeedbackSerializer,
-                           CreateContestPrepMemberSerializer, CreateContestProblemFeedbackSerializer,
-                           EditContestPrepMemberSerializer, EditContestProblemFeedbackSerializer)
+                           ContestPrepProblemCountSerializer, ContestPrepProblemMetaSerializer,
+                           ContestPrepProblemOrderSerializer, ContestPrepProblemSelectSerializer,
+                           ContestPrepPublicProblemSerializer, ContestPrepPublishSerializer,
+                           ContestPrepReviewSerializer, ContestProblemFeedbackSerializer,
+                           CreateContestPrepInviteSerializer, CreateContestPrepMemberSerializer,
+                           CreateContestProblemFeedbackSerializer, EditContestProblemFeedbackSerializer)
 
-VIEW, AUTHOR, EDIT, MANAGE = "view", "author", "edit", "manage"
+VIEW, MANAGE = "view", "manage"
 MAX_OPEN_INVITES = 20
 INVITE_FAILURE_LIMIT = 10
 INVITE_FAILURE_WINDOW = 10 * 60
@@ -45,8 +47,8 @@ INVITE_FAILURE_WINDOW = 10 * 60
 def load_prep_contest(request, contest_id, need=VIEW):
     """Return the preparation contest for this member or raise APIError.
 
-    need: VIEW (any role), AUTHOR (creator or setter), EDIT (AUTHOR while in
-    Preparation) or MANAGE (creator only).
+    need: VIEW (any member, who may also set and select problems) or MANAGE
+    (creator only: roles, invites, the problem count, review rounds, publish).
     """
     if not str(contest_id or "").isdigit():
         raise APIError("Invalid parameter, contest_id is required")
@@ -60,10 +62,6 @@ def load_prep_contest(request, contest_id, need=VIEW):
         raise APIError("Contest does not exist")
     if need == MANAGE and role != ContestPrepRole.CREATOR:
         raise APIError("Only the contest creator can do this")
-    if need in (AUTHOR, EDIT) and role not in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER):
-        raise APIError("Only problem setters can do this")
-    if need == EDIT and contest.prep_state != ContestPrepState.PREPARATION:
-        raise APIError("Switch the contest back to preparation before editing problems")
     return contest
 
 
@@ -86,22 +84,45 @@ def get_contest_problem(contest, problem_id):
         raise APIError("Problem does not exist")
 
 
-class ContestPrepStateAPI(APIView):
-    @validate_serializer(ContestPrepStateSerializer)
+def problem_list(contest):
+    problems = order_contest_problems(Problem.objects.filter(contest=contest)
+                                      .select_related("created_by").prefetch_related("tags"))
+    return with_feedback_counts(contest, ProblemAdminSerializer(problems, many=True).data)
+
+
+@transaction.atomic
+def keep_selected_first(contest, problem_ids=None):
+    """Relabel the problems so the selected ones come first, in their current order.
+
+    The selected problems are the contest: review and publish show them as A,
+    B, C... and the candidates that were not picked follow them.
+    """
+    problems = list(order_contest_problems(Problem.objects.select_for_update().filter(contest=contest)))
+    selected = {problem.id for problem in problems if problem.visible}
+    if problem_ids is None:
+        problem_ids = [problem.id for problem in problems]
+    ordered = [pk for pk in problem_ids if pk in selected] + [pk for pk in problem_ids if pk not in selected]
+    reorder_contest_problems(contest, ordered)
+
+
+class ContestPrepReviewAPI(APIView):
+    """Start a review round: a fresh 5-hour mock contest of the selected problems."""
+
+    @validate_serializer(ContestPrepReviewSerializer)
     @login_required
-    def put(self, request):
-        contest = load_prep_contest(request, request.data["contest_id"], MANAGE)
-        state = request.data["state"]
-        if state == ContestPrepState.REVIEW and contest.prep_state != ContestPrepState.REVIEW:
-            # Each review round runs like a fresh 5-hour contest: the clock and
-            # the review board start over every time setting switches to review.
-            contest.review_started_at = now()
-        contest.prep_state = state
-        contest.save(update_fields=["prep_state", "review_started_at", "last_update_time"])
+    def post(self, request):
+        data = request.serializer.validated_data
+        contest = load_prep_contest(request, data["contest_id"], MANAGE)
+        if not Problem.objects.filter(contest=contest, visible=True).exists():
+            return self.error("Select the contest problems before starting a review")
+        # The clock and the review board start over with every round.
+        contest.review_started_at = now()
+        if "password" in data:
+            contest.password = data["password"] or None
+        contest.save(update_fields=["password", "review_started_at", "last_update_time"])
         clear_rank_cache(contest)
-        return self.success({"prep_state": contest.prep_state,
-                             "review_started_at": datetime2str(contest.review_started_at)
-                             if contest.review_started_at else None})
+        return self.success({"review_started_at": datetime2str(contest.review_started_at),
+                             "password": contest.password})
 
 
 class ContestPrepMemberAPI(APIView):
@@ -128,21 +149,10 @@ class ContestPrepMemberAPI(APIView):
         if user.id == contest.created_by_id:
             return self.error("The creator already has every permission")
         member, created = ContestPrepMember.objects.get_or_create(
-            contest=contest, user=user, defaults={"role": data["role"]})
+            contest=contest, user=user, defaults={"role": ContestPrepRole.ORGANIZER})
         if not created:
             return self.error("The user is already a member")
         return self.success(ContestPrepMemberSerializer(member).data)
-
-    @validate_serializer(EditContestPrepMemberSerializer)
-    @login_required
-    def put(self, request):
-        data = request.data
-        contest = load_prep_contest(request, data["contest_id"], MANAGE)
-        updated = ContestPrepMember.objects.filter(contest=contest, user_id=data["user_id"]).update(
-            role=data["role"])
-        if not updated:
-            return self.error("Member does not exist")
-        return self.success()
 
     @login_required
     def delete(self, request):
@@ -172,20 +182,21 @@ class ContestPrepUserSearchAPI(APIView):
 class ContestPrepProblemAPI(ProblemBase):
     @login_required
     def get(self, request):
-        contest = load_prep_contest(request, request.GET.get("contest_id"), AUTHOR)
+        contest = load_prep_contest(request, request.GET.get("contest_id"))
         problem_id = request.GET.get("id")
         if problem_id:
             return self.success(ProblemAdminSerializer(get_contest_problem(contest, problem_id)).data)
-        problems = order_contest_problems(Problem.objects.filter(contest=contest).select_related("created_by"))
-        return self.success(with_feedback_counts(contest, ProblemAdminSerializer(problems, many=True).data))
+        return self.success(problem_list(contest))
 
     @validate_serializer(CreatePrepContestProblemSerializer)
     @login_required
     def post(self, request):
         data = request.data
-        contest = load_prep_contest(request, data.pop("contest_id"), EDIT)
+        contest = load_prep_contest(request, data.pop("contest_id"))
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
+        # New problems join the candidates; picking them is a separate step.
+        data["visible"] = False
         data["_id"] = next_contest_display_id(contest)
         error_info = self.common_checks(request)
         if error_info:
@@ -197,10 +208,12 @@ class ContestPrepProblemAPI(ProblemBase):
     @login_required
     def put(self, request):
         data = request.data
-        contest = load_prep_contest(request, data.pop("contest_id"), EDIT)
+        contest = load_prep_contest(request, data.pop("contest_id"))
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
         problem = get_contest_problem(contest, data.pop("id"))
+        # Selection belongs to the selection tab; an editor tab may hold a stale value.
+        data["visible"] = problem.visible
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
@@ -209,61 +222,111 @@ class ContestPrepProblemAPI(ProblemBase):
 
     @login_required
     def delete(self, request):
-        contest = load_prep_contest(request, request.GET.get("contest_id"), EDIT)
+        contest = load_prep_contest(request, request.GET.get("contest_id"))
         problem = get_contest_problem(contest, request.GET.get("id"))
         # Verification runs are deleted with the problem; they never reached
         # any rank, mark or counter.
         problem.delete()
+        # Close the gap so the selected problems stay A, B, C...
+        keep_selected_first(contest)
         clear_rank_cache(contest)
         return self.success()
 
 
-class ContestPrepProblemVisibleAPI(APIView):
-    @validate_serializer(ContestPrepProblemVisibleSerializer)
+class ContestPrepProblemSelectAPI(APIView):
+    """Pick a candidate for the contest, or put it back among the candidates."""
+
+    @validate_serializer(ContestPrepProblemSelectSerializer)
     @login_required
     def put(self, request):
         data = request.data
-        contest = load_prep_contest(request, data["contest_id"], EDIT)
+        contest = load_prep_contest(request, data["contest_id"])
+        with transaction.atomic():
+            # Lock every problem so concurrent picks cannot overshoot the count.
+            problems = list(Problem.objects.select_for_update().filter(contest=contest))
+            problem = next((item for item in problems if item.id == data["id"]), None)
+            if problem is None:
+                return self.error("Problem does not exist")
+            if data["selected"] and not problem.visible:
+                if not problem.difficulty or not problem.tags.exists():
+                    return self.error("Fill in the difficulty and knowledge points before selecting this problem")
+                limit = contest.prep_problem_count
+                if limit and sum(item.visible for item in problems) >= limit:
+                    return self.error(f"This contest takes {limit} problems; unselect one first")
+            problem.visible = data["selected"]
+            problem.save(update_fields=["visible"])
+            keep_selected_first(contest)
+        clear_rank_cache(contest)
+        return self.success(problem_list(contest))
+
+
+class ContestPrepProblemMetaAPI(APIView):
+    """Difficulty and knowledge points, filled in while picking the problem set."""
+
+    @validate_serializer(ContestPrepProblemMetaSerializer)
+    @login_required
+    def put(self, request):
+        data = request.data
+        contest = load_prep_contest(request, data["contest_id"])
         problem = get_contest_problem(contest, data["id"])
-        problem.visible = data["visible"]
-        problem.save(update_fields=["visible"])
-        return self.success({"visible": problem.visible})
+        names = list(dict.fromkeys(name for name in data["tags"] if name))
+        if not names:
+            return self.error("Add at least one knowledge point")
+        problem.difficulty = data["difficulty"]
+        problem.save(update_fields=["difficulty"])
+        problem.tags.set([ProblemTag.objects.get_or_create(name=name)[0] for name in names])
+        return self.success(ProblemAdminSerializer(problem).data)
+
+
+class ContestPrepProblemCountAPI(APIView):
+    @validate_serializer(ContestPrepProblemCountSerializer)
+    @login_required
+    def put(self, request):
+        data = request.data
+        contest = load_prep_contest(request, data["contest_id"], MANAGE)
+        count = data["problem_count"]
+        selected = Problem.objects.filter(contest=contest, visible=True).count()
+        if count is not None and count < selected:
+            return self.error(f"{selected} problems are selected; unselect some before lowering the count")
+        contest.prep_problem_count = count
+        contest.save(update_fields=["prep_problem_count", "last_update_time"])
+        return self.success({"prep_problem_count": count})
 
 
 class ContestPrepProblemOrderAPI(APIView):
     @validate_serializer(ContestPrepProblemOrderSerializer)
     @login_required
     def put(self, request):
-        contest = load_prep_contest(request, request.data["contest_id"], EDIT)
-        reorder_contest_problems(contest, request.data["problem_ids"])
+        contest = load_prep_contest(request, request.data["contest_id"])
+        # A drag never moves a problem across the selected / candidate boundary.
+        keep_selected_first(contest, request.data["problem_ids"])
         clear_rank_cache(contest)
-        problems = order_contest_problems(Problem.objects.filter(contest=contest).select_related("created_by"))
-        return self.success(with_feedback_counts(contest, ProblemAdminSerializer(problems, many=True).data))
+        return self.success(problem_list(contest))
 
 
 class ContestPrepTestCaseAPI(TestCaseAPI):
     @login_required
     def get(self, request):
-        contest = load_prep_contest(request, request.GET.get("contest_id"), AUTHOR)
+        contest = load_prep_contest(request, request.GET.get("contest_id"))
         return self.test_case_response(get_contest_problem(contest, request.GET.get("problem_id")))
 
     @login_required
     def post(self, request):
-        load_prep_contest(request, request.POST.get("contest_id"), EDIT)
+        load_prep_contest(request, request.POST.get("contest_id"))
         return TestCaseAPI.post(self, request)
 
 
 class ContestPrepCompileSPJAPI(CompileSPJAPI):
     @login_required
     def post(self, request):
-        load_prep_contest(request, request.data.get("contest_id"), EDIT)
+        load_prep_contest(request, request.data.get("contest_id"))
         return CompileSPJAPI.post(self, request)
 
 
 class ContestPrepImportProblemAPI(ImportProblemAPI):
     @login_required
     def post(self, request):
-        contest = load_prep_contest(request, request.POST.get("contest_id"), EDIT)
+        contest = load_prep_contest(request, request.POST.get("contest_id"))
         return self.import_upload(request, contest=contest)
 
 
@@ -283,8 +346,6 @@ class ContestPrepFeedbackAPI(APIView):
     def get(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"))
         feedback = ContestProblemFeedback.objects.filter(contest=contest).select_related("user", "problem")
-        if contest.prep_role(request.user) == ContestPrepRole.VERIFIER:
-            feedback = feedback.filter(problem__visible=True)
         problem_id = request.GET.get("problem_id")
         if problem_id:
             feedback = feedback.filter(problem=get_contest_problem(contest, problem_id))
@@ -295,11 +356,7 @@ class ContestPrepFeedbackAPI(APIView):
     def post(self, request):
         data = request.data
         contest = load_prep_contest(request, data["contest_id"])
-        if contest.prep_state != ContestPrepState.REVIEW:
-            return self.error("Feedback is collected during review")
         problem = get_contest_problem(contest, data["problem_id"])
-        if not problem.visible and contest.prep_role(request.user) == ContestPrepRole.VERIFIER:
-            return self.error("Problem does not exist")
         feedback = ContestProblemFeedback.objects.create(contest=contest, problem=problem, user=request.user,
                                                          content=data["content"].strip())
         return self.success(ContestProblemFeedbackSerializer(feedback).data)
@@ -308,7 +365,7 @@ class ContestPrepFeedbackAPI(APIView):
     @login_required
     def put(self, request):
         data = request.data
-        contest = load_prep_contest(request, data["contest_id"], AUTHOR)
+        contest = load_prep_contest(request, data["contest_id"])
         updated = ContestProblemFeedback.objects.filter(contest=contest, id=data["id"]).update(
             resolved=data["resolved"])
         if not updated:
@@ -335,12 +392,12 @@ class ContestPrepRankAPI(APIView):
 
 
 class ContestPrepPublicProblemAPI(APIView):
-    """Copy a released library problem into the contest, hidden like any new draft."""
+    """Copy a released library problem into the contest as an unselected candidate."""
 
     @validate_serializer(ContestPrepPublicProblemSerializer)
     @login_required
     def post(self, request):
-        contest = load_prep_contest(request, request.data["contest_id"], EDIT)
+        contest = load_prep_contest(request, request.data["contest_id"])
         try:
             problem = Problem.objects.get(id=request.data["problem_id"], contest_id__isnull=True, visible=True)
         except Problem.DoesNotExist:
@@ -413,7 +470,7 @@ class ContestPrepInviteAPI(APIView):
         # The link itself is the credential, so it carries 256 random bits.
         token = secrets.token_urlsafe(32)
         invite = ContestPrepInvite.objects.create(
-            contest=contest, role=request.data["role"], token_hash=invite_token_hash(token),
+            contest=contest, role=ContestPrepRole.ORGANIZER, token_hash=invite_token_hash(token),
             created_by=request.user, expire_time=now() + timedelta(days=PREP_INVITE_DAYS))
         return self.success({"token": token, "role": invite.role, "expire_time": datetime2str(invite.expire_time)})
 

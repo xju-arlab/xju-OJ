@@ -7,7 +7,6 @@ from django.db import transaction
 from django.db.models.functions import Length
 
 from utils.api import APIError
-from utils.constants import ContestPrepState
 from .models import Problem, ProblemTag
 
 
@@ -78,9 +77,3 @@ def reorder_contest_problems(contest, problem_ids):
         Problem.objects.filter(pk=problem_id).update(_id=f"~{problem_id}")
     for index, problem_id in enumerate(problem_ids):
         Problem.objects.filter(pk=problem_id).update(_id=alphabetic_display_id(index))
-
-
-def ensure_contest_problems_editable(contest):
-    """Problems of a preparation contest are frozen while it is in Review."""
-    if contest.prep_state == ContestPrepState.REVIEW:
-        raise APIError("Switch the contest back to preparation before editing problems")

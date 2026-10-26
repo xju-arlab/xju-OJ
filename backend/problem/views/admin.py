@@ -28,10 +28,9 @@ from ..models import (Problem, ProblemRuleType, ProblemTag, ProblemJudgeMode,
                       ProblemIOMode)
 from ..remote import RemoteProblemError, fetch_remote_problem
 from ..remote.common import markdown_to_html
-from ..contest_authoring import (alphabetic_display_id, create_contest_problem,
-                                 ensure_contest_problems_editable, next_contest_display_id,
+from ..contest_authoring import (alphabetic_display_id, create_contest_problem, next_contest_display_id,
                                  order_contest_problems, update_contest_problem)
-from ..publication import publish_due_contest_problems
+from ..publication import next_public_display_id, publish_due_contest_problems, remote_problem_display_id
 from ..tasks import schedule_contest_problem_publication
 from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            CreateProblemSerializer, EditProblemSerializer, EditContestProblemSerializer,
@@ -46,26 +45,8 @@ _alphabetic_display_id = alphabetic_display_id
 _next_contest_display_id = next_contest_display_id
 
 
-def _next_public_display_id():
-    local_problem_count = Problem.objects.filter(
-        contest_id__isnull=True,
-        judge_mode=ProblemJudgeMode.LOCAL,
-    ).count()
-    candidate = 1001 + local_problem_count
-    while Problem.objects.filter(_id=str(candidate), contest_id__isnull=True).exists():
-        candidate += 1
-    return str(candidate)
-
-
-def _remote_problem_display_id(problem):
-    remote_id = str(problem.remote_problem_id or "").strip()
-    if problem.remote_oj == "NOWCODER":
-        return remote_id if remote_id.upper().startswith("NC") else f"NC{remote_id}"
-    if problem.remote_oj == "LUOGU":
-        return f"LG{remote_id}"
-    if problem.remote_oj == "CODEFORCES":
-        return f"CF{remote_id}"
-    return _next_public_display_id()
+_next_public_display_id = next_public_display_id
+_remote_problem_display_id = remote_problem_display_id
 
 
 class TestCaseZipProcessor(object):
@@ -375,7 +356,6 @@ class RemoteProblemImportAPI(APIView):
                 ensure_created_by(contest, request.user)
             except Contest.DoesNotExist:
                 return self.error("Contest does not exist")
-            ensure_contest_problems_editable(contest)
             if contest.status == ContestStatus.CONTEST_ENDED and not contest.is_preparation:
                 return self.error("Contest has ended")
             if contest.rule_type != ProblemRuleType.ACM:
@@ -418,7 +398,8 @@ class RemoteProblemImportAPI(APIView):
                 public_problem.contest = contest
                 public_problem._id = display_id
                 public_problem.is_public = True
-                public_problem.visible = True
+                # A preparation contest picks its problems separately.
+                public_problem.visible = not contest.is_preparation
                 public_problem.publish_after_contest = False
                 public_problem.post_contest_display_id = None
                 public_problem.submission_number = 0
@@ -451,7 +432,7 @@ class RemoteProblemImportAPI(APIView):
                 spj_code=None,
                 spj_compile_ok=False,
                 rule_type=ProblemRuleType.ACM,
-                visible=True,
+                visible=contest is None or not contest.is_preparation,
                 difficulty=remote["difficulty"],
                 source=remote["source"],
                 share_submission=False,
@@ -483,7 +464,9 @@ class ContestProblemAPI(ProblemBase):
 
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
-        ensure_contest_problems_editable(contest)
+        if contest.is_preparation:
+            # New problems join the candidates; the contest picks them separately.
+            data["visible"] = False
 
         _id = _next_contest_display_id(contest)
         data["_id"] = _id
@@ -539,7 +522,6 @@ class ContestProblemAPI(ProblemBase):
 
         if data["rule_type"] != contest.rule_type:
             return self.error("Invalid rule type")
-        ensure_contest_problems_editable(contest)
 
         problem_id = data.pop("id")
 
@@ -549,6 +531,9 @@ class ContestProblemAPI(ProblemBase):
             return self.error("Problem does not exist")
 
         data["_id"] = problem._id
+        if contest.is_preparation:
+            # Selection is kept by the preparation workspace, not this form.
+            data["visible"] = problem.visible
 
         error_info = self.common_checks(request)
         if error_info:
@@ -566,7 +551,6 @@ class ContestProblemAPI(ProblemBase):
         except Problem.DoesNotExist:
             return self.error("Problem does not exists")
         ensure_created_by(problem.contest, request.user)
-        ensure_contest_problems_editable(problem.contest)
         # Submissions to a preparation contest are verification runs that never
         # reach any statistics; they are removed together with the problem.
         if not problem.contest.is_preparation and Submission.objects.filter(problem=problem).exists():
@@ -634,7 +618,6 @@ class AddContestProblemAPI(APIView):
         if problem.contest_id is not None:
             return self.error("Only public library problems can be added")
 
-        ensure_contest_problems_editable(contest)
         if contest.status == ContestStatus.CONTEST_ENDED and not contest.is_preparation:
             return self.error("Contest has ended")
         display_id = _next_contest_display_id(contest)
@@ -645,7 +628,7 @@ class AddContestProblemAPI(APIView):
         problem.pk = None
         problem.contest = contest
         problem.is_public = True
-        problem.visible = True
+        problem.visible = not contest.is_preparation
         problem._id = display_id
         problem.submission_number = problem.accepted_number = 0
         problem.statistic_info = {}

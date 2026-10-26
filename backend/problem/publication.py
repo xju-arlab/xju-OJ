@@ -1,7 +1,29 @@
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Problem
+from .models import Problem, ProblemJudgeMode
+
+
+def next_public_display_id():
+    local_problem_count = Problem.objects.filter(
+        contest_id__isnull=True,
+        judge_mode=ProblemJudgeMode.LOCAL,
+    ).count()
+    candidate = 1001 + local_problem_count
+    while Problem.objects.filter(_id=str(candidate), contest_id__isnull=True).exists():
+        candidate += 1
+    return str(candidate)
+
+
+def remote_problem_display_id(problem):
+    remote_id = str(problem.remote_problem_id or "").strip()
+    if problem.remote_oj == "NOWCODER":
+        return remote_id if remote_id.upper().startswith("NC") else f"NC{remote_id}"
+    if problem.remote_oj == "LUOGU":
+        return f"LG{remote_id}"
+    if problem.remote_oj == "CODEFORCES":
+        return f"CF{remote_id}"
+    return next_public_display_id()
 
 
 def _remote_public_problem(problem):
@@ -48,7 +70,12 @@ def publish_due_contest_problems(contest_ids=None):
             published.append(existing)
             continue
 
-        display_id = contest_problem.post_contest_display_id or contest_problem._id
+        # Remote imports reserve their library ID up front; problems published
+        # from a preparation contest take the next free one when they go out.
+        display_id = contest_problem.post_contest_display_id
+        if not display_id:
+            display_id = (remote_problem_display_id(contest_problem)
+                          if contest_problem.judge_mode == ProblemJudgeMode.REMOTE else next_public_display_id())
         if Problem.objects.filter(_id=display_id, contest_id__isnull=True).exists():
             # A later admin edit may have occupied the reserved display ID.
             # Keep this item queued instead of publishing under an unexpected ID.
@@ -78,4 +105,4 @@ def publish_due_contest_problems(contest_ids=None):
     return published
 
 
-__all__ = ["publish_due_contest_problems"]
+__all__ = ["next_public_display_id", "publish_due_contest_problems", "remote_problem_display_id"]

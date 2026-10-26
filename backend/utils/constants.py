@@ -23,21 +23,20 @@ class ContestRuleType(Choices):
 
 
 class ContestPrepState(Choices):
-    """States of a private contest preparation workspace; null means a normal contest.
+    """Marks a private contest preparation workspace; null means a normal contest.
 
-    Preparation is for setting problems; Review runs the contest for verifiers.
+    Problems are set in the workspace at any time; review rounds run beside it.
     """
     PREPARATION = "Preparation"
-    REVIEW = "Review"
 
 
 class ContestPrepRole(Choices):
     CREATOR = "Creator"
-    SETTER = "Setter"
-    VERIFIER = "Verifier"
+    # Sets, selects and tests problems; everything but roles, review rounds and publishing.
+    ORGANIZER = "Organizer"
 
 
-# Every review of a preparation contest runs as a 5-hour contest.
+# Every review round of a preparation contest runs as a 5-hour contest.
 PREP_REVIEW_HOURS = 5
 # A preparation invite link works once and only within this many days.
 PREP_INVITE_DAYS = 7

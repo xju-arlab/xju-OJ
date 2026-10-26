@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.timezone import now
 from utils.models import JSONField
 
-from utils.constants import ContestPrepRole, ContestPrepState, ContestStatus, ContestType
+from utils.constants import ContestPrepRole, ContestStatus, ContestType
 from account.models import User
 from utils.models import RichTextField
 
@@ -35,9 +35,13 @@ class Contest(models.Model):
     prep_state = models.TextField(null=True)
     published_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL,
                                        related_name="published_contests")
-    # When Review first started; the review leaderboard counts submissions
-    # from this moment, like a contest start time.
+    # When the latest review round started; the review leaderboard counts
+    # submissions from this moment, like a contest start time.
     review_started_at = models.DateTimeField(null=True, blank=True)
+    # How many problems the creator plans for the contest. Review and publish
+    # use the selected problems (Problem.visible), and at most this many may be
+    # selected; publishing needs exactly this many. Null means not decided yet.
+    prep_problem_count = models.PositiveIntegerField(null=True, blank=True)
 
     objects = ContestQuerySet.as_manager()
 
@@ -79,10 +83,6 @@ class Contest(models.Model):
                 cache[user.id] = member.role if member else None
         return cache[user.id]
 
-    def prep_can_edit(self, user):
-        return (self.prep_state == ContestPrepState.PREPARATION and
-                self.prep_role(user) in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER))
-
     def prep_can_manage(self, user):
         return self.prep_role(user) == ContestPrepRole.CREATOR
 
@@ -109,7 +109,7 @@ class Contest(models.Model):
 
 
 class ContestProblemFeedback(models.Model):
-    """A reviewer's note on a problem of a preparation contest, read by the setters."""
+    """A review note on a problem of a preparation contest, read by the whole team."""
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="problem_feedback")
     problem = models.ForeignKey("problem.Problem", on_delete=models.CASCADE, related_name="feedback")
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -123,10 +123,10 @@ class ContestProblemFeedback(models.Model):
 
 
 class ContestPrepMember(models.Model):
-    """A problem setter or verifier of a preparation contest; the creator is Contest.created_by."""
+    """An organizer of a preparation contest; the creator is Contest.created_by."""
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="prep_members")
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    # ContestPrepRole.SETTER or ContestPrepRole.VERIFIER
+    # ContestPrepRole.ORGANIZER
     role = models.TextField()
     create_time = models.DateTimeField(auto_now_add=True)
 
@@ -137,13 +137,13 @@ class ContestPrepMember(models.Model):
 
 
 class ContestPrepInvite(models.Model):
-    """A one-time link that makes whoever redeems it a setter or verifier.
+    """A one-time link that makes whoever redeems it an organizer.
 
     Only the SHA-256 digest of the random token is stored, so neither the
     database nor a backup can be turned back into a working link.
     """
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="prep_invites")
-    # ContestPrepRole.SETTER or ContestPrepRole.VERIFIER
+    # ContestPrepRole.ORGANIZER
     role = models.TextField()
     token_hash = models.CharField(max_length=64, unique=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")

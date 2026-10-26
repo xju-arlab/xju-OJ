@@ -115,12 +115,13 @@ class EditContestProblemSerializer(CreateOrEditProblemSerializer):
 
 
 class CreatePrepContestProblemSerializer(CreateContestProblemSerializer):
-    # Problems uploaded while preparing a contest start hidden as drafts.
+    # In a preparation contest visible means selected for the contest; the
+    # workspace sets it, so new problems always start as candidates.
     visible = serializers.BooleanField(required=False, default=False)
 
 
 class EditPrepContestProblemSerializer(EditContestProblemSerializer):
-    pass
+    visible = serializers.BooleanField(required=False)
 
 
 class RemoteProblemImportSerializer(serializers.Serializer):

@@ -4,7 +4,6 @@ from utils.api import APIView, validate_serializer
 from account.decorators import check_contest_permission, login_required
 from account.models import User
 from submission.models import JudgeStatus, Submission
-from utils.constants import ContestPrepRole, ContestPrepState
 from ..contest_authoring import order_contest_problems
 from ..models import ProblemFavorite, ProblemTag, Problem, ProblemRuleType
 from ..serializers import (ProblemFavoriteSerializer, ProblemSerializer, ProfileProblemSerializer,
@@ -109,7 +108,8 @@ class ContestProblemAPI(APIView):
         """Preparation contests keep no statistics; derive them from verification runs."""
         runs = Submission.objects.filter(contest=self.contest).exclude(
             result__in=(JudgeStatus.PENDING, JudgeStatus.JUDGING))
-        if self.contest.review_started_at and self.contest.prep_state == ContestPrepState.REVIEW:
+        # Count the current review round, like a contest counts from its start.
+        if self.contest.review_started_at:
             runs = runs.filter(create_time__gte=self.contest.review_started_at)
         counts = {item["problem_id"]: item for item in runs.values("problem_id").annotate(
             total=Count("id"), accepted=Count("id", filter=Q(result=JudgeStatus.ACCEPTED)))}
@@ -139,8 +139,8 @@ class ContestProblemAPI(APIView):
                         not self.contest.is_registered(request.user):
                     return self.error("Please register for the contest first")
             problems = Problem.objects.select_related("created_by").filter(contest=self.contest)
-            # Setters open their hidden drafts; verifiers only see released problems.
-            if self.contest.prep_role(request.user) not in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER):
+            # The preparation team opens every candidate; contestants only the contest's problems.
+            if self.contest.prep_role(request.user) is None:
                 problems = problems.filter(visible=True)
             try:
                 problem = problems.get(_id=problem_id)

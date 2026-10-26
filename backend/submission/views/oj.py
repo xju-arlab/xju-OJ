@@ -3,7 +3,6 @@ import logging
 
 from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
-from utils.constants import ContestPrepRole
 from django.db import transaction
 from django.utils import timezone
 from judge.tasks import judge_task
@@ -80,9 +79,8 @@ class SubmissionAPI(APIView):
             return self.error(error)
 
         problems = Problem.objects.filter(contest_id=data.get("contest_id"))
-        # Setters may test their hidden drafts in a preparation contest.
-        authors = (ContestPrepRole.CREATOR, ContestPrepRole.SETTER)
-        if contest is None or contest.prep_role(request.user) not in authors:
+        # The preparation team may test every candidate, selected or not.
+        if contest is None or contest.prep_role(request.user) is None:
             problems = problems.filter(visible=True)
         try:
             problem = problems.get(id=data["problem_id"])
@@ -210,7 +208,7 @@ class ContestSubmissionListAPI(APIView):
         username = request.GET.get("username")
         if problem_id:
             problems = Problem.objects.filter(contest_id=contest.id)
-            if contest.prep_role(request.user) not in (ContestPrepRole.CREATOR, ContestPrepRole.SETTER):
+            if contest.prep_role(request.user) is None:
                 problems = problems.filter(visible=True)
             try:
                 problem = problems.get(_id=problem_id)

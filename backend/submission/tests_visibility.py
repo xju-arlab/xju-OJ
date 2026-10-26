@@ -71,14 +71,12 @@ class ContestCodeVisibilityTest(APITestCase):
         submission.save()
         self.assertSuccess(self.detail(submission))
 
-    def test_preparation_runs_are_for_creator_and_setters_only(self):
-        contest = self.make_contest(ended=True, prep_state=ContestPrepState.REVIEW)
-        setter = self.create_user("setter", "setter-pass", login=False)
-        verifier = self.create_user("verifier", "verifier-pass", login=False)
-        ContestPrepMember.objects.create(contest=contest, user=setter, role=ContestPrepRole.SETTER)
-        ContestPrepMember.objects.create(contest=contest, user=verifier, role=ContestPrepRole.VERIFIER)
+    def test_preparation_runs_stay_inside_the_team(self):
+        contest = self.make_contest(ended=True, prep_state=ContestPrepState.PREPARATION)
+        organizer = self.create_user("organizer", "organizer-pass", login=False)
+        ContestPrepMember.objects.create(contest=contest, user=organizer, role=ContestPrepRole.ORGANIZER)
         submission = self.make_submission(contest)
-        for user, allowed in ((self.reader, False), (verifier, False), (setter, True)):
+        for user, allowed in ((self.reader, False), (organizer, True), (self.admin, True)):
             self.client.force_login(user)
             response = self.detail(submission)
             if allowed:

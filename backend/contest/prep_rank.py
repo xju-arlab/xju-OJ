@@ -1,9 +1,10 @@
 """Review leaderboard of a preparation contest.
 
 Judge statistics skip preparation contests, so the board is derived from the
-verification runs made since the current Review started, using the normal ACM
-(solved, then penalty) or OI (latest score per problem) rules. Every member
-appears, and setters carry the labels of the problems they authored.
+verification runs made since the current review round started, using the
+normal ACM (solved, then penalty) or OI (latest score per problem) rules. Only
+the selected problems count. Every member appears, and authors carry the
+labels of the problems they wrote.
 """
 from account.models import User
 from problem.contest_authoring import order_contest_problems

@@ -1,6 +1,6 @@
 from utils.api import UsernameSerializer, serializers
 
-from utils.constants import ContestPrepRole, ContestPrepState
+from utils.constants import Difficulty
 from .models import Contest, ContestAnnouncement, ContestPrepMember, ContestProblemFeedback, ContestRuleType
 from .models import ACMContestRank, OIContestRank
 
@@ -117,9 +117,10 @@ class ACMContesHelperSerializer(serializers.Serializer):
     checked = serializers.BooleanField()
 
 
-class ContestPrepStateSerializer(serializers.Serializer):
+class ContestPrepReviewSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
-    state = serializers.ChoiceField(choices=ContestPrepState.choices())
+    # Pre-filled as the published contest's password; blank clears it.
+    password = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
 
 
 class ContestPrepMemberSerializer(serializers.ModelSerializer):
@@ -134,13 +135,6 @@ class ContestPrepMemberSerializer(serializers.ModelSerializer):
 class CreateContestPrepMemberSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     username = serializers.CharField(max_length=32)
-    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
-
-
-class EditContestPrepMemberSerializer(serializers.Serializer):
-    contest_id = serializers.IntegerField()
-    user_id = serializers.IntegerField()
-    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
 
 
 class ContestPrepProblemOrderSerializer(serializers.Serializer):
@@ -148,10 +142,23 @@ class ContestPrepProblemOrderSerializer(serializers.Serializer):
     problem_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False, max_length=500)
 
 
-class ContestPrepProblemVisibleSerializer(serializers.Serializer):
+class ContestPrepProblemSelectSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     id = serializers.IntegerField()
-    visible = serializers.BooleanField()
+    selected = serializers.BooleanField()
+
+
+class ContestPrepProblemMetaSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    id = serializers.IntegerField()
+    difficulty = serializers.ChoiceField(choices=Difficulty.choices())
+    # Knowledge points: at least one, so the problem set can be balanced.
+    tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False, max_length=12)
+
+
+class ContestPrepProblemCountSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    problem_count = serializers.IntegerField(min_value=1, max_value=500, allow_null=True)
 
 
 class ContestPrepPublishSerializer(serializers.Serializer):
@@ -190,7 +197,6 @@ class EditContestProblemFeedbackSerializer(serializers.Serializer):
 
 class CreateContestPrepInviteSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
-    role = serializers.ChoiceField(choices=[ContestPrepRole.SETTER, ContestPrepRole.VERIFIER])
 
 
 class AcceptContestPrepInviteSerializer(serializers.Serializer):
