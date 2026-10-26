@@ -186,7 +186,7 @@ git pull --ff-only
 BUILD_TARGETS=frontend ./deploy.sh --frontend-only
 ```
 
-该模式只构建并替换 `frontend` 容器，不执行数据库迁移、后端 bootstrap、管理员/token 初始化，也不重启 backend、Worker、Judge、PostgreSQL 或 Redis。它要求已有成功的完整 release 和本地保留的其他镜像；如果自上次 release 以来检测到 `frontend/` 以外的代码、Compose 或部署变更，会直接拒绝，避免前后端版本不匹配。前端 Dockerfile 已将 Node/pnpm 基础镜像和依赖下载分层，首次构建后后续迭代会复用本机 BuildKit/pnpm cache。
+该模式只构建并替换 `frontend` 容器，不执行数据库迁移、后端 bootstrap、管理员/token 初始化，也不重启 backend、Worker、Judge、PostgreSQL 或 Redis。它要求已有成功的完整 release 和本地保留的其他镜像；如果自上次 release 以来检测到 `frontend/` 以外的代码、Compose 或部署变更，会直接拒绝，避免前后端版本不匹配；仓库认知索引（`aoci*.txt`、`.aoci/`）不进入任何镜像，不受此限制。前端 Dockerfile 已将 Node/pnpm 基础镜像和依赖下载分层，首次构建后后续迭代会复用本机 BuildKit/pnpm cache；本机基础镜像按摘要引用，构建时不再向镜像仓库查询。
 
 预检和回滚演练：
 

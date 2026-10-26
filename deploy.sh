@@ -638,6 +638,7 @@ frontend_only_source_guard() {
     previous_commit=$(release_source_commit 2>/dev/null || true)
     [ -n "$previous_commit" ] || fail "--frontend-only requires source commit metadata in $release_file"
     python3 - "$ROOT" "$previous_commit" "${GIT_COMMIT:-}" <<'PY' || fail "--frontend-only is allowed only when changes are confined to frontend/"
+import re
 import subprocess
 import sys
 
@@ -664,8 +665,14 @@ for record in records:
     if "R" in record[:2] or "C" in record[:2]:
         working.append(next(records))
 
+def frontend_only_safe(path):
+    # The frontend itself, or the AOCI repository index, which no image ships.
+    return (path == "frontend" or path.startswith("frontend/") or path == ".aoci" or path.startswith(".aoci/")
+            or re.fullmatch(r"aoci(\.[a-z]+)?\.txt", path) is not None)
+
+
 changed = committed + working
-outside = sorted({path for path in changed if not (path == "frontend" or path.startswith("frontend/"))})
+outside = sorted({path for path in changed if not frontend_only_safe(path)})
 if outside:
     print("changed paths outside frontend/: " + ", ".join(outside), file=sys.stderr)
     raise SystemExit(1)
@@ -1135,6 +1142,22 @@ PY
             elif [ "$frontend_build_needed" -eq 1 ]; then
                 log_success "[reuse] frontend-base: local image $FRONTEND_BASE_IMAGE"
             fi
+            # The base image exists only on this host. Referenced by tag alone,
+            # BuildKit first asks the registry and its mirrors for it, which
+            # stalls for about 100 s; a digest is resolved locally at once. Only
+            # the containerd image store reports one, so other hosts keep the tag.
+            frontend_base_ref=$FRONTEND_BASE_IMAGE
+            if [ "$frontend_build_needed" -eq 1 ]; then
+                case "$FRONTEND_BASE_IMAGE" in
+                    *@*) ;;
+                    *)
+                        base_digest=$(docker image inspect --format '{{with .Descriptor}}{{.Digest}}{{end}}' "$FRONTEND_BASE_IMAGE" 2>/dev/null || true)
+                        case "$base_digest" in
+                            sha256:*) frontend_base_ref="$FRONTEND_BASE_IMAGE@$base_digest" ;;
+                        esac
+                        ;;
+                esac
+            fi
             for build_target in $build_targets; do
                 if target_skip_requested "$build_target"; then
                     target_ref=$(target_ref_for "$build_target")
@@ -1186,7 +1209,7 @@ PY
                     --set "$build_target.args.HTTP_PROXY=$target_http_proxy" \
                     --set "$build_target.args.HTTPS_PROXY=$target_https_proxy" \
                     --set "$build_target.args.ALL_PROXY=$target_all_proxy" \
-                    --set "$build_target.args.FRONTEND_BASE_IMAGE=$FRONTEND_BASE_IMAGE" \
+                    --set "$build_target.args.FRONTEND_BASE_IMAGE=$frontend_base_ref" \
                     --set "$build_target.tags=$target_ref" \
                     --load "$build_target"
                 then
