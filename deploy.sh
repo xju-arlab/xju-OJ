@@ -1142,10 +1142,11 @@ PY
             elif [ "$frontend_build_needed" -eq 1 ]; then
                 log_success "[reuse] frontend-base: local image $FRONTEND_BASE_IMAGE"
             fi
-            # The base image exists only on this host. Referenced by tag alone,
-            # BuildKit first asks the registry and its mirrors for it, which
-            # stalls for about 100 s; a digest is resolved locally at once. Only
-            # the containerd image store reports one, so other hosts keep the tag.
+            # The base image exists only on this host, so pin the exact local
+            # image by digest and never let a registry answer for that name
+            # (frontend/Dockerfile also avoids the external syntax frontend,
+            # which queried the registry first and stalled builds ~100 s). Only
+            # the containerd image store reports a digest; other hosts keep the tag.
             frontend_base_ref=$FRONTEND_BASE_IMAGE
             if [ "$frontend_build_needed" -eq 1 ]; then
                 case "$FRONTEND_BASE_IMAGE" in

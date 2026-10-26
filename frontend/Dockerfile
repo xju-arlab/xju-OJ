@@ -1,4 +1,6 @@
-# syntax=docker/dockerfile:1.7
+# No syntax= directive on purpose: the daemon's built-in Dockerfile frontend
+# finds the host-only FRONTEND_BASE_IMAGE locally, while the external
+# docker/dockerfile image asks the registry for it first and stalls the build.
 ARG NODE_IMAGE=node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
 ARG NGINX_IMAGE=nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 ARG PNPM_VERSION=11.22.0
