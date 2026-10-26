@@ -30,7 +30,8 @@ def publish_prep_contest(prep_contest, overrides):
     end_time = overrides.get("end_time", prep.end_time)
     if end_time <= start_time:
         raise APIError("Start time must occur earlier than end time")
-    password = overrides.get("password", prep.password) or None
+    # The review password stays with the review; the real contest gets its own.
+    password = overrides.get("password") or None
 
     contest = Contest.objects.create(
         title=overrides.get("title", prep.title),

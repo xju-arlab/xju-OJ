@@ -507,8 +507,9 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         published = Contest.objects.get(id=response.data["data"]["id"])
         self.assertEqual((published.title, published.prep_state, published.published_from_id, published.visible),
                          ("Regional final", None, self.contest.id, True))
+        # The review password is not carried over; the publish form sets the contest's own.
         self.assertEqual((published.password, published.rule_type, published.created_by_id),
-                         ("secret", "ACM", self.creator.id))
+                         (None, "ACM", self.creator.id))
         copies = list(order_contest_problems(Problem.objects.filter(contest=published)))
         self.assertEqual([(item._id, item.title) for item in copies], [("A", "first"), ("B", "second")])
         self.assertEqual(copies[0].test_case_id, self.first.test_case_id)
