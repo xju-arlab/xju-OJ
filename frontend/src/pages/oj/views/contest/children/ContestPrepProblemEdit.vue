@@ -9,7 +9,11 @@
                        :service="service"
                        cancelable
                        @saved="backToList"
-                       @cancel="backToList" />
+                       @cancel="backToList">
+      <template #remarks>
+        <PrepFeedbackThread :contest-id="contestID" :problem-id="$route.params.problemId" />
+      </template>
+    </ProblemEditorForm>
   </section>
 </template>
 
@@ -17,10 +21,11 @@
 import { mapGetters } from '@/store/compat'
 import ProblemEditorForm from '@/shared/problem/ProblemEditorForm.vue'
 import { prepProblemService } from './prepProblemService'
+import PrepFeedbackThread from './PrepFeedbackThread.vue'
 
 export default {
   name: 'ContestPrepProblemEdit',
-  components: { ProblemEditorForm },
+  components: { ProblemEditorForm, PrepFeedbackThread },
   computed: {
     ...mapGetters(['canEditPrep']),
     contestID () {
@@ -40,4 +45,6 @@ export default {
 
 <style scoped lang="less">
 @import "@/styles/contest-prep.less";
+:deep(.thread-head) { font-size: 16px; }
+:deep(.thread-head strong) { font-weight: 680; }
 </style>

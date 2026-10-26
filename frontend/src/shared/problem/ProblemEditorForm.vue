@@ -231,6 +231,10 @@
         </template>
       </section>
 
+      <section v-if="$slots.remarks" class="form-section">
+        <slot name="remarks"></slot>
+      </section>
+
       <div class="form-actions">
         <el-button v-if="cancelable" @click="$emit('cancel')">{{ $t('m.Cancel') }}</el-button>
         <el-button type="primary" :loading="saving" @click="submit()">保存题目</el-button>

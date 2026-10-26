@@ -602,6 +602,20 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.login(self.stranger)
         self.assertFailed(self.client.get(self.feedback_url + f"?contest_id={self.contest.id}"))
 
+    def test_the_team_sees_real_names_on_remarks_and_problems(self):
+        for user, name in ((self.organizer, "李出题"), (self.teammate, "王验题")):
+            user.userprofile.real_name = name
+            user.userprofile.save(update_fields=["real_name"])
+        self.login(self.teammate)
+        response = self.client.post(self.feedback_url, data={"contest_id": self.contest.id,
+                                                             "problem_id": self.draft.id, "content": "Check n = 0"})
+        self.assertEqual(response.data["data"]["user"]["real_name"], "王验题")
+        listing = self.client.get(self.feedback_url + f"?contest_id={self.contest.id}")
+        self.assertEqual([item["user"]["real_name"] for item in listing.data["data"]], ["王验题"])
+        problems = self.client.get(self.reverse("contest_prep_problem_api") + f"?contest_id={self.contest.id}")
+        self.assertEqual({item["created_by"]["real_name"] for item in problems.data["data"]}, {"李出题"})
+        self.assertEqual({item["difficulty"] for item in problems.data["data"]}, {self.draft.difficulty})
+
     def test_review_round_is_started_by_the_creator_and_keeps_the_password(self):
         self.login(self.organizer)
         self.assertFailed(self.client.post(self.review_url, data={"contest_id": self.contest.id}),

@@ -136,11 +136,6 @@
               <Tooltip :content="$t('m.Click_to_Refresh')" placement="top"><img :src="captchaSrc" @click="getCaptchaSrc"/></Tooltip>
               <Input v-model="captchaCode" class="captcha-code" />
             </div>
-            <button v-if="feedbackWritable" type="button" class="problem-feedback-button" @click="openFeedback">
-              <Icon type="chatbubble" />
-              <span>{{ $t('m.Prep_Feedback') }}</span>
-              <small v-if="feedback.length">{{ feedback.length }}</small>
-            </button>
             <LegacyButton type="primary" @click="submitCode"
                     :disabled="problemSubmitDisabled || submitted || submitting"
                     :class="['oj-submit-button', { 'is-loading': submitting, 'is-success': submitted }]">
@@ -154,42 +149,6 @@
           </div>
         </div>
       </section>
-
-      <section v-if="feedbackPanelVisible" class="problem-feedback-card" aria-labelledby="problem-feedback-title">
-        <h2 id="problem-feedback-title">{{ $t('m.Prep_Feedback') }} <small>{{ openFeedbackCount }}/{{ feedback.length }}</small></h2>
-        <ul class="feedback-list">
-          <li v-for="item in feedback" :key="item.id" :class="{ 'is-resolved': item.resolved }">
-            <div class="feedback-meta">
-              <strong>{{ item.user.username }}</strong>
-              <time>{{ formatSubmissionTime(item.create_time) }}</time>
-              <button v-if="canEditPrep" type="button" class="feedback-resolve" @click="toggleFeedbackResolved(item)">
-                {{ item.resolved ? $t('m.Prep_Feedback_Reopen') : $t('m.Prep_Feedback_Resolve') }}
-              </button>
-            </div>
-            <p>{{ item.content }}</p>
-          </li>
-        </ul>
-      </section>
-
-      <LegacyDialog :title="$t('m.Prep_Feedback')" width="560px"
-                    :visible="feedbackDialogVisible" @update:visible="feedbackDialogVisible = $event">
-        <ul v-if="feedback.length" class="feedback-list is-compact">
-          <li v-for="item in feedback" :key="item.id" :class="{ 'is-resolved': item.resolved }">
-            <div class="feedback-meta">
-              <strong>{{ item.user.username }}</strong>
-              <time>{{ formatSubmissionTime(item.create_time) }}</time>
-            </div>
-            <p>{{ item.content }}</p>
-          </li>
-        </ul>
-        <el-input v-model="feedbackDraft" type="textarea" :rows="4" maxlength="2000" show-word-limit></el-input>
-        <template #footer>
-          <el-button @click="feedbackDialogVisible = false">{{ $t('m.Cancel') }}</el-button>
-          <el-button type="primary" :loading="feedbackSending" :disabled="!feedbackDraft.trim()" @click="sendFeedback">
-            {{ $t('m.Prep_Feedback_Send') }}
-          </el-button>
-        </template>
-      </LegacyDialog>
 
       <section class="recent-submission-card" aria-labelledby="recent-submissions-title">
         <RemoteSubmissionNotice v-if="result.id" :submission="result" @updated="checkSubmissionStatus" />
@@ -238,6 +197,10 @@
             {{ acceptedOnly ? $t('m.No_Accepted_Code') : $t('m.No_Recent_Submissions') }}
           </div>
         </div>
+      </section>
+
+      <section v-if="feedbackVisible" class="problem-feedback-section">
+        <PrepFeedbackThread :key="problem.id" :contest-id="contestID" :problem-id="problem.id" />
       </section>
 
       <LegacyDialog :title="$t('m.Submission_Code')" width="760px" class="submission-code-dialog"
@@ -314,6 +277,7 @@
   import { submissionStatus as presentSubmissionStatus } from '@oj/submissionStatus'
   import RemoteSubmissionNotice from '@oj/components/RemoteSubmissionNotice.vue'
   import Highlight from '@oj/components/Highlight.vue'
+  import PrepFeedbackThread from '../contest/children/PrepFeedbackThread.vue'
   import { applyDevelopmentProblemFixture, cloneFixtures, MOCK_PROBLEMS, MOCK_SUBMISSIONS } from '@oj/mocks/fixtures'
 
   const DEFAULT_PROBLEM_LANGUAGE = 'C++'
@@ -327,7 +291,7 @@
   export default {
     name: 'Problem',
     components: {
-      CodeMirror, ContestAnnouncementBanner, RemoteSubmissionNotice, Highlight
+      CodeMirror, ContestAnnouncementBanner, RemoteSubmissionNotice, Highlight, PrepFeedbackThread
     },
     mixins: [FormMixin],
     data () {
@@ -358,10 +322,6 @@
         refreshStatus: null,
         recentSubmissions: [],
         favoriting: false,
-        feedback: [],
-        feedbackDialogVisible: false,
-        feedbackDraft: '',
-        feedbackSending: false,
         acceptedOnly: false,
         codeDialogVisible: false,
         codeLoading: false,
@@ -712,38 +672,6 @@
         this.acceptedCelebrationResolve = null
         if (resolve) resolve()
       },
-      loadFeedback () {
-        if (!this.contestID || !this.isPrepContest || !this.problem.id) {
-          this.feedback = []
-          return
-        }
-        const generation = this.pageGeneration
-        api.getPrepFeedback(this.contestID, this.problem.id).then(res => {
-          if (this.disposed || generation !== this.pageGeneration) return
-          this.feedback = res.data.data || []
-        }).catch(() => {})
-      },
-      openFeedback () {
-        this.feedbackDialogVisible = true
-        this.loadFeedback()
-      },
-      sendFeedback () {
-        this.feedbackSending = true
-        api.addPrepFeedback(this.contestID, this.problem.id, this.feedbackDraft.trim()).then(() => {
-          this.feedbackDraft = ''
-          this.feedbackDialogVisible = false
-          this.$success(this.$t('m.Prep_Feedback_Sent'))
-          this.loadFeedback()
-        }).catch(() => {}).finally(() => {
-          this.feedbackSending = false
-        })
-      },
-      toggleFeedbackResolved (item) {
-        const resolved = !item.resolved
-        api.setPrepFeedbackResolved(this.contestID, item.id, resolved).then(() => {
-          item.resolved = resolved
-        }).catch(() => {})
-      },
       toggleFavorite () {
         const favorited = !this.problem.favorited
         this.favoriting = true
@@ -810,18 +738,9 @@
       submissionStatus () {
         return presentSubmissionStatus(this.result, this.$t)
       },
-      feedbackWritable () {
+      feedbackVisible () {
         // The team leaves review notes on any problem while setting or reviewing.
-        return Boolean(this.contestID) && this.isPrepContest
-      },
-      feedbackPanelVisible () {
-        return Boolean(this.contestID) && this.isPrepContest && this.feedback.length > 0
-      },
-      openFeedbackCount () {
-        return this.feedback.filter(item => !item.resolved).length
-      },
-      feedbackKey () {
-        return this.isPrepContest ? String(this.problem.id || '') : ''
+        return Boolean(this.contestID) && this.isPrepContest && Boolean(this.problem.id)
       },
       ownSubmissionsMode () {
         // Keep OI results hidden while a non-real-time contest is running.
@@ -878,9 +797,6 @@
       },
       theme () {
         this.scheduleProblemCodeSave()
-      },
-      feedbackKey () {
-        this.loadFeedback()
       }
     }
   }
@@ -1256,68 +1172,7 @@
     &.is-active { color: #d9a400; }
     &.is-active :deep(svg) { fill: currentColor; }
   }
-  .problem-feedback-button {
-    display: inline-flex;
-    height: 36px;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-bg);
-    color: var(--color-text-muted);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    transition: border-color var(--transition), color var(--transition), background-color var(--transition);
-    :deep(.legacy-icon) { display: inline-flex; }
-    small {
-      min-width: 18px;
-      padding: 0 5px;
-      border-radius: 999px;
-      background: var(--color-bg-subtle);
-      font-size: 11px;
-      text-align: center;
-    }
-    &:hover, &:focus-visible { border-color: var(--line-strong); background: var(--color-bg-subtle); color: var(--color-text); }
-  }
-  .problem-feedback-card {
-    margin-top: 14px;
-    padding: 14px 16px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-bg);
-    h2 { margin: 0 0 8px; color: var(--color-text); font-size: 14px; font-weight: 650; }
-    h2 small { margin-left: 4px; color: var(--color-text-faint); font-size: 12px; font-weight: 500; }
-  }
-  .feedback-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    li { padding: 10px 0; border-top: 1px solid var(--color-border); }
-    li:first-child { border-top: 0; }
-    li.is-resolved p { color: var(--color-text-faint); text-decoration: line-through; }
-    p { margin: 4px 0 0; color: var(--color-text); font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-    &.is-compact { max-height: 240px; overflow-y: auto; margin-bottom: 12px; }
-  }
-  .feedback-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    strong { color: var(--color-text); }
-    time { color: var(--color-text-faint); }
-  }
-  .feedback-resolve {
-    margin-left: auto;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-link);
-    font: inherit;
-    font-size: 12px;
-    cursor: pointer;
-  }
+  .problem-feedback-section { padding: 14px 15px 16px; }
   .submission-code-meta {
     display: flex;
     flex-wrap: wrap;

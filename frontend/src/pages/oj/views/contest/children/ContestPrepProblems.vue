@@ -5,6 +5,7 @@
         <span v-if="canEditPrep" role="columnheader" :aria-label="$t('m.Prep_Drag_To_Reorder')"></span>
         <span role="columnheader">#</span>
         <span role="columnheader">{{ $t('m.Title') }}</span>
+        <span class="cell-difficulty" role="columnheader">{{ $t('m.Prep_Difficulty') }}</span>
         <span class="cell-tags" role="columnheader">{{ $t('m.Tags') }}</span>
         <span role="columnheader">{{ $t('m.Prep_Feedback') }}</span>
         <span class="cell-author" role="columnheader">{{ $t('m.Prep_Author') }}</span>
@@ -33,16 +34,21 @@
           <router-link :to="{ name: 'contest-problem-details', params: { contestID, problemID: problem._id } }">{{ problem.title }}</router-link>
           <span v-if="!problem.test_case_id && problem.judge_mode !== 'REMOTE'" class="problem-warning">{{ $t('m.Prep_No_Test_Data') }}</span>
         </span>
+        <span class="cell-difficulty">
+          <span v-if="problem.difficulty" :class="['level-chip', `is-${problem.difficulty.toLowerCase()}`]">{{ $t(`m.${problem.difficulty}`) }}</span>
+        </span>
         <span class="cell-tags">
           <span v-for="tag in (problem.tags || []).slice(0, 3)" :key="tag" class="tag-chip">{{ tag }}</span>
           <span v-if="(problem.tags || []).length > 3" class="tag-more" :title="problem.tags.join(', ')">+{{ problem.tags.length - 3 }}</span>
         </span>
         <span class="cell-feedback">
-          <router-link v-if="problem.feedback_count" class="feedback-count"
-                       :to="{ name: 'contest-problem-details', params: { contestID, problemID: problem._id } }">{{ problem.feedback_count }}</router-link>
-          <span v-else class="feedback-none">—</span>
+          <button type="button" :class="['feedback-open', { 'has-open': problem.feedback_count }]"
+                  :title="$t('m.Prep_Feedback_Of', { title: problem.title })" @click="openFeedback(problem)">
+            <Icon type="chatbubble" />
+            <span v-if="problem.feedback_count">{{ problem.feedback_count }}</span>
+          </button>
         </span>
-        <span class="cell-author">{{ problem.created_by && problem.created_by.username }}</span>
+        <span class="cell-author" :title="problem.created_by && problem.created_by.username">{{ authorName(problem) }}</span>
         <span class="cell-actions">
           <el-button v-if="canEditPrep" text size="small" @click="editProblem(problem)">{{ $t('m.Edit') }}</el-button>
           <a v-if="problem.test_case_id" class="download-link" :href="testCaseUrl(problem)">{{ $t('m.Prep_Test_Data') }}</a>
@@ -52,12 +58,19 @@
 
       <p v-if="!loading && !problems.length" class="prep-empty">{{ $t('m.Prep_No_Problems') }}</p>
     </div>
+
+    <LegacyDialog :title="feedbackProblem ? $t('m.Prep_Feedback_Of', { title: feedbackProblem.title }) : ''" width="560px"
+                  class="prep-feedback-dialog" :visible="Boolean(feedbackProblem)" @update:visible="closeFeedback">
+      <PrepFeedbackThread v-if="feedbackProblem" :key="feedbackProblem.id" bare
+                          :contest-id="contestID" :problem-id="feedbackProblem.id" @count="setFeedbackCount" />
+    </LegacyDialog>
   </section>
 </template>
 
 <script>
 import api from '@oj/api'
 import { mapGetters } from '@/store/compat'
+import PrepFeedbackThread from './PrepFeedbackThread.vue'
 
 // Rows glide a little slower than a typical UI transition so a reorder is easy to follow.
 const MOVE_MS = 340
@@ -83,10 +96,12 @@ const sameSet = (a, b) => a.length === b.length && a.every(id => b.includes(id))
 
 export default {
   name: 'ContestPrepProblems',
+  components: { PrepFeedbackThread },
   data () {
     return {
       loading: false,
       problems: [],
+      feedbackProblem: null,
       draggingId: null,
       settlingId: null,
       flashId: null,
@@ -158,6 +173,19 @@ export default {
       }
       // History only holds orders of the same problem set.
       if (!sameSet(previous, this.order())) this.clearHistory()
+    },
+    authorName (problem) {
+      const author = problem.created_by
+      return author ? author.real_name || author.username : ''
+    },
+    openFeedback (problem) {
+      this.feedbackProblem = problem
+    },
+    closeFeedback (visible) {
+      if (!visible) this.feedbackProblem = null
+    },
+    setFeedbackCount (count) {
+      if (this.feedbackProblem) this.feedbackProblem.feedback_count = count
     },
     testCaseUrl (problem) {
       return `/api/contest/prep/test_case?contest_id=${this.contestID}&problem_id=${problem.id}`
@@ -393,10 +421,10 @@ export default {
 @import "@/styles/contest-prep.less";
 
 .prep-problem-list {
-  --prep-columns: 52px minmax(0, 1.2fr) minmax(0, 1fr) 72px 120px 190px;
+  --prep-columns: 52px minmax(0, 1.2fr) 72px minmax(0, 1fr) 64px 110px 190px;
   position: relative;
   font-size: 13px;
-  &.has-handle { --prep-columns: 34px 52px minmax(0, 1.2fr) minmax(0, 1fr) 72px 120px 190px; }
+  &.has-handle { --prep-columns: 34px 52px minmax(0, 1.2fr) 72px minmax(0, 1fr) 64px 110px 190px; }
 }
 .prep-problem-row {
   position: relative;
@@ -479,20 +507,46 @@ export default {
   a { overflow: hidden; color: var(--color-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 }
 .problem-warning { flex: none; color: var(--oj-danger); font-size: 12px; }
-.feedback-count {
+.level-chip {
+  --level: var(--cat-tools);
+  --level-bg: var(--tag-tools-bg);
   display: inline-flex;
-  min-width: 22px;
   height: 22px;
   align-items: center;
-  justify-content: center;
-  padding: 0 7px;
+  gap: 5px;
+  padding: 0 8px;
   border-radius: 999px;
-  background: var(--tag-research-bg);
-  color: var(--cat-research);
+  background: var(--level-bg);
+  color: var(--level);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  &::before { width: 6px; height: 6px; border-radius: 50%; background: var(--level); content: ''; }
+  &.is-mid { --level: var(--cat-kaggle); --level-bg: var(--tag-kaggle-bg); }
+  &.is-high { --level: var(--cat-research); --level-bg: var(--tag-research-bg); }
+}
+.feedback-open {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-faint);
+  font: inherit;
   font-size: 12px;
   font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease;
+  :deep(.legacy-icon) { display: inline-flex; }
+  :deep(svg) { width: 15px; height: 15px; }
+  &.has-open { background: var(--tag-course-bg); color: var(--cat-course); }
+  &:hover, &:focus-visible { background: rgba(55, 53, 47, .08); color: var(--color-text); outline: none; }
+  &.has-open:hover, &.has-open:focus-visible { background: var(--tag-course-bg); color: var(--cat-course); filter: brightness(.96); }
 }
-.feedback-none { color: var(--color-text-faint); }
 .cell-author { overflow: hidden; color: var(--color-text-muted); text-overflow: ellipsis; white-space: nowrap; }
 .cell-actions { display: flex; align-items: center; justify-content: flex-end; white-space: nowrap; }
 .download-link { margin: 0 8px; color: var(--color-link); font-size: 12px; }
@@ -502,7 +556,7 @@ export default {
 @media (max-width: 760px) {
   .prep-problem-list { --prep-columns: 44px minmax(0, 1fr) 56px 150px; }
   .prep-problem-list.has-handle { --prep-columns: 30px 44px minmax(0, 1fr) 56px 150px; }
-  .cell-author, .cell-tags { display: none !important; }
+  .cell-author, .cell-tags, .cell-difficulty { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prep-problem-row.is-flash { animation: none; }

@@ -90,9 +90,14 @@ def clean_tags(tags):
 
 
 def problem_list(contest):
-    problems = order_contest_problems(Problem.objects.filter(contest=contest)
-                                      .select_related("created_by").prefetch_related("tags"))
-    return with_feedback_counts(contest, ProblemAdminSerializer(problems, many=True).data)
+    problems = list(order_contest_problems(Problem.objects.filter(contest=contest)
+                                           .select_related("created_by__userprofile").prefetch_related("tags")))
+    data = ProblemAdminSerializer(problems, many=True).data
+    # The team knows each other by real name.
+    for problem, item in zip(problems, data):
+        profile = getattr(problem.created_by, "userprofile", None)
+        item["created_by"]["real_name"] = profile.real_name if profile else None
+    return with_feedback_counts(contest, data)
 
 
 def close_label_gaps(contest):
@@ -393,7 +398,7 @@ class ContestPrepFeedbackAPI(APIView):
     @login_required
     def get(self, request):
         contest = load_prep_contest(request, request.GET.get("contest_id"))
-        feedback = ContestProblemFeedback.objects.filter(contest=contest).select_related("user", "problem")
+        feedback = ContestProblemFeedback.objects.filter(contest=contest).select_related("user__userprofile", "problem")
         problem_id = request.GET.get("problem_id")
         if problem_id:
             feedback = feedback.filter(problem=get_contest_problem(contest, problem_id))

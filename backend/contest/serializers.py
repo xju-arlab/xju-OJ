@@ -184,7 +184,7 @@ class ContestPrepPublishSerializer(serializers.Serializer):
 
 
 class ContestProblemFeedbackSerializer(serializers.ModelSerializer):
-    user = UsernameSerializer()
+    user = UsernameSerializer(need_real_name=True)
     problem = serializers.SerializerMethodField()
 
     class Meta:

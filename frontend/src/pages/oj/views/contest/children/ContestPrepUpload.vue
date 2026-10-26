@@ -5,7 +5,7 @@
                        mode="add"
                        :contest-id="contestID"
                        :service="service"
-                       @saved="backToList">
+                       @saved="saved">
       <template #basic-actions>
         <el-upload :action="importAction"
                    :headers="csrfHeaders()"
@@ -19,6 +19,14 @@
           <el-button size="small" :loading="importing"><Icon type="upload" />{{ $t('m.Prep_Import_Zip') }}</el-button>
         </el-upload>
         <el-button size="small" @click="openPicker"><Icon type="search" />{{ $t('m.Prep_Select_Problem') }}</el-button>
+      </template>
+      <template #remarks>
+        <div class="remark-heading">
+          <h3>{{ $t('m.Prep_Feedback') }}</h3>
+          <p>{{ $t('m.Prep_Remark_Hint') }}</p>
+        </div>
+        <el-input v-model="remark" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" maxlength="2000"
+                  show-word-limit :placeholder="$t('m.Prep_Remark_Placeholder')" />
       </template>
     </ProblemEditorForm>
 
@@ -77,6 +85,7 @@ export default {
   data () {
     return {
       importing: false,
+      remark: '',
       importAction: '/api/contest/prep/import_problem',
       pickerVisible: false,
       pickerLoading: false,
@@ -106,6 +115,19 @@ export default {
   },
   methods: {
     csrfHeaders,
+    async saved (res) {
+      // The remark opens the new problem's thread.
+      const remark = this.remark.trim()
+      const problem = res && res.data && res.data.data
+      if (remark && problem) {
+        try {
+          await api.addPrepFeedback(this.contestID, problem.id, remark)
+        } catch (_) {
+          // The API client already shows the error; the problem itself is saved.
+        }
+      }
+      this.backToList()
+    },
     backToList () {
       this.$router.push({ name: 'contest-prep-problems', params: { contestID: this.contestID } })
     },
@@ -178,6 +200,11 @@ export default {
   font-size: 13px;
   th, td { padding: 9px 10px; border-bottom: 1px solid var(--color-border); text-align: left; }
   th { color: var(--color-text-muted); font-weight: 600; }
+}
+.remark-heading {
+  margin-bottom: 14px;
+  h3 { margin: 0; color: var(--color-text); font-size: 16px; font-weight: 680; }
+  p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
 }
 .id-column { width: 90px; }
 .title-column { color: var(--color-text); }
