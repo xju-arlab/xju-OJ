@@ -60,9 +60,9 @@ class UserProfileAPI(APIView):
             not user_profile.oj_onboarding_completed
             and ExternalIdentity.objects.filter(user=request.user, provider="authentik").exists()
         ):
-            # OJ profile fields are optional. Saving any valid payload completes
-            # the first-login handoff without making product-specific metadata
-            # a prerequisite for access.
+            # The serializer only requires the student ID, so confirming it
+            # completes the first-login handoff; every other OJ profile field
+            # stays optional and can be filled in later.
             user_profile.oj_onboarding_completed = True
         for k, v in data.items():
             setattr(user_profile, k, v)

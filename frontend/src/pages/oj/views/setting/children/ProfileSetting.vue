@@ -1,9 +1,20 @@
 <template>
   <div class="setting-main">
-    <Alert v-if="onboardingRequired" type="warning" show-icon>
-      {{ $t('m.Profile_Onboarding_Notice') }}
-    </Alert>
+    <section v-if="onboardingRequired" class="onboarding-card" aria-labelledby="onboarding-title">
+      <div id="onboarding-title" class="section-title">{{ $t('m.Onboarding_Title') }}</div>
+      <p class="onboarding-notice">{{ $t('m.Profile_Onboarding_Notice') }}</p>
+      <Form :model="formProfile" label-position="top">
+        <FormItem :label="$t('m.Username')">
+          <span class="onboarding-username">{{ username }}</span>
+        </FormItem>
+        <FormItem :label="$t('m.Student_ID')" required>
+          <Input v-model="formProfile.student_id" autocomplete="off" @on-enter="confirmOnboarding"/>
+        </FormItem>
+        <LegacyButton type="primary" :loading="loadingSaveBtn" @click="confirmOnboarding">{{ $t('m.Onboarding_Confirm') }}</LegacyButton>
+      </Form>
+    </section>
 
+    <template v-else>
     <div class="section-title">{{$t('m.Avatar_Setting')}}</div>
     <div class="avatar-setting-card">
       <div class="avatar-preview" :class="{'is-loading': loadingUploadBtn}">
@@ -39,7 +50,7 @@
     <Form ref="formProfile" :model="formProfile">
       <Row type="flex" :gutter="30" justify="space-around">
         <Col :span="11">
-          <FormItem :label="$t('m.Real_Name')" required>
+          <FormItem :label="$t('m.Real_Name')">
             <Input v-model="formProfile.real_name"/>
           </FormItem>
           <Form-item :label="$t('m.Student_ID')" required>
@@ -74,6 +85,7 @@
         </Col>
       </Row>
     </Form>
+    </template>
   </div>
 </template>
 
@@ -108,17 +120,20 @@
       }
     },
     mounted () {
-      const profile = this.$store.state.user.profile
-      Object.keys(this.formProfile).forEach(element => {
-        if (profile[element] !== undefined) {
-          this.formProfile[element] = profile[element]
-        }
-      })
+      this.fillForm(this.$store.state.user.profile)
     },
     beforeUnmount () {
       this.clearAvatarPreview()
     },
     methods: {
+      fillForm (profile) {
+        // New OIDC profiles store optional fields as NULL; keep inputs as strings.
+        Object.keys(this.formProfile).forEach(element => {
+          if (profile[element] !== undefined) {
+            this.formProfile[element] = profile[element] ?? ''
+          }
+        })
+      },
       openAvatarPicker () {
         if (!this.loadingUploadBtn) this.$refs.avatarInput?.click()
       },
@@ -239,35 +254,43 @@
         await this.$nextTick()
         if (previewUrl) URL.revokeObjectURL(previewUrl)
       },
-      updateProfile () {
-        const missing = []
-        if (!String(this.formProfile.real_name || '').trim()) missing.push(this.$t('m.Real_Name'))
-        if (!String(this.formProfile.student_id || '').trim()) missing.push(this.$t('m.Student_ID'))
-        if (missing.length) {
-          const separator = ['zh-CN', 'zh-TW'].includes(this.$i18n.locale) ? '、' : ', '
-          this.$Notice.warning({
-            title: this.$t('m.Profile_Required_Title'),
-            desc: this.$t('m.Profile_Required_Fields', {fields: missing.join(separator)})
-          })
-          return
-        }
+      requireStudentId () {
+        if (String(this.formProfile.student_id || '').trim()) return true
+        this.$Notice.warning({
+          title: this.$t('m.Profile_Required_Title'),
+          desc: this.$t('m.Profile_Required_Fields', {fields: this.$t('m.Student_ID')})
+        })
+        return false
+      },
+      saveProfile (updateData) {
         this.loadingSaveBtn = true
-        const updateData = {...this.formProfile}
-        api.updateProfile(updateData).then(res => {
-          this.$success('Success')
+        return api.updateProfile(updateData).then(res => {
           this.$store.commit(types.CHANGE_PROFILE, {profile: res.data.data})
-          if (this.$route.query.onboarding === '1') {
-            this.$router.replace({query: {}})
-          }
-          this.loadingSaveBtn = false
-        }, _ => {
+          return true
+        }, _ => false).finally(() => {
           this.loadingSaveBtn = false
         })
+      },
+      async confirmOnboarding () {
+        if (this.loadingSaveBtn || !this.requireStudentId()) return
+        // Only the student ID is sent, so empty optional fields can never
+        // block the first-login handoff.
+        if (await this.saveProfile({student_id: this.formProfile.student_id.trim()})) {
+          this.$success(this.$t('m.Onboarding_Done'))
+          this.$router.replace({name: 'home'})
+        }
+      },
+      async updateProfile () {
+        if (!this.requireStudentId()) return
+        if (await this.saveProfile({...this.formProfile})) this.$success('Success')
       }
     },
     computed: {
       onboardingRequired () {
-        return this.$route.query.onboarding === '1' || this.$store.state.user.profile.oj_onboarding_completed === false
+        return this.$store.state.user.profile.oj_onboarding_completed === false
+      },
+      username () {
+        return this.$store.state.user.profile.user?.username || ''
       },
       avatarSrc () {
         if (this.avatarPreviewUrl) return this.avatarPreviewUrl
@@ -284,6 +307,11 @@
     watch: {
       avatarSrc () {
         this.avatarFailed = false
+      },
+      // A hard reload can mount this page before getProfile resolves. Later
+      // profile refreshes (e.g. avatar upload) must not discard unsaved edits.
+      '$store.state.user.profile' (profile, previous) {
+        if (!previous?.user) this.fillForm(profile)
       }
     }
   }
@@ -292,6 +320,29 @@
 <style lang="less" scoped>
   :deep(.el-form-item.is-required .el-form-item__label::before) {
     color: #c94f4f;
+  }
+
+  .onboarding-card {
+    width: min(100%, 440px);
+    padding: 22px 24px 24px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+
+    .section-title {
+      margin-top: 0;
+    }
+  }
+
+  .onboarding-notice {
+    margin: 0 0 18px;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  .onboarding-username {
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .avatar-setting-card {

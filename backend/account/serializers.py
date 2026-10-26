@@ -104,15 +104,18 @@ class EditUserSerializer(serializers.Serializer):
 
 
 class EditUserProfileSerializer(serializers.Serializer):
-    real_name = serializers.CharField(max_length=32, allow_blank=False, allow_null=False, required=True)
+    # The student ID is the only OJ-specific requirement; the username comes
+    # from Authentik. Optional fields accept null because Studio/OIDC profiles
+    # are created with NULL columns and the profile form sends them back.
+    real_name = serializers.CharField(max_length=32, allow_blank=True, allow_null=True, required=False)
     student_id = serializers.CharField(max_length=32, allow_blank=False, allow_null=False, required=True)
     avatar = serializers.CharField(max_length=256, allow_blank=True, required=False)
-    blog = serializers.URLField(max_length=256, allow_blank=True, required=False)
-    mood = serializers.CharField(max_length=256, allow_blank=True, required=False)
-    github = serializers.URLField(max_length=256, allow_blank=True, required=False)
-    school = serializers.CharField(max_length=64, allow_blank=True, required=False)
-    major = serializers.CharField(max_length=64, allow_blank=True, required=False)
-    language = serializers.CharField(max_length=32, allow_blank=True, required=False)
+    blog = serializers.URLField(max_length=256, allow_blank=True, allow_null=True, required=False)
+    mood = serializers.CharField(max_length=256, allow_blank=True, allow_null=True, required=False)
+    github = serializers.URLField(max_length=256, allow_blank=True, allow_null=True, required=False)
+    school = serializers.CharField(max_length=64, allow_blank=True, allow_null=True, required=False)
+    major = serializers.CharField(max_length=64, allow_blank=True, allow_null=True, required=False)
+    language = serializers.CharField(max_length=32, allow_blank=True, allow_null=True, required=False)
 
 
 class ApplyResetPasswordSerializer(serializers.Serializer):
