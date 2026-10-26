@@ -144,7 +144,8 @@ const useApplicationStore = defineStore('application', {
         this.contest.contest = res.data.data
         this.contest.now = moment(res.data.data.now)
         // Preparation members never need the password.
-        if (this.contest.contest.contest_type === CONTEST_TYPE.PRIVATE && !this.contest.contest.prep_state) await this.getContestAccess()
+        // A preparation contest with a password asks for it on its review view.
+        if (this.contest.contest.contest_type === CONTEST_TYPE.PRIVATE) await this.getContestAccess()
         return res
       } catch (error) {
         if (!current()) return

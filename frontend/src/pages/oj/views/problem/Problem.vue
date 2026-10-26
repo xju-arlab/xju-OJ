@@ -800,7 +800,8 @@
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       contestEnded () {
-        return Boolean(this.contestID) && this.contestStatus === CONTEST_STATUS.ENDED
+        // A preparation contest's placeholder window means nothing: its runs are never practice.
+        return Boolean(this.contestID) && !this.isPrepContest && this.contestStatus === CONTEST_STATUS.ENDED
       },
       publicProblemTags () {
         if (this.contestID) return []

@@ -324,6 +324,11 @@ export default {
       data: { contest_id: contestId, password }
     })
   },
+  endPrepReview (contestId) {
+    return ajax('contest/prep/review', 'delete', {
+      params: { contest_id: contestId }
+    })
+  },
   setPrepProblemCount (contestId, count) {
     return ajax('contest/prep/problem_count', 'put', {
       data: { contest_id: contestId, problem_count: count }
@@ -374,15 +379,26 @@ export default {
       params: { contest_id: contestId, id: problemId }
     })
   },
-  // Picks a candidate for the contest (or puts it back); returns the reordered list.
-  selectPrepProblem (contestId, problemId, selected) {
-    return ajax('contest/prep/problem/select', 'put', {
-      data: { contest_id: contestId, id: problemId, selected }
+  // The problem plan: { items, progress } with each member's assigned and uploaded counts.
+  getPrepPlan (contestId) {
+    return ajax('contest/prep/plan', 'get', {
+      params: { contest_id: contestId }
     })
   },
-  updatePrepProblemMeta (contestId, problemId, difficulty, tags) {
-    return ajax('contest/prep/problem/meta', 'put', {
-      data: { contest_id: contestId, id: problemId, difficulty, tags }
+  addPrepPlanItem (contestId, data) {
+    return ajax('contest/prep/plan', 'post', {
+      data: { contest_id: contestId, ...data }
+    })
+  },
+  // Only the fields passed change; assignee_id null leaves the problem unclaimed.
+  updatePrepPlanItem (contestId, id, data) {
+    return ajax('contest/prep/plan', 'put', {
+      data: { contest_id: contestId, id, ...data }
+    })
+  },
+  deletePrepPlanItem (contestId, id) {
+    return ajax('contest/prep/plan', 'delete', {
+      params: { contest_id: contestId, id }
     })
   },
   addPrepProblemFromPublic (contestId, problemId) {

@@ -88,6 +88,11 @@
           </template>
         </div>
         <div v-else-if="isPrepContest && prepRole" class="prep-controls">
+          <button v-if="canManagePrep && reviewRunning" type="button" class="prep-action is-danger"
+                  :disabled="endingReview" @click="endReview">
+            <Icon type="close" />
+            <span>{{ $t('m.Prep_Review_End') }}</span>
+          </button>
           <router-link class="prep-back" :to="{ name: 'contest-prep-problems', params: { contestID } }">
             <Icon type="arrow-left" />
             <span>{{ $t('m.Prep_Back_To_Setting') }}</span>
@@ -97,7 +102,28 @@
     </template>
 
     <main :class="['contest-content', { 'is-root': routeName === 'contest-details' }]">
-      <div v-if="isOverviewRoute" class="contest-overview-grid">
+      <!-- The member's own share of the problem plan, on every setting tab. -->
+      <div v-if="isPrepSettingView && myPlan && myPlan.assigned"
+           :class="['prep-my-progress', { 'is-done': myPlan.assigned && myPlan.uploaded >= myPlan.assigned }]"
+           :title="$t('m.Prep_My_Progress')">
+        <span>{{ $t('m.Prep_My_Progress') }}</span>
+        <span class="my-progress-track" aria-hidden="true">
+          <span class="my-progress-fill" :style="{ width: `${myProgressPercent}%` }"></span>
+        </span>
+        <strong>{{ myPlan.uploaded }} / {{ myPlan.assigned }}</strong>
+      </div>
+      <!-- Review runs like the real contest, so the team enters its password too. -->
+      <section v-if="reviewGateVisible" class="prep-review-gate" aria-labelledby="prep-review-gate-title">
+        <span class="gate-icon" aria-hidden="true"><Icon type="ios-locked-outline" /></span>
+        <h2 id="prep-review-gate-title">{{ $t('m.Prep_Review_Password_Title') }}</h2>
+        <p>{{ $t('m.Prep_Review_Password_Note') }}</p>
+        <form class="gate-form" @submit.prevent="enterReview">
+          <el-input v-model="reviewGatePassword" type="password" show-password maxlength="32"
+                    :placeholder="$t('m.Contest_Password')"></el-input>
+          <el-button type="primary" native-type="submit" :loading="enteringReview">{{ $t('m.Prep_Review_Password_Enter') }}</el-button>
+        </form>
+      </section>
+      <div v-else-if="isOverviewRoute" class="contest-overview-grid">
         <section class="contest-overview" aria-labelledby="contest-overview-title">
           <div class="section-heading">
             <span class="section-icon"><Icon type="file-text" /></span>
@@ -153,9 +179,10 @@
       <template #footer>
         <div class="prep-dialog-footer">
           <el-button v-if="reviewRunning" text @click="openReviewTab()">{{ $t('m.Prep_Review_Open_Current') }}</el-button>
+          <el-button v-if="reviewRunning" text type="danger" :loading="endingReview" @click="endReview">{{ $t('m.Prep_Review_End') }}</el-button>
           <span class="prep-dialog-spacer"></span>
           <el-button @click="reviewVisible = false">{{ $t('m.Cancel') }}</el-button>
-          <el-button type="primary" :loading="startingReview" :disabled="!selectedCount" @click="startReview">
+          <el-button type="primary" :loading="startingReview" :disabled="!uploadedCount" @click="startReview">
             {{ $t(reviewRunning ? 'm.Prep_Review_Restart' : 'm.Prep_Review_Start') }}
           </el-button>
         </div>
@@ -200,12 +227,12 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
-  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_REVIEW_HOURS } from '@/utils/constants'
+  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PREP_REVIEW_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
   const PREP_SETTING_ROUTES = ['contest-details', 'contest-prep-problems', 'contest-prep-problem-edit',
-    'contest-prep-upload', 'contest-prep-select', 'contest-prep-roles']
+    'contest-prep-upload', 'contest-prep-assign', 'contest-prep-roles']
 
   export default {
     name: 'ContestDetail',
@@ -219,7 +246,11 @@
         reviewVisible: false,
         reviewPassword: '',
         startingReview: false,
-        selectedCount: null,
+        uploadedCount: null,
+        myPlan: null,
+        reviewGatePassword: '',
+        enteringReview: false,
+        endingReview: false,
         publishVisible: false,
         publishing: false,
         publishForm: {}
@@ -228,6 +259,7 @@
     mounted () {
       this.syncRoute()
       this.loadContest()
+      window.addEventListener(PREP_PLAN_CHANGED_EVENT, this.loadMyPlan)
     },
     methods: {
       ...mapActions(['changeDomTitle']),
@@ -241,7 +273,10 @@
           if (data.rule_type === 'AI') return this.$router.replace({ name: 'ai-contest', params: { contestID: data.id } })
           this.changeDomTitle({ title: data.title })
           this.syncClock()
-          if (data.prep_state) this.enterPrepWorkspace()
+          if (data.prep_state) {
+            this.enterPrepWorkspace()
+            this.loadMyPlan()
+          }
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
         })
@@ -281,12 +316,28 @@
         }
       },
       async loadSelection () {
-        this.selectedCount = null
+        this.uploadedCount = null
         try {
           const res = await api.getPrepProblems(this.contestID)
-          this.selectedCount = res.data.data.filter(problem => problem.visible).length
+          this.uploadedCount = res.data.data.length
         } catch (_) {
-          this.selectedCount = 0
+          this.uploadedCount = 0
+        }
+      },
+      async loadMyPlan () {
+        if (!this.isPrepContest || !this.prepRole || !this.user.id) return
+        const contestID = this.contestID
+        try {
+          const res = await api.getPrepPlan(contestID)
+          if (contestID !== this.contestID) return
+          const me = this.user.id
+          const mine = res.data.data.progress.find(row => row.id === me)
+          this.myPlan = {
+            assigned: res.data.data.items.filter(item => item.assignee && item.assignee.id === me).length,
+            uploaded: mine ? mine.uploaded : 0
+          }
+        } catch (_) {
+          this.myPlan = null
         }
       },
       reviewHref () {
@@ -310,11 +361,46 @@
         this.reviewVisible = true
         this.loadSelection()
       },
+      endReview () {
+        this.$confirm(this.$t('m.Prep_Review_End_Confirm'), this.$t('m.Prep_Review_End'), {
+          type: 'warning'
+        }).then(async () => {
+          this.endingReview = true
+          try {
+            await api.endPrepReview(this.contestID)
+            await this.$store.dispatch('getContest')
+            this.syncClock()
+            this.reviewVisible = false
+            this.$success(this.$t('m.Prep_Review_Ended_Done'))
+          } catch (_) {
+            // The API client already shows the error.
+          } finally {
+            this.endingReview = false
+          }
+        }).catch(() => {})
+      },
+      async enterReview () {
+        const password = this.reviewGatePassword.trim()
+        if (!password) return this.$error(this.$t('m.Contest_Password_Required'))
+        this.enteringReview = true
+        try {
+          await api.checkContestPassword(this.contestID, password)
+          this.reviewGatePassword = ''
+          this.$store.commit(types.CONTEST_ACCESS, { access: true })
+        } catch (_) {
+          // The API client already shows the error.
+        } finally {
+          this.enteringReview = false
+        }
+      },
       async startReview () {
         const tab = this.blankTab()
+        const password = this.reviewPassword.trim()
         this.startingReview = true
         try {
-          await api.startPrepReview(this.contestID, this.reviewPassword.trim())
+          await api.startPrepReview(this.contestID, password)
+          // Whoever just set the password has entered it: the session lets the new tab in.
+          if (password) await api.checkContestPassword(this.contestID, password).catch(() => {})
           await this.$store.dispatch('getContest')
           this.syncClock()
           this.reviewVisible = false
@@ -380,12 +466,13 @@
     computed: {
       ...mapState({
         contest: state => state.contest.contest,
+        contestAccess: state => state.contest.access,
         now: state => state.contest.now
       }),
       ...mapGetters([
         'contestMenuDisabled', 'contestRuleType', 'contestStatus', 'isContestAdmin',
         'isAuthenticated', 'OIContestRealTimePermission',
-        'isPrepContest', 'prepRole', 'canManagePrep'
+        'isPrepContest', 'prepRole', 'canManagePrep', 'user'
       ]),
       publishedContests () {
         return this.contest.published_contests || []
@@ -395,6 +482,11 @@
       },
       isPrepReviewView () {
         return this.isPrepContest && !this.isPrepSettingView
+      },
+      reviewGateVisible () {
+        // Problem pages stay open: organizers reach them from the setting list too.
+        return this.isPrepReviewView && !this.isProblemRoute && String(this.contest.id) === String(this.contestID) &&
+          this.contest.contest_type && this.contest.contest_type !== 'Public' && !this.contestAccess
       },
       isOverviewRoute () {
         return this.routeName === 'contest-details' || this.routeName === 'contest-prep-review'
@@ -406,16 +498,20 @@
         return this.contest.prep_problem_count || null
       },
       selectionIssue () {
-        return this.selectedCount !== null && (!this.selectedCount || (this.problemCount && this.selectedCount !== this.problemCount))
+        return this.uploadedCount !== null && (!this.uploadedCount || (this.problemCount && this.uploadedCount !== this.problemCount))
       },
       publishBlocked () {
-        return this.selectedCount === null || !this.selectedCount || Boolean(this.problemCount && this.selectedCount !== this.problemCount)
+        return this.uploadedCount === null || !this.uploadedCount || Boolean(this.problemCount && this.uploadedCount !== this.problemCount)
       },
       selectionSummary () {
-        if (this.selectedCount === null) return this.$t('m.Loading')
-        if (!this.selectedCount) return this.$t('m.Prep_Selection_Empty')
-        if (this.problemCount) return this.$t('m.Prep_Selection_Of', { selected: this.selectedCount, total: this.problemCount })
-        return this.$t('m.Prep_Selection_Count', { selected: this.selectedCount })
+        if (this.uploadedCount === null) return this.$t('m.Loading')
+        if (!this.uploadedCount) return this.$t('m.Prep_No_Uploads')
+        if (this.problemCount) return this.$t('m.Prep_Uploaded_Of', { uploaded: this.uploadedCount, total: this.problemCount })
+        return this.$t('m.Prep_Uploaded_Count', { uploaded: this.uploadedCount })
+      },
+      myProgressPercent () {
+        if (!this.myPlan || !this.myPlan.assigned) return 0
+        return Math.min(this.myPlan.uploaded / this.myPlan.assigned, 1) * 100
       },
       metaStart () {
         if (!this.isPrepContest) return this.contest.start_time
@@ -442,7 +538,7 @@
           return [
             { name: 'contest-prep-problems', label: 'Prep_Problem_List', icon: 'list-ol', route: { name: 'contest-prep-problems', params: common }, activeNames: ['contest-prep-problem-edit'] },
             { name: 'contest-prep-upload', label: 'Prep_Upload', icon: 'upload', route: { name: 'contest-prep-upload', params: common } },
-            { name: 'contest-prep-select', label: 'Prep_Select', icon: 'check-square', route: { name: 'contest-prep-select', params: common } },
+            { name: 'contest-prep-assign', label: 'Prep_Assign', icon: 'check-square', route: { name: 'contest-prep-assign', params: common } },
             { name: 'contest-prep-roles', label: 'Prep_Roles', icon: 'users', route: { name: 'contest-prep-roles', params: common } }
           ]
         }
@@ -482,9 +578,11 @@
         return item ? this.$t(`m.${item.name.replace(/ /g, '_')}`) : this.$t('m.Status')
       },
       reviewEndsAt () {
-        // Every review round restarts a 5-hour clock, like a fresh contest.
+        // Every review round restarts a 5-hour clock, like a fresh contest; the creator may end it early.
         if (!this.isPrepContest || !this.contest.review_started_at) return null
-        return moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
+        const end = moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
+        const ended = this.contest.review_ended_at && moment(this.contest.review_ended_at)
+        return ended && ended.isBefore(end) ? ended : end
       },
       reviewRunning () {
         return Boolean(this.reviewEndsAt && this.reviewEndsAt.isAfter(this.now))
@@ -532,10 +630,15 @@
         this.syncRoute()
         if (contestChanged) this.loadContest()
         else this.changeDomTitle({ title: this.contest.title })
-        if (!contestChanged && this.isPrepContest) this.enterPrepWorkspace()
+        if (!contestChanged && this.isPrepContest) {
+          this.enterPrepWorkspace()
+          // Uploads and deletions happen on other tabs; refresh the member's own progress.
+          if (this.isPrepSettingView) this.loadMyPlan()
+        }
       }
     },
     beforeUnmount () {
+      window.removeEventListener(PREP_PLAN_CHANGED_EVENT, this.loadMyPlan)
       clearInterval(this.timer)
       this.$store.commit(types.CLEAR_CONTEST)
     }
@@ -591,6 +694,7 @@
   &:hover, &:focus-visible { border-color: var(--line-strong); background: var(--bg-hover); color: var(--color-text); }
 }
 .prep-back { border-color: transparent; color: var(--color-text-muted); font-weight: 500; }
+.prep-action.is-danger { color: var(--oj-danger); &:hover, &:focus-visible { border-color: rgba(224, 62, 62, .35); background: var(--tag-research-bg); color: var(--oj-danger); } }
 /* A soft pulse marks a review round that is still running. */
 .prep-live {
   position: relative;
@@ -644,6 +748,65 @@
 @media (max-width: 760px) {
   .prep-controls { width: 100%; margin-left: 0; justify-content: flex-end; }
 }
+.prep-review-gate {
+  display: flex;
+  max-width: 420px;
+  flex-direction: column;
+  align-items: center;
+  margin: 24px auto;
+  padding: 32px 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  text-align: center;
+  h2 { margin: 12px 0 6px; color: var(--color-text); font-size: 17px; }
+  p { margin: 0 0 18px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+}
+.gate-icon {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--tag-tools-bg);
+  color: var(--cat-tools);
+  :deep(.legacy-icon) { display: inline-flex; }
+  :deep(svg) { width: 20px; height: 20px; }
+}
+.gate-form { display: flex; width: 100%; gap: 8px; }
+.gate-form .el-button { margin-left: 0; }
+.prep-my-progress {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px auto;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
+  &.is-done strong { color: var(--cat-tools); }
+}
+.my-progress-track {
+  position: relative;
+  width: 120px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(55, 53, 47, .08);
+}
+.my-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-link);
+  transition: width .45s cubic-bezier(.2, .8, .2, 1);
+}
+.prep-my-progress.is-done .my-progress-fill { background: var(--cat-tools); }
 .prep-dialog-note { margin: 0 0 12px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
 .prep-dialog-count {
   display: flex;

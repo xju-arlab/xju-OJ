@@ -5,20 +5,16 @@
         <span v-if="canEditPrep" role="columnheader" :aria-label="$t('m.Prep_Drag_To_Reorder')"></span>
         <span role="columnheader">#</span>
         <span role="columnheader">{{ $t('m.Title') }}</span>
+        <span class="cell-tags" role="columnheader">{{ $t('m.Tags') }}</span>
         <span role="columnheader">{{ $t('m.Prep_Feedback') }}</span>
         <span class="cell-author" role="columnheader">{{ $t('m.Prep_Author') }}</span>
         <span role="columnheader"></span>
       </div>
 
-      <template v-for="(problem, index) in problems" :key="problem.id">
-      <!-- The selected problems are the contest; the rest wait as candidates. -->
-      <div v-if="groupStartsAt(index)" class="prep-problem-group" role="presentation">
-        <span>{{ problem.visible ? $t('m.Prep_Group_Selected') : $t('m.Prep_Group_Candidates') }}</span>
-        <small>{{ groupCount(problem.visible) }}</small>
-      </div>
-      <div :ref="el => setRowRef(problem.id, el)"
+      <div v-for="(problem, index) in problems"
+           :key="problem.id"
+           :ref="el => setRowRef(problem.id, el)"
            :class="['prep-problem-row', {
-             'is-candidate': !problem.visible,
              'is-dragging': draggingId === problem.id,
              'is-settling': settlingId === problem.id,
              'is-flash': flashId === problem.id
@@ -37,6 +33,10 @@
           <router-link :to="{ name: 'contest-problem-details', params: { contestID, problemID: problem._id } }">{{ problem.title }}</router-link>
           <span v-if="!problem.test_case_id && problem.judge_mode !== 'REMOTE'" class="problem-warning">{{ $t('m.Prep_No_Test_Data') }}</span>
         </span>
+        <span class="cell-tags">
+          <span v-for="tag in (problem.tags || []).slice(0, 3)" :key="tag" class="tag-chip">{{ tag }}</span>
+          <span v-if="(problem.tags || []).length > 3" class="tag-more" :title="problem.tags.join(', ')">+{{ problem.tags.length - 3 }}</span>
+        </span>
         <span class="cell-feedback">
           <router-link v-if="problem.feedback_count" class="feedback-count"
                        :to="{ name: 'contest-problem-details', params: { contestID, problemID: problem._id } }">{{ problem.feedback_count }}</router-link>
@@ -49,7 +49,6 @@
           <el-button v-if="canEditPrep" text type="danger" size="small" @click="deleteProblem(problem)">{{ $t('m.Delete') }}</el-button>
         </span>
       </div>
-      </template>
 
       <p v-if="!loading && !problems.length" class="prep-empty">{{ $t('m.Prep_No_Problems') }}</p>
     </div>
@@ -98,9 +97,6 @@ export default {
     ...mapGetters(['canEditPrep']),
     contestID () {
       return this.$route.params.contestID
-    },
-    problemCount () {
-      return this.$store.state.contest.contest.prep_problem_count || null
     }
   },
   created () {
@@ -131,13 +127,6 @@ export default {
     },
     order () {
       return this.problems.map(problem => problem.id)
-    },
-    groupStartsAt (index) {
-      return index === 0 || this.problems[index - 1].visible !== this.problems[index].visible
-    },
-    groupCount (selected) {
-      const count = this.problems.filter(problem => problem.visible === selected).length
-      return selected && this.problemCount ? `${count} / ${this.problemCount}` : count
     },
     labelFor (problem, index) {
       // While an order is in flight, show the labels the server is about to assign.
@@ -257,20 +246,15 @@ export default {
       if (this.reordering) return
       const listTop = this.$refs.list.getBoundingClientRect().top
       const center = this.pointer.clientY - this.pointer.grabOffset - listTop + this.pointer.height / 2
-      // A row moves within its own group; selecting happens on the selection tab.
-      const dragged = this.problems.find(problem => problem.id === this.draggingId)
-      const group = this.problems.filter(problem => problem.visible === dragged.visible)
-      const others = group.filter(problem => problem.id !== this.draggingId)
+      const others = this.problems.filter(problem => problem.id !== this.draggingId)
       let index = 0
       others.forEach(problem => {
         const el = this.rowEls.get(problem.id)
         if (el && center > el.offsetTop + el.offsetHeight / 2) index += 1
       })
-      if (index === group.indexOf(dragged)) return
-      const groupIds = others.map(problem => problem.id)
-      groupIds.splice(index, 0, this.draggingId)
-      const rest = this.problems.filter(problem => problem.visible !== dragged.visible).map(problem => problem.id)
-      const ids = dragged.visible ? [...groupIds, ...rest] : [...rest, ...groupIds]
+      if (index === this.problems.findIndex(problem => problem.id === this.draggingId)) return
+      const ids = others.map(problem => problem.id)
+      ids.splice(index, 0, this.draggingId)
       this.reordering = true
       this.applyOrder(ids, this.draggingId).then(() => {
         this.reordering = false
@@ -336,7 +320,6 @@ export default {
       event.preventDefault()
       const target = index + offset
       if (target < 0 || target >= this.problems.length || this.draggingId !== null) return
-      if (this.problems[target].visible !== this.problems[index].visible) return
       const previous = this.order()
       const ids = previous.slice()
       const [id] = ids.splice(index, 1)
@@ -366,10 +349,8 @@ export default {
         let failed = false
         try {
           const res = await api.reorderPrepProblems(this.contestID, ids)
-          // With no newer save queued, the server's list wins: usually only the
-          // labels change, but a pick made in another tab may regroup the rows.
-          if (this.pendingSaves === 1) {
-            if (!sameOrder(res.data.data.map(problem => problem.id), this.order())) this.clearHistory()
+          if (this.pendingSaves === 1 && sameOrder(res.data.data.map(problem => problem.id), this.order())) {
+            // Same rows in the same order: only the labels and counts change.
             this.problems = res.data.data
           }
         } catch (_) {
@@ -412,22 +393,10 @@ export default {
 @import "@/styles/contest-prep.less";
 
 .prep-problem-list {
-  --prep-columns: 52px minmax(0, 1fr) 72px 130px 190px;
+  --prep-columns: 52px minmax(0, 1.2fr) minmax(0, 1fr) 72px 120px 190px;
   position: relative;
   font-size: 13px;
-  &.has-handle { --prep-columns: 34px 52px minmax(0, 1fr) 72px 130px 190px; }
-}
-.prep-problem-group {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 16px 12px 6px;
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  small { color: var(--color-text-faint); font-weight: 500; font-variant-numeric: tabular-nums; }
+  &.has-handle { --prep-columns: 34px 52px minmax(0, 1.2fr) minmax(0, 1fr) 72px 120px 190px; }
 }
 .prep-problem-row {
   position: relative;
@@ -490,7 +459,19 @@ export default {
 }
 .prep-problem-row:hover .drag-handle { opacity: 1; }
 .cell-label strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
-.prep-problem-row.is-candidate .cell-label strong { color: var(--color-text-faint); font-weight: 500; }
+.cell-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; overflow: hidden; }
+.tag-chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(55, 53, 47, .06);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag-more { color: var(--color-text-faint); font-size: 12px; }
 .cell-title {
   display: flex;
   align-items: center;
@@ -521,7 +502,7 @@ export default {
 @media (max-width: 760px) {
   .prep-problem-list { --prep-columns: 44px minmax(0, 1fr) 56px 150px; }
   .prep-problem-list.has-handle { --prep-columns: 30px 44px minmax(0, 1fr) 56px 150px; }
-  .cell-author { display: none; }
+  .cell-author, .cell-tags { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prep-problem-row.is-flash { animation: none; }

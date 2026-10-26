@@ -146,7 +146,7 @@ export default [
         path: 'review',
         component: Contest.ContestPrepReview
       },
-      // Preparation workspace: problems, upload, selection and members.
+      // Preparation workspace: problems, upload, problem assignment and members.
       {
         name: 'contest-prep-problems',
         path: 'prep/problems',
@@ -163,9 +163,9 @@ export default [
         component: Contest.ContestPrepProblemEdit
       },
       {
-        name: 'contest-prep-select',
-        path: 'prep/select',
-        component: Contest.ContestPrepSelect
+        name: 'contest-prep-assign',
+        path: 'prep/assign',
+        component: Contest.ContestPrepAssign
       },
       {
         name: 'contest-prep-roles',
