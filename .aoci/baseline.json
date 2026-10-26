@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-26T08:23:28Z",
+  "updated_at": "2026-10-26T08:27:33Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -248,9 +248,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ed277563ea1a859bb0dd42f4a8094dbe97f997189f83af5bbe8613472dfd129c",
-      "size": 202364,
-      "normalized_sha256": "ed277563ea1a859bb0dd42f4a8094dbe97f997189f83af5bbe8613472dfd129c"
+      "sha256": "fa4b81100f9c7de92b38d0293fcc32af27605ab3cda6ac5c1169e553ebf81123",
+      "size": 202469,
+      "normalized_sha256": "fa4b81100f9c7de92b38d0293fcc32af27605ab3cda6ac5c1169e553ebf81123"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -2940,9 +2940,9 @@
     },
     "frontend/src/pages/admin/views/problem/ProblemList.vue": {
       "role": "index",
-      "sha256": "69430c98040e83a54c623e29fc5488d73655e431cff17899174f71c73fe809ab",
-      "size": 13104,
-      "normalized_sha256": "69430c98040e83a54c623e29fc5488d73655e431cff17899174f71c73fe809ab"
+      "sha256": "fc2f10e46f4f7e1bd72fe0b78eea1b1c5ae8f9d6b07e5f1e54157244f5a20209",
+      "size": 13632,
+      "normalized_sha256": "fc2f10e46f4f7e1bd72fe0b78eea1b1c5ae8f9d6b07e5f1e54157244f5a20209"
     },
     "frontend/src/pages/oj/App.vue": {
       "role": "index",

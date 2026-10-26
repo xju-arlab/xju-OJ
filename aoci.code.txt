@@ -531,7 +531,7 @@ User.vue[EU6L]: F:管理用户资料角色、CSV导入及批量账户生成和�
 AddPublicProblem.vue[EU5S]: F:按比赛赛制筛选公开题并调用复制到比赛接口 | R:code:frontend/src/pages/admin/api.js | A:contestID；on-change事件；getPublicProblem | S:未给页码默认第一页；复制后的测试数据共享由后端管理
 ImportAndExport.vue[EU6M]: F:统一普通与AI题目的导入导出入口并保留ZIP FPS和远程题流程 | R:code:frontend/src/pages/admin/views/ai/ImportAndExport.vue,code:backend/problem/views/admin.py | A:普通题目与AI题目路由页签；选题导出与上传 | S:AI路由只挂AI组件，不请求普通题列表；原生上传带CSRF且以JSON error判定成功；Codeforces仍需浏览器助手
 Problem.vue[EU6T]: F:以后台API服务包装共享题目编辑表单，创建编辑公开及比赛题目 | R:code:frontend/src/shared/problem/ProblemEditorForm.vue,code:frontend/src/pages/admin/api.js | A:公开及比赛题目编辑页；service注入 | S:编辑逻辑在共享表单，此处只按路由选公开或比赛接口；lint:modern检查后台路由对本文件路径的懒加载原文
-ProblemList.vue[EU6M]: F:管理公开及比赛题搜索、编辑、公开化和远程导入 | R:code:frontend/src/pages/admin/api.js | A:题目列表与快捷操作 | S:关键字变化从第一页查询；不同题库路径选择相应后台接口
+ProblemList.vue[EU6M]: F:管理公开及比赛题搜索、编辑、公开化和远程导入 | R:code:frontend/src/pages/admin/api.js | A:题目列表与快捷操作；loadContestKind | S:关键字变化从第一页查询；不同题库路径选择相应后台接口；筹备比赛隐藏可见开关，因为可见即选题且后台保存会保留原值
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/===
 App.vue[EU6T]: F:组织OJ导航内容壳和OIDC错误提示，并控制AI题目Notebook纯享布局 | R:code:frontend/src/pages/oj/components/NavBar.vue,code:frontend/src/pages/oj/authError.js,code:frontend/src/pages/oj/views/ai/studio.less | A:OJ根组件；notebookOnly布局状态 | S:默认分栏，离开AI题目重置纯享；切换只改CSS类，不重建编辑器；认证错误仅用白名单且展示后移除
