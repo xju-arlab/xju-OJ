@@ -162,7 +162,7 @@
             <div class="feedback-meta">
               <strong>{{ item.user.username }}</strong>
               <time>{{ formatSubmissionTime(item.create_time) }}</time>
-              <button v-if="canAuthorPrep" type="button" class="feedback-resolve" @click="toggleFeedbackResolved(item)">
+              <button v-if="canEditPrep" type="button" class="feedback-resolve" @click="toggleFeedbackResolved(item)">
                 {{ item.resolved ? $t('m.Prep_Feedback_Reopen') : $t('m.Prep_Feedback_Resolve') }}
               </button>
             </div>
@@ -790,13 +790,13 @@
     },
     computed: {
       ...mapGetters(['problemSubmitDisabled', 'contestRuleType', 'OIContestRealTimePermission', 'contestStatus', 'user', 'isAuthenticated', 'contestMenuDisabled', 'isContestAdmin',
-        'isPrepContest', 'isPrepReview', 'canAuthorPrep']),
+        'isPrepContest', 'canEditPrep']),
       contest () {
         return this.$store.state.contest.contest
       },
       canReadAnnouncements () {
         if (!this.contestID || !this.isAuthenticated || String(this.contest.id) !== String(this.contestID)) return false
-        if (this.isPrepContest) return this.isPrepReview
+        if (this.isPrepContest) return true
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       contestEnded () {
@@ -810,17 +810,17 @@
         return presentSubmissionStatus(this.result, this.$t)
       },
       feedbackWritable () {
-        return Boolean(this.contestID) && this.isPrepReview
+        // The team leaves review notes on any problem while setting or reviewing.
+        return Boolean(this.contestID) && this.isPrepContest
       },
       feedbackPanelVisible () {
-        // Setters read the review notes on the problem page once back in setting mode.
-        return Boolean(this.contestID) && this.isPrepContest && !this.isPrepReview && this.feedback.length > 0
+        return Boolean(this.contestID) && this.isPrepContest && this.feedback.length > 0
       },
       openFeedbackCount () {
         return this.feedback.filter(item => !item.resolved).length
       },
       feedbackKey () {
-        return this.isPrepContest ? `${this.problem.id}:${this.contest.prep_state}` : ''
+        return this.isPrepContest ? String(this.problem.id || '') : ''
       },
       ownSubmissionsMode () {
         // Keep OI results hidden while a non-real-time contest is running.

@@ -21,7 +21,7 @@
             <td class="rank-column">{{ index + 1 }}</td>
             <td class="user-column">
               <span class="user-name">{{ row.user.username }}</span>
-              <span v-if="row.authored.length" class="role-chip is-setter" :title="$t('m.Prep_Role_Setter')">
+              <span v-if="row.authored.length" class="role-chip is-author" :title="$t('m.Prep_Author')">
                 {{ $t('m.Prep_Rank_Authored', { labels: row.authored.join(', ') }) }}
               </span>
               <span v-else-if="row.role" :class="['role-chip', `is-${row.role.toLowerCase()}`]">{{ $t(`m.Prep_Role_${row.role}`) }}</span>
@@ -184,9 +184,9 @@ export default {
   letter-spacing: .01em;
   vertical-align: middle;
 }
-.role-chip.is-setter { background: var(--tag-course-bg); color: var(--cat-course); }
+.role-chip.is-author { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
 .role-chip.is-creator { background: var(--tag-recommend-bg); color: var(--cat-recommend); }
-.role-chip.is-verifier { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
+.role-chip.is-organizer { background: var(--tag-course-bg); color: var(--cat-course); }
 .cell-time { display: block; line-height: 1.2; }
 .cell-tries { display: block; font-size: 11px; line-height: 1.2; opacity: .85; }
 .prep-rank-empty { height: 72px !important; color: var(--color-text-faint); }

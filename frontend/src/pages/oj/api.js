@@ -311,16 +311,22 @@ export default {
       params
     })
   },
-  // Contest preparation workspace (creator, problem setters and verifiers).
+  // Contest preparation workspace (the creator and organizers).
   // Creating one is an admin action, so it reuses the admin contest endpoint.
   createPrepContest (data) {
     return ajax('admin/contest', 'post', {
       data: { ...data, preparation: true }
     })
   },
-  setPrepContestState (contestId, state) {
-    return ajax('contest/prep/state', 'put', {
-      data: { contest_id: contestId, state }
+  // Starts a fresh 5-hour review round; the password is kept for publishing.
+  startPrepReview (contestId, password) {
+    return ajax('contest/prep/review', 'post', {
+      data: { contest_id: contestId, password }
+    })
+  },
+  setPrepProblemCount (contestId, count) {
+    return ajax('contest/prep/problem_count', 'put', {
+      data: { contest_id: contestId, problem_count: count }
     })
   },
   getPrepMembers (contestId) {
@@ -328,14 +334,9 @@ export default {
       params: { contest_id: contestId }
     })
   },
-  addPrepMember (contestId, username, role) {
+  addPrepMember (contestId, username) {
     return ajax('contest/prep/members', 'post', {
-      data: { contest_id: contestId, username, role }
-    })
-  },
-  updatePrepMember (contestId, userId, role) {
-    return ajax('contest/prep/members', 'put', {
-      data: { contest_id: contestId, user_id: userId, role }
+      data: { contest_id: contestId, username }
     })
   },
   removePrepMember (contestId, userId) {
@@ -373,9 +374,15 @@ export default {
       params: { contest_id: contestId, id: problemId }
     })
   },
-  setPrepProblemVisible (contestId, problemId, visible) {
-    return ajax('contest/prep/problem/visible', 'put', {
-      data: { contest_id: contestId, id: problemId, visible }
+  // Picks a candidate for the contest (or puts it back); returns the reordered list.
+  selectPrepProblem (contestId, problemId, selected) {
+    return ajax('contest/prep/problem/select', 'put', {
+      data: { contest_id: contestId, id: problemId, selected }
+    })
+  },
+  updatePrepProblemMeta (contestId, problemId, difficulty, tags) {
+    return ajax('contest/prep/problem/meta', 'put', {
+      data: { contest_id: contestId, id: problemId, difficulty, tags }
     })
   },
   addPrepProblemFromPublic (contestId, problemId) {
@@ -423,9 +430,9 @@ export default {
       params: { contest_id: contestId }
     })
   },
-  createPrepInvite (contestId, role) {
+  createPrepInvite (contestId) {
     return ajax('contest/prep/invite', 'post', {
-      data: { contest_id: contestId, role }
+      data: { contest_id: contestId }
     })
   },
   // Revokes one link by id, or every unused link of the contest.

@@ -18,14 +18,14 @@
                 <div class="contest-title-badges">
                   <span :class="['contest-rule', ruleClass]">{{contest.rule_type || 'ACM'}}</span>
                   <template v-if="isPrepContest">
-                    <span :class="['contest-prep-badge', { 'is-review': isPrepReview }]">{{ prepStateLabel }}</span>
+                    <span :class="['contest-prep-badge', { 'is-review': isPrepReviewView }]">{{ prepStateLabel }}</span>
                     <span v-if="prepRole" :class="['contest-prep-role', `is-${prepRole.toLowerCase()}`]">{{ $t(`m.Prep_Role_${prepRole}`) }}</span>
                     <router-link v-for="item in publishedContests" :key="item.id" class="contest-prep-published"
                                  :to="{ name: 'contest-details', params: { contestID: item.id } }"
                                  :title="item.title">{{ $t('m.Prep_Published_As') }} #{{ item.id }}</router-link>
                   </template>
                   <span v-else :class="['contest-status', statusClass]">{{statusLabel}}</span>
-                  <span v-if="contest.contest_type && contest.contest_type !== 'Public' && !contestEnded" class="contest-private">
+                  <span v-if="!isPrepContest && contest.contest_type && contest.contest_type !== 'Public' && !contestEnded" class="contest-private">
                     <Icon type="ios-locked-outline" />
                     {{contestTypeLabel}}
                   </span>
@@ -34,7 +34,7 @@
             </div>
           </div>
 
-          <div v-if="!isPrepContest || isPrepReview" class="contest-countdown" :aria-label="countdownCaption">
+          <div v-if="!isPrepContest || isPrepReviewView" class="contest-countdown" :aria-label="countdownCaption">
             <span>{{countdownCaption}}</span>
             <strong>{{countdownValue}}</strong>
           </div>
@@ -43,11 +43,11 @@
         <dl class="contest-meta">
           <div>
             <dt><Icon type="calendar" />{{$t('m.StartAt')}}</dt>
-            <dd>{{formatTime(isPrepContest ? contest.create_time : contest.start_time)}}</dd>
+            <dd>{{formatTime(metaStart)}}</dd>
           </div>
           <div>
             <dt><Icon type="calendar" />{{$t('m.EndAt')}}</dt>
-            <dd>{{isPrepContest ? '—' : formatTime(contest.end_time)}}</dd>
+            <dd>{{formatTime(metaEnd)}}</dd>
           </div>
           <div>
             <dt><Icon type="android-time" />{{$t('m.Duration')}}</dt>
@@ -71,26 +71,33 @@
           <Icon :type="tab.icon" />
           <span>{{$t(`m.${tab.label}`)}}</span>
         </button>
-        <div v-if="canManagePrep" class="prep-controls">
-          <div class="prep-mode-switch" role="group" :aria-label="$t('m.Contest_Preparation')">
-            <button v-for="state in prepStates" :key="state" type="button"
-                    :class="{ 'is-active': contest.prep_state === state }"
-                    :disabled="switchingState"
-                    :aria-pressed="contest.prep_state === state ? 'true' : 'false'"
-                    @click="switchPrepState(state)">{{ $t(`m.Prep_Mode_${state}`) }}</button>
-          </div>
-          <button type="button" class="prep-publish" @click="openPublish">{{ $t('m.Prep_Publish') }}</button>
-          <el-tooltip :content="$t('m.Prep_Edit_Settings')" placement="top">
-            <a class="prep-settings" :href="`/admin/contest/${contestID}/edit`" :aria-label="$t('m.Prep_Edit_Settings')">
-              <Icon type="settings" />
-            </a>
-          </el-tooltip>
+        <div v-if="isPrepContest && prepRole && isPrepSettingView" class="prep-controls">
+          <!-- Review and publish open in a new tab; this setting page stays where it is. -->
+          <button type="button" class="prep-action" @click="openReview">
+            <Icon type="flask" />
+            <span>{{ $t('m.Prep_Review') }}</span>
+            <span v-if="reviewRunning" class="prep-live" :title="$t('m.Prep_Review_Countdown')"></span>
+          </button>
+          <template v-if="canManagePrep">
+            <button type="button" class="prep-publish" @click="openPublish">{{ $t('m.Prep_Publish') }}</button>
+            <el-tooltip :content="$t('m.Prep_Edit_Settings')" placement="top">
+              <a class="prep-settings" :href="`/admin/contest/${contestID}/edit`" :aria-label="$t('m.Prep_Edit_Settings')">
+                <Icon type="settings" />
+              </a>
+            </el-tooltip>
+          </template>
+        </div>
+        <div v-else-if="isPrepContest && prepRole" class="prep-controls">
+          <router-link class="prep-back" :to="{ name: 'contest-prep-problems', params: { contestID } }">
+            <Icon type="arrow-left" />
+            <span>{{ $t('m.Prep_Back_To_Setting') }}</span>
+          </router-link>
         </div>
       </nav>
     </template>
 
     <main :class="['contest-content', { 'is-root': routeName === 'contest-details' }]">
-      <div v-if="routeName === 'contest-details'" class="contest-overview-grid">
+      <div v-if="isOverviewRoute" class="contest-overview-grid">
         <section class="contest-overview" aria-labelledby="contest-overview-title">
           <div class="section-heading">
             <span class="section-icon"><Icon type="file-text" /></span>
@@ -110,7 +117,7 @@
             <div><dt>{{$t('m.Rule')}}</dt><dd :class="['contest-rule', ruleClass]">{{contest.rule_type || 'ACM'}}</dd></div>
             <div><dt>{{$t('m.ContestType')}}</dt><dd>{{contestTypeLabel}}</dd></div>
             <div><dt>{{$t('m.Problems')}}</dt><dd>{{contestProblemIds.length || '—'}}</dd></div>
-            <div v-if="isPrepContest"><dt>{{$t('m.Status')}}</dt><dd><span :class="['contest-prep-badge', { 'is-review': isPrepReview }]">{{ prepStateLabel }}</span></dd></div>
+            <div v-if="isPrepContest"><dt>{{$t('m.Status')}}</dt><dd><span :class="['contest-prep-badge', { 'is-review': reviewRunning }]">{{ reviewStatusLabel }}</span></dd></div>
             <div v-else><dt>{{$t('m.Status')}}</dt><dd :class="['contest-status', statusClass]">{{statusLabel}}</dd></div>
           </dl>
           <button type="button"
@@ -127,8 +134,40 @@
       </router-view>
     </main>
 
+    <LegacyDialog v-if="canManagePrep" :title="$t('m.Prep_Review')" width="480px"
+                  :visible="reviewVisible" @update:visible="reviewVisible = $event">
+      <p class="prep-dialog-note">{{ $t('m.Prep_Review_Note', { hours: reviewHours }) }}</p>
+      <p :class="['prep-dialog-count', { 'is-warning': selectionIssue }]">
+        <Icon :type="selectionIssue ? 'alert-circle' : 'check-circle'" />
+        <span>{{ selectionSummary }}</span>
+      </p>
+      <p v-if="reviewRunning" class="prep-dialog-running">
+        <span class="prep-live"></span>{{ $t('m.Prep_Review_Running', { time: countdownValue }) }}
+      </p>
+      <el-form label-position="top" @submit.prevent>
+        <el-form-item :label="$t('m.Contest_Password')">
+          <el-input v-model="reviewPassword" maxlength="32" :placeholder="$t('m.Prep_Password_Placeholder')"></el-input>
+          <small class="prep-field-hint">{{ $t('m.Prep_Review_Password_Hint') }}</small>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="prep-dialog-footer">
+          <el-button v-if="reviewRunning" text @click="openReviewTab()">{{ $t('m.Prep_Review_Open_Current') }}</el-button>
+          <span class="prep-dialog-spacer"></span>
+          <el-button @click="reviewVisible = false">{{ $t('m.Cancel') }}</el-button>
+          <el-button type="primary" :loading="startingReview" :disabled="!selectedCount" @click="startReview">
+            {{ $t(reviewRunning ? 'm.Prep_Review_Restart' : 'm.Prep_Review_Start') }}
+          </el-button>
+        </div>
+      </template>
+    </LegacyDialog>
+
     <LegacyDialog v-if="canManagePrep" :title="$t('m.Prep_Publish')" width="560px"
                   :visible="publishVisible" @update:visible="publishVisible = $event">
+      <p :class="['prep-dialog-count', { 'is-warning': publishBlocked }]">
+        <Icon :type="publishBlocked ? 'alert-circle' : 'check-circle'" />
+        <span>{{ selectionSummary }}</span>
+      </p>
       <el-form label-position="top">
         <el-form-item :label="$t('m.Contest_Name')">
           <el-input v-model="publishForm.title" maxlength="128" :placeholder="$t('m.Contest_Name')"></el-input>
@@ -150,7 +189,7 @@
       </el-form>
       <template #footer>
         <el-button @click="publishVisible = false">{{ $t('m.Cancel') }}</el-button>
-        <el-button type="primary" :loading="publishing" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
+        <el-button type="primary" :loading="publishing" :disabled="publishBlocked" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
       </template>
     </LegacyDialog>
   </div>
@@ -164,7 +203,9 @@
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_REVIEW_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
-  const PREP_STATES = ['Preparation', 'Review']
+  // The workspace tabs; every other contest route of a preparation contest is its review view.
+  const PREP_SETTING_ROUTES = ['contest-details', 'contest-prep-problems', 'contest-prep-problem-edit',
+    'contest-prep-upload', 'contest-prep-select', 'contest-prep-roles']
 
   export default {
     name: 'ContestDetail',
@@ -174,8 +215,11 @@
         routeName: '',
         contestID: '',
         timer: null,
-        prepStates: PREP_STATES,
-        switchingState: false,
+        reviewHours: PREP_REVIEW_HOURS,
+        reviewVisible: false,
+        reviewPassword: '',
+        startingReview: false,
+        selectedCount: null,
         publishVisible: false,
         publishing: false,
         publishForm: {}
@@ -197,7 +241,7 @@
           if (data.rule_type === 'AI') return this.$router.replace({ name: 'ai-contest', params: { contestID: data.id } })
           this.changeDomTitle({ title: data.title })
           this.syncClock()
-          if (data.prep_state) this.enterPrepTab()
+          if (data.prep_state) this.enterPrepWorkspace()
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
         })
@@ -209,9 +253,7 @@
         this.openTab(this.tabs.find(tab => tab.name === 'contest-problem-list'))
       },
       isTabActive (tab) {
-        return tab.name === 'contest-details'
-          ? this.routeName === 'contest-details'
-          : this.routeName === tab.name || (tab.activeNames || []).includes(this.routeName)
+        return this.routeName === tab.name || (tab.activeNames || []).includes(this.routeName)
       },
       formatTime (value) {
         return value ? this.$filters.localtime(value, 'YYYY-MM-DD HH:mm') : '—'
@@ -232,25 +274,56 @@
           .map(value => String(value).padStart(2, '0')).join(':')
         return days ? `${days}d ${clock}` : clock
       },
-      enterPrepTab () {
-        // Setting mode has no overview page; review keeps the contest tabs.
-        const names = this.visibleTabs.flatMap(tab => [tab.name, ...(tab.activeNames || [])])
-        if (!names.includes(this.routeName) && this.routeName !== 'contest-problem-details') {
-          this.$router.replace(this.visibleTabs[0].route)
+      enterPrepWorkspace () {
+        // A preparation contest opens on its setting workspace; review lives at its own address.
+        if (this.routeName === 'contest-details') {
+          this.$router.replace({ name: 'contest-prep-problems', params: { contestID: this.contestID } })
         }
       },
-      async switchPrepState (state) {
-        if (state === this.contest.prep_state) return
-        this.switchingState = true
+      async loadSelection () {
+        this.selectedCount = null
         try {
-          await api.setPrepContestState(this.contestID, state)
+          const res = await api.getPrepProblems(this.contestID)
+          this.selectedCount = res.data.data.filter(problem => problem.visible).length
+        } catch (_) {
+          this.selectedCount = 0
+        }
+      },
+      reviewHref () {
+        return this.$router.resolve({ name: 'contest-prep-review', params: { contestID: this.contestID } }).href
+      },
+      // Open the tab while the click still counts as a user gesture, then point
+      // it at the page once the request succeeds; popup blockers allow that.
+      blankTab () {
+        const tab = window.open('', '_blank')
+        if (tab) tab.opener = null
+        return tab
+      },
+      openReviewTab (tab = null) {
+        const href = this.reviewHref()
+        if (tab) tab.location.href = href
+        else window.open(href, '_blank', 'noopener')
+      },
+      openReview () {
+        if (!this.canManagePrep) return this.openReviewTab()
+        this.reviewPassword = this.contest.password || ''
+        this.reviewVisible = true
+        this.loadSelection()
+      },
+      async startReview () {
+        const tab = this.blankTab()
+        this.startingReview = true
+        try {
+          await api.startPrepReview(this.contestID, this.reviewPassword.trim())
           await this.$store.dispatch('getContest')
           this.syncClock()
-          this.enterPrepTab()
+          this.reviewVisible = false
+          this.openReviewTab(tab)
         } catch (_) {
           // The API client already shows the error.
+          if (tab) tab.close()
         } finally {
-          this.switchingState = false
+          this.startingReview = false
         }
       },
       openPublish () {
@@ -270,6 +343,7 @@
           real_time_rank: this.contest.real_time_rank !== false
         }
         this.publishVisible = true
+        this.loadSelection()
       },
       async publish () {
         const form = this.publishForm
@@ -277,6 +351,7 @@
           this.$error(this.$t('m.Prep_Time_Invalid'))
           return
         }
+        const tab = this.blankTab()
         this.publishing = true
         try {
           const res = await api.publishPrepContest({
@@ -289,9 +364,14 @@
           })
           this.publishVisible = false
           this.$success(this.$t('m.Prep_Published'))
-          this.$router.push({ name: 'contest-details', params: { contestID: res.data.data.id } })
+          const href = this.$router.resolve({ name: 'contest-details', params: { contestID: res.data.data.id } }).href
+          if (tab) tab.location.href = href
+          else window.open(href, '_blank', 'noopener')
+          // Show the new "published as" link on this page.
+          this.$store.dispatch('getContest').catch(() => {})
         } catch (_) {
           // The API client already shows the error.
+          if (tab) tab.close()
         } finally {
           this.publishing = false
         }
@@ -305,17 +385,49 @@
       ...mapGetters([
         'contestMenuDisabled', 'contestRuleType', 'contestStatus', 'isContestAdmin',
         'isAuthenticated', 'OIContestRealTimePermission',
-        'isPrepContest', 'isPrepReview', 'prepRole', 'canManagePrep', 'canAuthorPrep', 'canEditPrep'
+        'isPrepContest', 'prepRole', 'canManagePrep'
       ]),
       publishedContests () {
         return this.contest.published_contests || []
       },
+      isPrepSettingView () {
+        return this.isPrepContest && PREP_SETTING_ROUTES.includes(this.routeName)
+      },
+      isPrepReviewView () {
+        return this.isPrepContest && !this.isPrepSettingView
+      },
+      isOverviewRoute () {
+        return this.routeName === 'contest-details' || this.routeName === 'contest-prep-review'
+      },
       prepStateLabel () {
-        return this.$t(this.isPrepReview ? 'm.Prep_State_Review' : 'm.Prep_State_Preparation')
+        return this.$t(this.isPrepReviewView ? 'm.Prep_State_Review' : 'm.Prep_State_Preparation')
+      },
+      problemCount () {
+        return this.contest.prep_problem_count || null
+      },
+      selectionIssue () {
+        return this.selectedCount !== null && (!this.selectedCount || (this.problemCount && this.selectedCount !== this.problemCount))
+      },
+      publishBlocked () {
+        return this.selectedCount === null || !this.selectedCount || Boolean(this.problemCount && this.selectedCount !== this.problemCount)
+      },
+      selectionSummary () {
+        if (this.selectedCount === null) return this.$t('m.Loading')
+        if (!this.selectedCount) return this.$t('m.Prep_Selection_Empty')
+        if (this.problemCount) return this.$t('m.Prep_Selection_Of', { selected: this.selectedCount, total: this.problemCount })
+        return this.$t('m.Prep_Selection_Count', { selected: this.selectedCount })
+      },
+      metaStart () {
+        if (!this.isPrepContest) return this.contest.start_time
+        return this.isPrepReviewView ? this.contest.review_started_at : this.contest.create_time
+      },
+      metaEnd () {
+        if (!this.isPrepContest) return this.contest.end_time
+        return this.isPrepReviewView && this.reviewEndsAt ? this.reviewEndsAt.toDate() : null
       },
       canReadAnnouncements () {
         if (!this.isAuthenticated || !this.contestID || String(this.contest.id) !== String(this.contestID)) return false
-        if (this.isPrepContest) return this.isPrepReview
+        if (this.isPrepContest) return true
         return !this.contestMenuDisabled && (this.contestStatus !== CONTEST_STATUS.NOT_START || this.isContestAdmin)
       },
       isProblemRoute () {
@@ -326,17 +438,18 @@
       },
       tabs () {
         const common = { contestID: this.contestID }
-        // Review uses the same tabs as a published contest.
-        if (this.isPrepContest && !this.isPrepReview) {
-          const list = this.canAuthorPrep ? 'contest-prep-problems' : 'contest-problem-list'
+        if (this.isPrepSettingView) {
           return [
-            { name: list, label: 'Prep_Problem_List', icon: 'list-ol', route: { name: list, params: common }, activeNames: ['contest-prep-problem-edit'] },
-            { name: 'contest-prep-upload', label: 'Prep_Upload', icon: 'upload', route: { name: 'contest-prep-upload', params: common }, visible: this.canAuthorPrep },
+            { name: 'contest-prep-problems', label: 'Prep_Problem_List', icon: 'list-ol', route: { name: 'contest-prep-problems', params: common }, activeNames: ['contest-prep-problem-edit'] },
+            { name: 'contest-prep-upload', label: 'Prep_Upload', icon: 'upload', route: { name: 'contest-prep-upload', params: common } },
+            { name: 'contest-prep-select', label: 'Prep_Select', icon: 'check-square', route: { name: 'contest-prep-select', params: common } },
             { name: 'contest-prep-roles', label: 'Prep_Roles', icon: 'users', route: { name: 'contest-prep-roles', params: common } }
           ]
         }
+        // A review round uses the same tabs as a published contest.
+        const overview = this.isPrepContest ? 'contest-prep-review' : 'contest-details'
         return [
-          { name: 'contest-details', label: 'Overview', icon: 'home', route: { name: 'contest-details', params: common } },
+          { name: overview, label: 'Overview', icon: 'home', route: { name: overview, params: common } },
           { name: 'contest-announcement-list', label: 'Announcements', icon: 'megaphone', route: { name: 'contest-announcement-list', params: common }, disabled: this.contestMenuDisabled },
           { name: 'contest-problem-list', label: 'Problems', icon: 'ios-photos', route: { name: 'contest-problem-list', params: common } },
           { name: 'contest-submission-list', label: 'Submissions', icon: 'navicon-round', route: { name: 'contest-submission-list', params: common }, disabled: this.contestMenuDisabled, visible: this.OIContestRealTimePermission },
@@ -369,13 +482,21 @@
         return item ? this.$t(`m.${item.name.replace(/ /g, '_')}`) : this.$t('m.Status')
       },
       reviewEndsAt () {
-        // Every switch into review restarts a 5-hour clock, like a fresh contest.
-        if (!this.isPrepReview || !this.contest.review_started_at) return null
+        // Every review round restarts a 5-hour clock, like a fresh contest.
+        if (!this.isPrepContest || !this.contest.review_started_at) return null
         return moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
+      },
+      reviewRunning () {
+        return Boolean(this.reviewEndsAt && this.reviewEndsAt.isAfter(this.now))
+      },
+      reviewStatusLabel () {
+        if (this.reviewRunning) return this.$t('m.Prep_State_Review')
+        return this.$t(this.contest.review_started_at ? 'm.Prep_Review_Ended' : 'm.Prep_Review_Not_Started')
       },
       countdownCaption () {
         if (this.isPrepContest) {
-          return this.$t(this.reviewEndsAt && this.reviewEndsAt.isAfter(this.now) ? 'm.Prep_Review_Countdown' : 'm.Prep_Review_Ended')
+          if (this.reviewRunning) return this.$t('m.Prep_Review_Countdown')
+          return this.$t(this.contest.review_started_at ? 'm.Prep_Review_Ended' : 'm.Prep_Review_Not_Started')
         }
         if (this.contestStatus === CONTEST_STATUS.NOT_START) return this.$t('m.Not_Started')
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
@@ -383,7 +504,7 @@
       },
       countdownValue () {
         if (this.isPrepContest) {
-          return this.reviewEndsAt ? this.formatCountdown(this.reviewEndsAt.diff(this.now, 'seconds')) : '—'
+          return this.reviewRunning ? this.formatCountdown(this.reviewEndsAt.diff(this.now, 'seconds')) : '—'
         }
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
         const target = this.contestStatus === CONTEST_STATUS.NOT_START ? this.contest.start_time : this.contest.end_time
@@ -391,7 +512,7 @@
         return this.formatCountdown(moment(target).diff(this.now, 'seconds'))
       },
       durationLabel () {
-        if (this.isPrepContest) return this.isPrepReview ? `${PREP_REVIEW_HOURS}h` : '—'
+        if (this.isPrepContest) return this.isPrepReviewView ? `${PREP_REVIEW_HOURS}h` : '—'
         if (!this.contest.start_time || !this.contest.end_time) return '—'
         const hours = Math.abs(moment(this.contest.end_time).diff(moment(this.contest.start_time), 'minutes')) / 60
         if (hours >= 24) return `${Number((hours / 24).toFixed(1))}d`
@@ -411,7 +532,7 @@
         this.syncRoute()
         if (contestChanged) this.loadContest()
         else this.changeDomTitle({ title: this.contest.title })
-        if (!contestChanged && this.isPrepContest && this.routeName === 'contest-details') this.enterPrepTab()
+        if (!contestChanged && this.isPrepContest) this.enterPrepWorkspace()
       }
     },
     beforeUnmount () {
@@ -449,31 +570,49 @@
   gap: 8px;
   margin-left: auto;
 }
-.prep-mode-switch {
+.prep-action,
+.prep-back {
   display: inline-flex;
-  padding: 2px;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: rgba(55, 53, 47, .06);
-  button {
-    height: 26px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--color-text-muted);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background-color var(--transition), color var(--transition), box-shadow var(--transition);
-    &:hover:not(.is-active) { color: var(--color-text); }
-    &.is-active {
-      background: var(--color-bg);
-      color: var(--color-text);
-      font-weight: 600;
-      box-shadow: 0 0 0 1px rgba(15, 15, 15, .06), 0 1px 2px rgba(15, 15, 15, .1);
-    }
-    &:disabled { cursor: wait; }
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+  :deep(.legacy-icon) { display: inline-flex; }
+  :deep(svg) { width: 15px; height: 15px; }
+  &:hover, &:focus-visible { border-color: var(--line-strong); background: var(--bg-hover); color: var(--color-text); }
+}
+.prep-back { border-color: transparent; color: var(--color-text-muted); font-weight: 500; }
+/* A soft pulse marks a review round that is still running. */
+.prep-live {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--cat-tools);
+  &::after {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: currentColor;
+    color: var(--cat-tools);
+    content: "";
+    opacity: .25;
+    animation: prep-live 1.8s ease-out infinite;
   }
+}
+@keyframes prep-live {
+  from { transform: scale(.6); opacity: .35; }
+  to { transform: scale(1.6); opacity: 0; }
 }
 .prep-publish {
   height: 30px;
@@ -504,6 +643,38 @@
 }
 @media (max-width: 760px) {
   .prep-controls { width: 100%; margin-left: 0; justify-content: flex-end; }
+}
+.prep-dialog-note { margin: 0 0 12px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.prep-dialog-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--tag-tools-bg);
+  color: var(--cat-tools);
+  font-size: 13px;
+  font-weight: 600;
+  :deep(.legacy-icon) { display: inline-flex; }
+  :deep(svg) { width: 16px; height: 16px; }
+  &.is-warning { background: var(--tag-course-bg); color: var(--oj-warning); }
+}
+.prep-dialog-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.prep-field-hint { display: block; margin-top: 4px; color: var(--color-text-faint); font-size: 12px; line-height: 1.5; }
+.prep-dialog-footer { display: flex; align-items: center; gap: 8px; }
+.prep-dialog-footer .el-button + .el-button { margin-left: 0; }
+.prep-dialog-spacer { flex: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .prep-live::after { animation: none; }
 }
 .prep-publish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 .prep-publish-grid :deep(.el-date-editor.el-input) { width: 100%; }

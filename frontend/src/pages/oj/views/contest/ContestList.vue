@@ -43,7 +43,7 @@
             <div class="contest-main">
               <p class="title">
                 <a class="entry" @click.stop="goContest(contest)">{{contest.title}}</a>
-                <Icon v-if="contest.contest_type != 'Public' && !isEnded(contest)" type="ios-locked-outline" size="16"></Icon>
+                <Icon v-if="!contest.prep_state && contest.contest_type != 'Public' && !isEnded(contest)" type="ios-locked-outline" size="16"></Icon>
               </p>
               <ul class="detail">
                 <!-- A preparation contest is scheduled only when it is published. -->
@@ -52,7 +52,7 @@
                 <li><span :class="['contest-rule', ruleClass(contest.rule_type)]">{{contest.rule_type}}</span></li>
               </ul>
             </div>
-            <span v-if="contest.prep_state" class="contest-status status-prep">{{ prepStateLabel(contest.prep_state) }}</span>
+            <span v-if="contest.prep_state" class="contest-status status-prep">{{ $t('m.Prep_Badge') }}</span>
             <span v-else :class="['contest-status', statusClass(contest.status)]">{{statusLabel(contest.status)}}</span>
           </div>
         </li>
@@ -181,9 +181,6 @@
         if (value === '1') return 'status-not-started'
         if (value === '-1') return 'status-ended'
         return 'status-underway'
-      },
-      prepStateLabel (state) {
-        return this.$t(state === 'Review' ? 'm.Prep_State_Review' : 'm.Prep_State_Preparation')
       },
       onPrepContestCreated (contest) {
         this.$router.push({ name: 'contest-details', params: { contestID: contest.id } })

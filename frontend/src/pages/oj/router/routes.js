@@ -140,7 +140,13 @@ export default [
         path: 'helper',
         component: Contest.ACMContestHelper
       },
-      // Preparation workspace: problem setting (tab 2) and roles (tab 1).
+      // Overview of a preparation contest's review round; ContestDetail draws it.
+      {
+        name: 'contest-prep-review',
+        path: 'review',
+        component: Contest.ContestPrepReview
+      },
+      // Preparation workspace: problems, upload, selection and members.
       {
         name: 'contest-prep-problems',
         path: 'prep/problems',
@@ -155,6 +161,11 @@ export default [
         name: 'contest-prep-problem-edit',
         path: 'prep/problems/:problemId/edit',
         component: Contest.ContestPrepProblemEdit
+      },
+      {
+        name: 'contest-prep-select',
+        path: 'prep/select',
+        component: Contest.ContestPrepSelect
       },
       {
         name: 'contest-prep-roles',

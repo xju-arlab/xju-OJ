@@ -142,8 +142,7 @@ export default {
   font-size: 12px;
   font-weight: 600;
 }
-.role-setter { background: var(--tag-course-bg); color: var(--cat-course); }
-.role-verifier { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
+.role-organizer { background: var(--tag-course-bg); color: var(--cat-course); }
 @keyframes invite-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) {
   .invite-mark.is-joining :deep(svg) { animation: none; }

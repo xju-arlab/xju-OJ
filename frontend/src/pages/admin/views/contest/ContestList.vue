@@ -50,7 +50,7 @@
           width="130">
           <template #default="scope">
             <el-tag v-if="scope.row.prep_state" type="warning">
-              {{ scope.row.prep_state === 'Review' ? '验题中' : '出题中' }}
+              筹备中
             </el-tag>
             <el-tag v-else
               :type="scope.row.status === '-1' ? 'danger' : scope.row.status === '0' ? 'success' : 'primary'">

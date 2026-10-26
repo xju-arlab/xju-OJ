@@ -82,7 +82,7 @@
             <div v-else-if="contest.prep_state" class="setting-card">
               <span class="setting-copy">
                 <strong>{{ $t('m.Contest_Preparation_Mode') }}</strong>
-                <small>{{ contest.prep_state === 'Review' ? '验题中' : '出题中' }}</small>
+                <small>筹备中</small>
               </span>
               <a class="prep-open-link" :href="`/contest/${$route.params.contestId}/`">打开筹备页</a>
             </div>

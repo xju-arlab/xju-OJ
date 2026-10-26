@@ -95,7 +95,8 @@
         </div>
 
         <div class="toggle-row">
-          <label class="toggle-field">
+          <!-- A preparation contest picks its problems on the selection tab instead. -->
+          <label v-if="!contest.prep_state" class="toggle-field">
             <span><strong>{{$t('m.Visible')}}</strong><small>{{ visibleHint }}</small></span>
             <el-switch v-model="problem.visible"></el-switch>
           </label>
@@ -309,7 +310,6 @@
         return this.contestId ? '允许其他用户在比赛结束后查看共享提交' : '允许其他用户查看共享提交'
       },
       visibleHint () {
-        if (this.contest.prep_state) return '对验题人可见'
         return '允许普通用户在题库中看到该题'
       }
     },
@@ -351,7 +351,7 @@
           this.service.getContest(this.contestId).then(contest => {
             this.contest = contest
             this.problem.rule_type = contest.rule_type
-            // Problems uploaded while preparing a contest start hidden as drafts.
+            // Problems uploaded while preparing a contest start as unselected candidates.
             if (this.mode !== 'edit' && contest.prep_state) this.problem.visible = false
           })
         }

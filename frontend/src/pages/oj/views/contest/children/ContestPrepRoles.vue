@@ -15,9 +15,6 @@
           </template>
         </el-autocomplete>
       </div>
-      <el-select v-model="newMember.role" class="prep-member-role">
-        <el-option v-for="role in assignableRoles" :key="role" :value="role" :label="roleLabel(role)"></el-option>
-      </el-select>
       <el-button type="primary" native-type="submit" :loading="adding">{{ $t('m.Prep_Add_Member') }}</el-button>
       <button type="button" class="tool-button" @click="openLinks">
         <Icon type="bars" />
@@ -25,14 +22,14 @@
         <span v-if="openInviteCount" class="tool-count">{{ openInviteCount }}</span>
       </button>
       <button type="button"
-              :class="['tool-button', 'invite-button', { 'is-copied': copiedRole, 'is-busy': inviting }]"
+              :class="['tool-button', 'invite-button', { 'is-copied': copied, 'is-busy': inviting }]"
               :disabled="inviting"
               @click="copyInvite">
-        <span class="invite-label invite-idle" :aria-hidden="copiedRole ? 'true' : 'false'">
+        <span class="invite-label invite-idle" :aria-hidden="copied ? 'true' : 'false'">
           <Icon type="link" />{{ $t('m.Prep_Invite_Link') }}
         </span>
-        <span class="invite-label invite-done" :aria-hidden="copiedRole ? 'false' : 'true'" role="status">
-          <Icon type="check" />{{ copiedRole ? $t(`m.Prep_Invite_Copied_${copiedRole}`) : '' }}
+        <span class="invite-label invite-done" :aria-hidden="copied ? 'false' : 'true'" role="status">
+          <Icon type="check" />{{ copied ? $t('m.Prep_Invite_Copied') : '' }}
         </span>
       </button>
     </form>
@@ -56,19 +53,7 @@
         <tr v-for="member in members" :key="member.id">
           <td><router-link :to="userHome(member.user.username)">{{ member.user.username }}</router-link></td>
           <td class="real-name">{{ member.user.real_name || '—' }}</td>
-          <td>
-            <!-- On hover the label gives way to a swap icon; both share one grid cell so the width stays put. -->
-            <button v-if="canManagePrep" type="button"
-                    :class="['role-pill', 'is-toggle', `role-${member.role.toLowerCase()}`, { 'is-busy': switching === member.id }]"
-                    :title="$t('m.Prep_Switch_To', { role: roleLabel(otherRole(member.role)) })"
-                    :aria-label="$t('m.Prep_Switch_To', { role: roleLabel(otherRole(member.role)) })"
-                    :disabled="switching === member.id"
-                    @click="toggleRole(member)">
-              <span class="role-face role-text">{{ roleLabel(member.role) }}</span>
-              <span class="role-face role-icon" aria-hidden="true"><Icon type="swap" /></span>
-            </button>
-            <span v-else :class="['role-pill', `role-${member.role.toLowerCase()}`]">{{ roleLabel(member.role) }}</span>
-          </td>
+          <td><span :class="['role-pill', `role-${member.role.toLowerCase()}`]">{{ roleLabel(member.role) }}</span></td>
           <td v-if="canManagePrep" class="actions-column">
             <el-button text type="danger" size="small" @click="removeMember(member)">{{ $t('m.Prep_Remove') }}</el-button>
           </td>
@@ -84,7 +69,6 @@
       <table v-if="invites.length" class="invite-table">
         <thead>
           <tr>
-            <th>{{ $t('m.Prep_Role') }}</th>
             <th>{{ $t('m.Status') }}</th>
             <th>{{ $t('m.Prep_Invite_Created') }}</th>
             <th>{{ $t('m.Prep_Invite_Detail') }}</th>
@@ -93,7 +77,6 @@
         </thead>
         <tbody>
           <tr v-for="invite in invites" :key="invite.id" :class="`is-${invite.status}`">
-            <td><span :class="['role-pill', 'is-small', `role-${invite.role.toLowerCase()}`]">{{ roleLabel(invite.role) }}</span></td>
             <td><span :class="['status-dot', `is-${invite.status}`]">{{ $t(`m.Prep_Invite_Status_${invite.status}`) }}</span></td>
             <td class="muted">{{ shortTime(invite.create_time) }}</td>
             <td class="muted">{{ inviteDetail(invite) }}</td>
@@ -157,11 +140,9 @@ export default {
       adding: false,
       creator: null,
       members: [],
-      assignableRoles: ['Setter', 'Verifier'],
-      newMember: { username: '', role: 'Setter' },
-      switching: null,
+      newMember: { username: '' },
       inviting: false,
-      copiedRole: '',
+      copied: false,
       copiedTimer: null,
       openInvites: {},
       invites: [],
@@ -188,9 +169,6 @@ export default {
   methods: {
     roleLabel (role) {
       return this.$t(`m.Prep_Role_${role}`)
-    },
-    otherRole (role) {
-      return role === 'Setter' ? 'Verifier' : 'Setter'
     },
     userHome (username) {
       return { name: 'user-home', query: { username } }
@@ -240,7 +218,7 @@ export default {
       if (!username) return
       this.adding = true
       try {
-        await api.addPrepMember(this.contestID, username, this.newMember.role)
+        await api.addPrepMember(this.contestID, username)
         this.newMember.username = ''
         await this.load()
       } catch (_) {
@@ -249,29 +227,16 @@ export default {
         this.adding = false
       }
     },
-    async toggleRole (member) {
-      const role = this.otherRole(member.role)
-      this.switching = member.id
-      try {
-        await api.updatePrepMember(this.contestID, member.user.id, role)
-        member.role = role
-      } catch (_) {
-        await this.load()
-      } finally {
-        this.switching = null
-      }
-    },
     async copyInvite () {
-      const role = this.newMember.role
       this.inviting = true
       try {
-        // Each click mints a new single-use link; the token is never shown again.
-        const res = await api.createPrepInvite(this.contestID, role)
+        // Each click mints a new single-use organizer link; the token is never shown again.
+        const res = await api.createPrepInvite(this.contestID)
         const link = inviteLink(res.data.data.token)
         if (await copyText(link)) {
           clearTimeout(this.copiedTimer)
-          this.copiedRole = role
-          this.copiedTimer = setTimeout(() => { this.copiedRole = '' }, COPIED_MS)
+          this.copied = true
+          this.copiedTimer = setTimeout(() => { this.copied = false }, COPIED_MS)
         } else {
           this.$Modal.info({ title: this.$t('m.Prep_Invite_Link'), content: link })
         }
@@ -323,7 +288,6 @@ export default {
 .prep-member-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
 .prep-member-form .el-button + .tool-button { margin-left: 0; }
 .prep-member-user { flex: 0 1 320px; min-width: 200px; :deep(.el-autocomplete) { width: 100%; } }
-.prep-member-role { width: 140px; }
 .suggestion-name { color: var(--color-text); }
 .suggestion-real-name { margin-left: 8px; color: var(--color-text-faint); font-size: 12px; }
 
@@ -406,32 +370,7 @@ export default {
   &.is-small { height: 22px; padding: 0 8px; font-size: 11px; }
 }
 .role-creator { background: var(--tag-recommend-bg); color: var(--cat-recommend); }
-.role-setter { background: var(--tag-course-bg); color: var(--cat-course); }
-.role-verifier { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
-.role-pill.is-toggle {
-  display: inline-grid;
-  place-items: center;
-  cursor: pointer;
-  &:hover, &:focus-visible { box-shadow: 0 0 0 1px currentColor inset; }
-  &.is-busy { cursor: wait; opacity: .6; }
-}
-.role-face {
-  display: inline-flex;
-  grid-area: 1 / 1;
-  align-items: center;
-  justify-content: center;
-  transition: opacity .2s ease, transform .28s cubic-bezier(.2, .8, .2, 1);
-}
-.role-icon {
-  opacity: 0;
-  transform: rotate(-90deg) scale(.7);
-  :deep(.legacy-icon) { display: inline-flex; }
-  :deep(svg) { width: 14px; height: 14px; }
-}
-.role-pill.is-toggle:hover, .role-pill.is-toggle:focus-visible {
-  .role-text { opacity: 0; transform: scale(.85); }
-  .role-icon { opacity: 1; transform: none; }
-}
+.role-organizer { background: var(--tag-course-bg); color: var(--cat-course); }
 
 .invite-table {
   width: 100%;
@@ -458,6 +397,6 @@ export default {
 .invite-footer-spacer { flex: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .invite-label, .role-pill, .role-face { transition: none; }
+  .invite-label, .role-pill { transition: none; }
 }
 </style>

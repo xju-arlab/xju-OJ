@@ -1,7 +1,7 @@
 <template>
   <section class="prep-panel" :aria-label="$t('m.Edit_Problem')">
-    <p v-if="!canEditPrep" class="prep-empty">{{ $t('m.Prep_Problem_Locked') }}</p>
-    <ProblemEditorForm v-else
+    <!-- Every member may write problems; wait for the contest so the role is known. -->
+    <ProblemEditorForm v-if="canEditPrep"
                        :key="$route.fullPath"
                        mode="edit"
                        :problem-id="$route.params.problemId"
