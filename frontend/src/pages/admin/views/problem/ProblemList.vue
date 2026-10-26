@@ -49,7 +49,9 @@
             {{ $filters.localtime(scope.row.create_time) }}
           </template>
         </el-table-column>
+        <!-- A preparation contest picks its problems on its own selection tab. -->
         <el-table-column
+          v-if="!isPrepContest"
           width="100"
           prop="visible"
           label="可见">
@@ -177,6 +179,7 @@
         currentPage: 1,
         routeName: '',
         contestId: '',
+        isPrepContest: false,
         // for make public use
         currentProblemID: '',
         currentRow: {},
@@ -194,9 +197,18 @@
     mounted () {
       this.routeName = this.$route.name
       this.contestId = this.$route.params.contestId
+      this.loadContestKind()
       this.getProblemList(this.currentPage)
     },
     methods: {
+      loadContestKind () {
+        this.isPrepContest = false
+        if (!this.contestId) return
+        const contestId = this.contestId
+        api.getContest(contestId).then(res => {
+          if (this.contestId === contestId) this.isPrepContest = Boolean(res.data.data.prep_state)
+        }).catch(() => {})
+      },
       providerLabel (provider) {
         return {
           NOWCODER: '牛客',
@@ -343,6 +355,7 @@
       '$route' (newVal, oldVal) {
         this.contestId = newVal.params.contestId
         this.routeName = newVal.name
+        this.loadContestKind()
         this.getProblemList(this.currentPage)
       },
       'keyword' () {
