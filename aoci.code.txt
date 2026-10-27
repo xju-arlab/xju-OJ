@@ -224,13 +224,14 @@ views.py[EC1T]: F:保留未实现的系统选项视图占位文件 | R:- | A:- |
 0018_unique_public_remote_problem.py[PD6T]: F:约束公开远程题的提供商与远程编号组合唯一 | R:code:backend/problem/models.py | A:problem迁移0018 | S:条件仅覆盖REMOTE模式且contest为空的行，不限制比赛副本
 0019_normalize_remote_problem_content.py[PD6T]: F:规范存量洛谷和牛客题面的链接与富文本 | R:code:backend/problem/remote/common.py,code:backend/problem/remote/nowcoder.py | A:problem数据迁移0019 | S:调用当前运行代码而非冻结实现；逆操作不恢复原题面
 0020_problem_favorite.py[PD5T]: F:创建用户收藏题目表 | R:code:backend/problem/models.py | A:problem迁移0020 | S:每位用户对同一题目唯一，用户或题目删除时级联移除收藏
+0021_problem_data_range.py[PD5T]: F:为题目增加可留空的富文本数据范围字段 | R:code:backend/problem/models.py | A:problem迁移0021 | S:存量题以空字符串回填而非NULL
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/problem/===
-models.py[PB8S]: F:持久化题目、标签、判题参数、统计、远程题和赛后发布信息及用户收藏 | R:code:backend/problem/publication.py,code:backend/judge/dispatcher.py | A:Problem；ProblemTag；ProblemFavorite；ProblemRuleType；ProblemJudgeMode；RemoteOJ | S:公开题和比赛副本共表；公开题contest为NULL使显示编号组合约束不能防止重复；收藏每用户每题唯一；测试文件在数据库之外；题面经RichTextField清洗
+models.py[PB8S]: F:持久化题目、标签、含数据范围与样例解释的题面、判题参数、统计、远程题和赛后发布信息及用户收藏 | R:code:backend/problem/publication.py,code:backend/judge/dispatcher.py | A:Problem；ProblemTag；ProblemFavorite；ProblemRuleType；ProblemJudgeMode；RemoteOJ | S:公开题和比赛副本共表；公开题contest为NULL使显示编号组合约束不能防止重复；收藏每用户每题唯一；测试文件在数据库之外；题面经RichTextField清洗，但样例JSON不经清洗，样例解释只能按纯文本渲染
 publication.py[AB7S]: F:在比赛结束后原子发布排队题目、分配题库编号并复用已存在的公开远程题 | R:code:backend/problem/models.py,code:backend/problem/tasks.py,code:backend/problem/views/admin.py | A:publish_due_contest_problems；next_public_display_id；remote_problem_display_id | S:筹备比赛题永不入库；未预留编号的题在发布时才取下一个空闲数字编号；占用的显示编号使任务保留排队；行锁不锁不存在的公开编号
-serializers.py[EB7M]: F:校验题目管理、筹备出题、远程导入、收藏和SPJ输入并定义公开、个人题目列表及导出字段 | R:code:backend/problem/models.py,code:backend/problem/utils.py | A:ProblemSerializer；ProblemSafeSerializer；ProblemAdminSerializer；CreatePrepContestProblemSerializer；ProfileProblemSerializer；ExportProblemSerializer | S:公开输出剔除测试文件、SPJ源码和远程元数据；模板只暴露TEMPLATE段；安全版本进一步隐藏统计信息；筹备题的visible由视图强制为真，编辑可省略
+serializers.py[EB7M]: F:校验题目管理、筹备出题、远程导入、收藏和SPJ输入并定义公开、个人题目列表及含数据范围和样例解释的导出字段 | R:code:backend/problem/models.py,code:backend/problem/utils.py | A:ProblemSerializer；ProblemSafeSerializer；ProblemAdminSerializer；CreatePrepContestProblemSerializer；ProfileProblemSerializer；ExportProblemSerializer | S:公开输出剔除测试文件、SPJ源码和远程元数据；模板只暴露TEMPLATE段；安全版本再隐藏统计；筹备题visible由视图强制；数据范围与样例解释可省略并补空串，导出把NULL提示写成空串
 tasks.py[AW6T]: F:通过Dramatiq在赛后调度题目发布 | R:code:backend/problem/publication.py | A:publish_contest_problems；schedule_contest_problem_publication | S:延迟为结束后至少1秒；消息最长存活十年且最多重试3次，读题接口也会补触发到期发布
-tests.py[TB6L]: F:回归题目管理、数据包导入、远程题面与赛后公开流程 | R:code:backend/problem/views/admin.py,code:backend/problem/publication.py | A:Django题目API测试 | S:外部题源使用固定HTML和网络替身；批量ZIP失败验证数据库及文件回滚，上传旧测试仍使用固定临时目录
+tests.py[TB6L]: F:回归题目管理、数据范围与样例解释存取、数据包导入导出往返、远程题面与赛后公开流程 | R:code:backend/problem/views/admin.py,code:backend/problem/publication.py,code:backend/problem/serializers.py | A:Django题目API测试 | S:外部题源使用固定HTML和网络替身；批量ZIP失败验证数据库及文件回滚，上传旧测试仍使用固定临时目录
 utils.py[LB5T]: F:在前置、用户模板和后置三个标记区段之间解析和构造代码模板 | R:code:backend/problem/serializers.py | A:parse_problem_template；build_problem_template | S:解析依赖精确换行标记，未匹配的区段返回空字符串
 tests_fps.py[TB6T]: F:验证FPS字符串解析、UTF8清单及题包导入失败回滚 | R:code:backend/fps/parser.py,code:backend/problem/views/admin.py | A:FPSParserTests；FPSImportTests | S:使用临时目录，覆盖第二题非法和数据库创建异常时不得留下部分题目或文件
 contest_authoring.py[DB8T]: F:统一比赛题字母编号、按编号排序、创建编辑与整体重排 | R:code:backend/problem/models.py,code:backend/problem/views/admin.py,code:backend/contest/views/prep.py | A:alphabetic_display_id；next_contest_display_id；order_contest_problems；create_contest_problem；update_contest_problem；reorder_contest_problems | S:题序由A至Z再AA的编号承载，排序须先按长度否则AA排在B前；重排须列全全部题，在事务行锁内先改临时编号再赋终值以避开比赛内编号唯一约束；编辑不改显示编号
@@ -248,7 +249,7 @@ admin.py[EB5T]: F:挂载题目、测试数据、SPJ编译和多种导入导出�
 oj.py[EB5T]: F:挂载公开题库、标签、随机题目、比赛题目、收藏及个人题目列表接口 | R:code:backend/problem/views/oj.py | A:前台题目urlpatterns | S:-
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/problem/views/===
-admin.py[AB9L]: F:管理题目与测试文件、编译SPJ、复制比赛题及导入导出题包，并供筹备工作区复用测试数据与ZIP导入 | R:code:backend/problem/serializers.py,code:backend/fps/parser.py,code:backend/judge/dispatcher.py,code:backend/problem/contest_authoring.py,code:backend/problem/publication.py | A:TestCaseAPI；CompileSPJAPI；ProblemAPI；RemoteProblemImportAPI；ImportProblemAPI.import_upload；FPSProblemImport | S:上传需浏览器CSRF；ZIP校验布局及解压预算；导入筹备比赛时赛制须一致，题可见并开启共享提交；后台新建或编辑筹备题一律保持可见；筹备题可连同验题提交删除，但不得公开化或排入赛后发布；FPS先校验整包再事务落库并回滚新文件；复制共享测试目录；公开编号仍无并发唯一约束
+admin.py[AB9L]: F:管理题目与测试文件、编译SPJ、复制比赛题及导入导出含数据范围和样例解释的题包，并供筹备工作区复用测试数据与ZIP导入 | R:code:backend/problem/serializers.py,code:backend/fps/parser.py,code:backend/judge/dispatcher.py,code:backend/problem/contest_authoring.py,code:backend/problem/publication.py | A:TestCaseAPI；CompileSPJAPI；ProblemAPI；RemoteProblemImportAPI；ImportProblemAPI.import_upload；FPSProblemImport | S:上传需浏览器CSRF；ZIP校验布局及解压预算；导入筹备比赛时赛制须一致，题可见并开启共享提交；后台新建或编辑筹备题一律保持可见；筹备题可连同验题提交删除，但不得公开化或排入赛后发布；FPS先校验整包再事务落库并回滚新文件；复制共享测试目录；公开编号仍无并发唯一约束
 oj.py[EB8M]: F:检索可见公开题和比赛题并注入个人答题状态，提供题目收藏和个人主页题目列表 | R:code:backend/account/decorators.py,code:backend/problem/publication.py,code:backend/problem/contest_authoring.py | A:ProblemTagAPI；PickOneAPI；ProblemAPI；ContestProblemAPI；ProblemFavoriteAPI；ProfileProblemListAPI | S:公开题读取可触发到期发布；赛中详情要求报名，赛后免密码和报名；筹备成员可按编号打开任一题，验题进行中计数与本人状态只算本轮，否则算全部提交；标签计数排除筹备题；收藏仅限公开可见题且收藏列表仅本人可读；已通过列表取自个人状态JSON
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/submission/migrations/===
@@ -354,7 +355,7 @@ version-matrix.md[SV5S]: F:保存单仓库统一前的Git、依赖、镜像和�
 ===/home/winbeau/xju-arlab/xju-oj/docs/operations/===
 demo-problems.md[SB5T]: F:说明两道标准与SPJ验收题的测试设计和幂等填充方法 | R:code:deploy/ops/seed-demo-problems.py | A:demo-ab；demo-spj；check/apply步骤 | S:脚本默认只检查；已有题内容冲突时停止；文中服务器目录需按实际部署工作树核对
 dev-frontend.md[SV6T]: F:说明Vite宿主运行与Docker后端协同的快速开发流程 | R:code:deploy.sh,code:compose.dev.yaml | A:./deploy.sh --dev frontend | S:仅回环桥接且生产不加载覆盖；Ctrl-C只停止Vite；OIDC回调仍取部署配置
-problem-zip-import.md[SB6T]: F:定义单题、嵌套批量及旧目录题包格式与导入回滚边界 | R:code:backend/problem/views/admin.py | A:problem.json；testcase目录 | S:包内display_id忽略，公开编号由OJ分配；整批失败回滚数据库和本次文件
+problem-zip-import.md[SB6S]: F:定义单题、嵌套批量及旧目录题包格式、可选数据范围与样例解释字段和导入回滚边界 | R:code:backend/problem/views/admin.py,code:backend/problem/serializers.py | A:problem.json；testcase目录 | S:包内display_id忽略，公开编号由OJ分配；整批失败回滚数据库和本次文件
 remote-oj-bridge.md[SN7S]: F:说明浏览器远程判题安装、持久事件确认、恢复和验收流程 | R:code:frontend/static/userscripts/xju-oj-remote-bridge.user.js,code:backend/submission/remote.py | A:/remote-bridge；恢复API；normalize_remote_acm_verdicts | S:第三方凭据留浏览器；已知ID恢复只查询；客户端事件可伪造，不能独立证明正式排名成绩
 audit-2026-10.md[SQ7T]: F:记录fork与服务器来源核对、代码和宿主问题修复及自动化验证范围 | R:code:docs/operations/acceptance-2026-10-07.md,code:.github/workflows/regression.yml | A:2026年10月审计记录 | S:索引覆盖不等于测试覆盖；线上结果另见验收记录；外部账号链路未实测，远程成绩仍由客户端上报
 release-and-recovery.md[SO7T]: F:规定统一发布、临时Git网络访问、宿主能力与排空重启及备份恢复 | R:code:deploy.sh,code:deploy/ops/check-judge-host.py | A:生产发布和恢复操作 | S:Git转发仅回环且代理按命令覆盖；可信入口按frontend实际来源；dump不含文件和Redis；有新写入不可直接回旧备份；手停unless-stopped须显式恢复
@@ -481,9 +482,9 @@ zh-TW.js[FL4S]: F:提供管理导航、用户、题目与比赛表单的繁体�
 index.js[CL6T]: F:合并前后台三语言字典并创建Vue国际化实例 | R:code:frontend/src/pages/admin/index.js,code:frontend/src/pages/oj/index.js | A:i18n默认导出；languages | S:同名键由管理字典覆盖OJ字典；默认与回退均为en-US，入口可改变语言
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/i18n/oj/===
-en-US.js[FL5L]: F:提供题库、比赛、筹备题目分配、验题与题目备注、组织者邀请与链接管理、个人主页、首次登录确认、认证、远程桥接及AI工作台命名的英文文案 | R:code:frontend/src/i18n/index.js | A:m英文键值表 | S:远程恢复提示要求助手1.1.0以上；AI导航和赛制说明分别为AI Studio和AI Evaluation；题目反馈统称Remarks
-zh-CN.js[FL5L]: F:提供题库、比赛、筹备题目分配、验题与题目备注、组织者邀请与链接管理、个人主页、首次登录确认、认证、远程桥接及AI工作台命名的简体中文文案 | R:code:frontend/src/i18n/index.js | A:m简体中文键值表 | S:AI导航为AI工作台，赛制名称保持AI，说明为AI评测赛制；筹备界面称出题、题目分配与验题，不用审题或选题，成员称组织者，题目反馈称备注；验题密码提示按用户指定措辞
-zh-TW.js[FL4M]: F:提供题库、比赛、账户、首次登录确认和AI工作台命名的繁体中文文案 | R:code:frontend/src/i18n/index.js | A:m繁体中文键值表 | S:远程恢复提示和筹备工作区文案尚未补齐，缺失项回退英文
+en-US.js[FL5L]: F:提供题库、题面数据范围与样例解释、比赛、筹备题目分配、验题与题目备注、组织者邀请与链接管理、个人主页、首次登录确认、认证、远程桥接及AI工作台命名的英文文案 | R:code:frontend/src/i18n/index.js | A:m英文键值表 | S:远程恢复提示要求助手1.1.0以上；AI导航和赛制说明分别为AI Studio和AI Evaluation；题目反馈统称Remarks；数据范围称Constraints
+zh-CN.js[FL5L]: F:提供题库、题面数据范围与样例解释、比赛、筹备题目分配、验题与题目备注、组织者邀请与链接管理、个人主页、首次登录确认、认证、远程桥接及AI工作台命名的简体中文文案 | R:code:frontend/src/i18n/index.js | A:m简体中文键值表 | S:AI导航为AI工作台，赛制名称保持AI，说明为AI评测赛制；筹备界面称出题、题目分配与验题，不用审题或选题，成员称组织者，题目反馈称备注；验题密码提示按用户指定措辞
+zh-TW.js[FL4L]: F:提供题库、题面数据范围与样例说明、比赛、账户、首次登录确认和AI工作台命名的繁体中文文案 | R:code:frontend/src/i18n/index.js | A:m繁体中文键值表 | S:远程恢复提示和筹备工作区文案尚未补齐，缺失项回退英文
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/===
 App.vue[EU4T]: F:提供管理端根路由视图和页面基础字体布局 | R:code:frontend/src/pages/admin/index.js,code:frontend/src/styles/tokens.css | A:管理端根组件 | S:字体取共享界面无衬线变量；不设antialiased字体平滑，避免macOS文字发细
@@ -610,7 +611,7 @@ RemoteBridge.vue[EU6S]: F:引导安装浏览器远程判题助手并检测版本
 index.js[EU5T]: F:导出用户端常用及懒加载路由组件 | R:code:frontend/src/pages/oj/router/routes.js | A:用户页面命名导出 | S:首页与404直接导入，其余主要视图按需加载
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/problem/===
-Problem.vue[EU8L]: F:展示题面、隔离保存草稿并提交及轮询本地或浏览器远程判题，并提供收藏、本人提交代码查看和筹备题目备注 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/utils/constants.js,code:frontend/src/styles/judge-status.less,code:frontend/src/pages/oj/views/contest/children/PrepFeedbackThread.vue | A:题目详情提交页；checkSubmissionStatus；submitCode；openSubmissionCode；toggleFavorite | S:请求绑定页面代次与提交ID，切题卸载取消旧轮询；迟到远程任务仍交助手但不改新页；草稿按题目比赛隔离；非实时OI保留结果隐藏策略；筹备比赛不按占位窗口视为已结束，提交不是练习；筹备备注串在提交记录下方且随时可写；lint:modern固定代码、语言、主题watcher顺序
+Problem.vue[EU8L]: F:展示含数据范围和样例解释的题面、隔离保存草稿并提交及轮询本地或浏览器远程判题，并提供收藏、本人提交代码查看和筹备题目备注 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/remoteBridge.js,code:frontend/src/utils/constants.js,code:frontend/src/styles/judge-status.less,code:frontend/src/pages/oj/views/contest/children/PrepFeedbackThread.vue | A:题目详情提交页；hasContent；checkSubmissionStatus；submitCode；openSubmissionCode；toggleFavorite | S:请求绑定页面代次与提交ID，切题卸载取消旧轮询；迟到远程任务仍交助手；草稿按题目比赛隔离；非实时OI保留结果隐藏；筹备比赛提交不是练习；筹备备注串在提交记录下方；空富文本的数据范围与提示不渲染，样例解释只用文本插值；lint:modern固定代码、语言、主题watcher顺序
 ProblemList.vue[EU6M]: F:按难度标签关键词及页大小检索题库和个人题目状态 | R:code:frontend/src/pages/oj/api.js | A:题库列表与URL筛选 | S:offset与请求limit使用同一query.limit；生产空标签不再回退样例
 chartData.js[FU4S]: F:定义题目结果分布的汇总及详细饼图初始配置 | R:code:frontend/src/shared/charts/LegacyECharts.js | A:pie；largePie | S:颜色查表未包含系统错误等所有结果，调用方应限制类别
 
@@ -902,4 +903,4 @@ problem_package.py[XA6T]: F:在仓库外从出题目录打包或校验可移植A
 import_ai_package.py[OD7T]: F:复用后台题包校验和队列导入并提供存量题目归档入口 | R:code:backend/ai_studio/packages.py | A:archive；--creator；--preview；--publish；--adopt-existing | S:默认隐藏；归档仅超级管理员且与publish和preview互斥；严格匹配现存元数据和绑定后仅增加归档关联；题包及映射须在私有存储
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/shared/problem/===
-ProblemEditorForm.vue[EU8L]: F:以注入服务创建编辑公开、比赛或筹备题目，并管理测试数据上传与特殊判题编译 | R:code:frontend/src/pages/admin/views/problem/Problem.vue,code:frontend/src/pages/oj/views/contest/children/prepProblemService.js,code:frontend/src/utils/csrf.js | A:mode；problemId；contestId；service；cancelable；basic-actions与remarks插槽 | S:接口与上传地址全由service提供，表单不自行选择后台或筹备API；SPJ源码或语言变化使编译标记失效，晚到编译结果不能覆盖新内容；比赛题默认开启共享提交；筹备比赛隐藏可见开关，筹备题一律可见；remarks插槽在保存按钮前独立成区；上传显式传CSRF；远程题不要求本地数据
+ProblemEditorForm.vue[EU8L]: F:以注入服务创建编辑公开、比赛或筹备题目，含数据范围与样例解释，并管理测试数据上传清除与特殊判题编译 | R:code:frontend/src/pages/admin/views/problem/Problem.vue,code:frontend/src/pages/oj/views/contest/children/prepProblemService.js,code:frontend/src/utils/csrf.js | A:mode；problemId；contestId；service；cancelable；basic-actions与remarks插槽 | S:接口与上传地址全由service提供；SPJ源码或语言变化使编译标记失效，晚到编译结果不覆盖新内容；比赛题默认共享提交；筹备比赛隐藏可见开关；标签输入失焦即提交并关闭，选中建议靠150毫秒延迟落定；清除测试数据只清表单，须重新上传才能保存；上传显式传CSRF
