@@ -623,6 +623,18 @@ class NowcoderProblemImportTest(APITestCase):
         self.assertIn("说明", acm["description"])
         self.assertIn(r"\(n,r\left(1 \le n; 0 \le r&lt;4\right)\)", acm["input_description"])
 
+    def test_markdown_emphasis_never_splits_formulas(self):
+        # `$a*b*c$` used to become `$a<em>b</em>c$`: the delimiters end up in
+        # different elements and the statement renders no formula at all.
+        self.assertEqual(
+            markdown_to_html("求 $a*b*c$ 与 $2*3*4$ 的值"),
+            "<p>求 $a*b*c$ 与 $2*3*4$ 的值</p>",
+        )
+        self.assertEqual(
+            markdown_to_html(r"$x<y$ 且 $a \le b$，正文 **加粗**"),
+            r"<p>$x&lt;y$ 且 $a \le b$，正文 <strong>加粗</strong></p>",
+        )
+
     def test_parse_luogu_and_codeforces_pages(self):
         self.assertEqual(parse_luogu_reference("https://www.luogu.com.cn/problem/P1001"), "P1001")
         luogu = parse_luogu_problem_page(LUOGU_PROBLEM_HTML, "P1001")

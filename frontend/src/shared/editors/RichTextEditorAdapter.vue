@@ -49,64 +49,10 @@
 </template>
 
 <script>
-import markdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import TurndownService from 'turndown'
-import { gfm } from 'turndown-plugin-gfm'
+import { createTurndown, htmlToMarkdown, renderMarkdown } from './richTextMarkdown'
 import { csrfHeaders } from '@/utils/csrf'
 import { compressImageToWebP } from '@/utils/imageCompress'
-
-const renderer = markdownIt({
-  html: true,
-  breaks: true,
-  linkify: true
-})
-
-function createTurndown () {
-  const service = new TurndownService({
-    bulletListMarker: '-',
-    codeBlockStyle: 'fenced',
-    emDelimiter: '*',
-    strongDelimiter: '**'
-  })
-  service.use(gfm)
-  service.keep(['u'])
-  return service
-}
-
-function htmlToMarkdown (value, turndown) {
-  let content = String(value || '')
-  if (!/<[a-z][\s\S]*>/i.test(content)) return content
-  content = DOMPurify.sanitize(content)
-  if (typeof document !== 'undefined' && content.includes('katex')) {
-    const root = document.createElement('div')
-    root.innerHTML = content
-    root.querySelectorAll('.katex').forEach(node => {
-      if (node.parentElement && node.parentElement.closest('.katex')) return
-      const annotation = node.querySelector('annotation[encoding="application/x-tex"]')
-      if (!annotation) return
-      const display = Boolean(node.closest('.katex-display'))
-      node.replaceWith(document.createTextNode(display
-        ? `$$${annotation.textContent || ''}$$`
-        : `$${annotation.textContent || ''}$`))
-    })
-    content = root.innerHTML
-  }
-  const math = []
-  const protectedHtml = content.replace(
-    /\$\$[\s\S]*?\$\$|\$[^$]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/g,
-    expression => {
-      const token = `MARKDOWNMATHPLACEHOLDER${math.length}X`
-      math.push(expression)
-      return token
-    }
-  )
-  let markdown = turndown.turndown(protectedHtml)
-  math.forEach((expression, index) => {
-    markdown = markdown.replace(`MARKDOWNMATHPLACEHOLDER${index}X`, expression)
-  })
-  return markdown
-}
 
 export default {
   name: 'RichTextEditorAdapter',
@@ -138,14 +84,14 @@ export default {
   mounted () {
     this.turndown = createTurndown()
     this.source = htmlToMarkdown(this.content, this.turndown)
-    this.previewHtml = DOMPurify.sanitize(renderer.render(this.source))
+    this.previewHtml = DOMPurify.sanitize(renderMarkdown(this.source))
     this.lastRenderedHtml = this.previewHtml
   },
   watch: {
     content (value) {
       if (!this.turndown || value === this.lastRenderedHtml) return
       this.source = htmlToMarkdown(value, this.turndown)
-      this.previewHtml = DOMPurify.sanitize(renderer.render(this.source))
+      this.previewHtml = DOMPurify.sanitize(renderMarkdown(this.source))
       this.lastRenderedHtml = this.previewHtml
     }
   },
@@ -159,16 +105,17 @@ export default {
       this.$emit('update:modelValue', html)
     },
     emitMarkdown () {
-      const html = DOMPurify.sanitize(renderer.render(this.source || ''))
+      const html = DOMPurify.sanitize(renderMarkdown(this.source || ''))
       this.previewHtml = html
       this.emitValue(html)
     },
     onPreviewInput () {
       const editor = this.$refs.previewEditor
       if (!editor || !this.turndown) return
-      const html = editor.innerHTML
-      this.source = htmlToMarkdown(html, this.turndown)
-      this.emitValue(html)
+      this.source = htmlToMarkdown(editor.innerHTML, this.turndown)
+      // Emit the Markdown rendering, never the live preview DOM: KaTeX markup
+      // must not reach the server, and the stored HTML keeps the $...$ source.
+      this.emitValue(renderMarkdown(this.source))
     },
     syncPreviewHtml () {
       const editor = this.$refs.previewEditor
@@ -177,7 +124,7 @@ export default {
     setMode (mode) {
       if (this.mode === 'preview') this.syncPreviewHtml()
       this.mode = mode
-      if (mode === 'preview') this.previewHtml = DOMPurify.sanitize(renderer.render(this.source || ''))
+      if (mode === 'preview') this.previewHtml = DOMPurify.sanitize(renderMarkdown(this.source || ''))
       this.$nextTick(() => {
         if (mode === 'raw') this.$refs.rawEditor?.focus()
         else this.$refs.previewEditor?.focus()

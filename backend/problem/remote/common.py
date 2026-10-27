@@ -9,6 +9,13 @@ DEFAULT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 )
 
+# The delimiters the OJ renders with KaTeX. Markdown emphasis must never be
+# applied inside a formula: `$a*b*c$` would become `$a<em>b</em>c$`, splitting
+# the delimiters across elements so the statement renders no formula at all.
+MATH_PATTERN = re.compile(
+    r"\$\$[\s\S]*?\$\$|\$[^$]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]"
+)
+
 
 class RemoteProblemError(RuntimeError):
     pass
@@ -239,6 +246,12 @@ def _render_markdown_inline(value):
     content = re.sub(
         r"`([^`]+)`",
         lambda match: store(f"<code>{html.escape(match.group(1))}</code>"),
+        content,
+    )
+    # Formula text is escaped here and restored after emphasis, so `*` inside
+    # TeX is neither emphasized nor split across elements.
+    content = MATH_PATTERN.sub(
+        lambda match: store(html.escape(match.group(0))),
         content,
     )
 
