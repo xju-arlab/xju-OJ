@@ -80,10 +80,9 @@
                 <p class="title">{{$t('m.Sample_Output')}} {{index + 1}}</p>
                 <pre>{{sample.output}}</pre>
               </div>
-              <!-- Plain text on purpose: samples are JSON and never pass the rich-text cleaner. -->
-              <div v-if="sample.explanation && sample.explanation.trim()" class="sample-explanation">
+              <div v-if="hasContent(explanationHtml(sample))" class="sample-explanation">
                 <p class="title">{{$t('m.Sample_Explanation')}} {{index + 1}}</p>
-                <div class="sample-explanation-body">{{sample.explanation}}</div>
+                <div class="sample-explanation-body" v-html="explanationHtml(sample)"></div>
               </div>
             </div>
           </div>
@@ -285,6 +284,7 @@
   import { submissionStatus as presentSubmissionStatus } from '@oj/submissionStatus'
   import RemoteSubmissionNotice from '@oj/components/RemoteSubmissionNotice.vue'
   import Highlight from '@oj/components/Highlight.vue'
+  import DOMPurify from 'dompurify'
   import PrepFeedbackThread from '../contest/children/PrepFeedbackThread.vue'
   import { applyDevelopmentProblemFixture, cloneFixtures, MOCK_PROBLEMS, MOCK_SUBMISSIONS } from '@oj/mocks/fixtures'
 
@@ -680,6 +680,16 @@
         this.acceptedCelebrationResolve = null
         if (resolve) resolve()
       },
+      explanationHtml (sample) {
+        const text = (sample && sample.explanation) || ''
+        // Plain text saved before explanations became Markdown keeps its line breaks.
+        if (!/<[a-z/][^>]*>/i.test(text)) {
+          return text.replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]))
+            .replace(/\n/g, '<br>')
+        }
+        // Samples are JSON; the server cleans explanations, and this guards older rows too.
+        return DOMPurify.sanitize(text)
+      },
       hasContent (html) {
         // Rich text editors leave markup like <p><br></p> behind when emptied.
         if (!html) return false
@@ -1074,7 +1084,9 @@
       overflow-wrap: anywhere;
     }
     // Same size and rhythm as statement paragraphs.
-    .sample-explanation-body { font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
+    .sample-explanation-body { font-size: 16px; line-height: 1.5; }
+    .sample-explanation-body :deep(p:first-child), .sample-explanation-body :deep(ul:first-child), .sample-explanation-body :deep(ol:first-child) { margin-top: 0; }
+    .sample-explanation-body :deep(p:last-child), .sample-explanation-body :deep(ul:last-child), .sample-explanation-body :deep(ol:last-child) { margin-bottom: 0; }
     .hint-box :deep(p:first-child) { margin-top: 0; }
     .hint-box :deep(p:last-child) { margin-bottom: 0; }
     .sample pre { flex: 1 1 auto; align-self: stretch; min-height: 76px; margin: 0; border: 1px solid var(--color-border); background: var(--color-bg); }

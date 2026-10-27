@@ -58,7 +58,7 @@ class Problem(models.Model):
     output_description = RichTextField()
     # Constraints shown after the output description; empty hides the section.
     data_range = RichTextField(default="", blank=True)
-    # [{input: "1", output: "2", explanation: "optional plain text"}, ...]
+    # [{input: "1", output: "2", explanation: "optional HTML, cleaned by the serializer"}, ...]
     samples = JSONField()
     test_case_id = models.TextField()
     # [{"input_name": "1.in", "output_name": "1.out", "score": 0}]

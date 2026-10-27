@@ -90,8 +90,8 @@ testcase/
 ```
 
 `data_range`（数据范围）可省略，旧题包照常导入；值为空时题面不显示该段。
-每个样例的 `explanation` 也可省略，它是纯文本（可写 `$...$` 公式），为空时不显示“样例解释”。
-导出的 `problem.json` 总会带上这两个字段。
+每个样例的 `explanation` 也可省略，可写 Markdown（含 `$...$` 公式）或 HTML，导入时统一转为清洗后的 HTML；为空时不显示“样例解释”。
+导出的 `problem.json` 总会带上这两个字段，`explanation` 为 HTML。
 
 ## 安全与回滚
 

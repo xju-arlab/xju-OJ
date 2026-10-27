@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-editor-adapter">
+  <div :class="['markdown-editor-adapter', { 'is-compact': compact }]">
     <div class="markdown-editor-toolbar">
       <div class="markdown-format-actions" aria-label="Markdown 格式工具">
         <button type="button" title="加粗" aria-label="加粗" @mousedown.prevent @click="applyFormat('bold')"><strong>B</strong></button>
@@ -28,6 +28,7 @@
               ref="rawEditor"
               v-model="source"
               class="markdown-raw-editor"
+              :placeholder="placeholder"
               spellcheck="false"
               @input="emitMarkdown"
               @paste="onPaste"></textarea>
@@ -113,7 +114,10 @@ export default {
     value: { type: String, default: '' },
     modelValue: { type: String, default: undefined },
     // { action, data }: where statement images go. Without it there is no image button.
-    imageUpload: { type: Object, default: null }
+    imageUpload: { type: Object, default: null },
+    // A shorter box for secondary text such as sample explanations.
+    compact: { type: Boolean, default: false },
+    placeholder: { type: String, default: '' }
   },
   emits: ['input', 'change', 'update:value', 'update:modelValue'],
   data () {
@@ -365,6 +369,8 @@ export default {
 .markdown-image-button .is-spinning { animation: markdown-image-spin .9s linear infinite; }
 @keyframes markdown-image-spin { to { transform: rotate(360deg); } }
 .markdown-preview :deep(img) { max-width: 100%; height: auto; }
+.markdown-raw-editor::placeholder { color: var(--color-text-faint); font-family: var(--font-sans); }
+.is-compact .markdown-raw-editor, .is-compact .markdown-preview { min-height: 92px; }
 .markdown-mode-switch { padding: 2px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg-subtle); }
 .markdown-mode-switch button { display: inline-flex; min-width: 62px; height: 26px; align-items: center; justify-content: center; border-radius: 4px; font-size: 12px; line-height: 1; }
 .markdown-mode-switch button.active { background: var(--color-bg); color: var(--color-text); box-shadow: 0 1px 3px rgba(55, 53, 47, .09); }

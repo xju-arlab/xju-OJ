@@ -433,19 +433,21 @@ class ProblemZipImportAPITest(APITestCase):
     def test_export_and_import_keep_data_range_and_sample_explanations(self):
         info = self.problem_info("Round trip")
         info["data_range"] = {"format": "markdown", "value": "$1 \\le n \\le 10^5$"}
-        info["samples"] = [{"input": "1\n", "output": "2\n", "explanation": "Add one to $n$."},
+        info["samples"] = [{"input": "1\n", "output": "2\n", "explanation": "Add **one** to $n$."},
                            {"input": "3\n", "output": "4\n"}]
         self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(info)},
                                             format="multipart"))
         original = Problem.objects.get()
         self.assertIn("10^5", original.data_range)
-        self.assertEqual([sample["explanation"] for sample in original.samples], ["Add one to $n$.", ""])
+        # Packages may carry Markdown; it is stored as cleaned HTML.
+        self.assertEqual([sample["explanation"] for sample in original.samples],
+                         ["<p>Add <strong>one</strong> to $n$.</p>", ""])
 
         response = self.client.get(self.reverse("export_problem_api"), {"problem_id": [original.id]})
         with ZipFile(io.BytesIO(b"".join(response.streaming_content))) as archive:
             exported = json.loads(archive.read("problem.json"))
         self.assertEqual(exported["data_range"], {"format": "html", "value": original.data_range})
-        self.assertEqual(exported["samples"][0]["explanation"], "Add one to $n$.")
+        self.assertEqual(exported["samples"][0]["explanation"], "<p>Add <strong>one</strong> to $n$.</p>")
 
         self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(exported)},
                                             format="multipart"))
@@ -494,20 +496,25 @@ class ProblemAdminAPITest(ProblemCreateTestBase):
 
     def test_data_range_and_sample_explanation_are_stored_and_served(self):
         self.data["data_range"] = "<p>1 ≤ n ≤ 100</p><script>alert(1)</script>"
-        self.data["samples"] = [{"input": "1", "output": "1", "explanation": "  keep\n  spacing"},
-                                {"input": "2", "output": "4"}]
+        self.data["samples"] = [
+            {"input": "1", "output": "1", "explanation": '<p>Odd, so <em>one</em>.</p><img src="x" onerror="alert(1)">'},
+            {"input": "2", "output": "4", "explanation": "plain\nlines"},
+            {"input": "3", "output": "9"}]
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         problem = Problem.objects.get(id=resp.data["data"]["id"])
         # Rich text is cleaned like the other statement fields: the tag goes, inert text stays.
         self.assertTrue(problem.data_range.startswith("<p>1 ≤ n ≤ 100</p>"))
         self.assertNotIn("<script", problem.data_range)
-        self.assertEqual(problem.samples, [{"input": "1", "output": "1", "explanation": "  keep\n  spacing"},
-                                           {"input": "2", "output": "4", "explanation": ""}])
+        explanations = [sample["explanation"] for sample in problem.samples]
+        # Editor HTML is cleaned like any rich text; plain text becomes paragraphs.
+        self.assertTrue(explanations[0].startswith("<p>Odd, so <em>one</em>.</p><img"))
+        self.assertNotIn("onerror", explanations[0])
+        self.assertEqual(explanations[1:], ["<p>plain<br />lines</p>", ""])
         public = self.client.get(self.reverse("problem_api") + "?problem_id=" + problem._id)
         self.assertSuccess(public)
         self.assertEqual(public.data["data"]["data_range"], problem.data_range)
-        self.assertEqual(public.data["data"]["samples"][0]["explanation"], "  keep\n  spacing")
+        self.assertEqual(public.data["data"]["samples"][0]["explanation"], explanations[0])
 
     def test_problem_without_data_range_defaults_to_empty(self):
         self.data.pop("data_range", None)

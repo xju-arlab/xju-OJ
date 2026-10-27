@@ -10,7 +10,7 @@ export const m = {
   Output: '輸出',
   Sample_Input: '輸入範例',
   Sample_Explanation: '範例說明',
-  Sample_Explanation_Placeholder: '說明此範例為何得到該輸出，留空則題面不顯示',
+  Sample_Explanation_Placeholder: '說明此範例為何得到該輸出，支援 Markdown 與 $公式$；留空則題面不顯示',
   Data_Range: '資料範圍',
   Optional_Hidden_When_Empty: '選填，留空不顯示',
   Sample_Output: '輸出範例',

@@ -22,7 +22,7 @@ export const m = {
   Output: '输出',
   Sample_Input: '输入样例',
   Sample_Explanation: '样例解释',
-  Sample_Explanation_Placeholder: '说明该样例为什么得到这个输出，留空则题面不显示',
+  Sample_Explanation_Placeholder: '说明该样例为什么得到这个输出，支持 Markdown 与 $公式$；留空则题面不显示',
   Data_Range: '数据范围',
   Optional_Hidden_When_Empty: '可选，留空不显示',
   Sample_Output: '输出样例',

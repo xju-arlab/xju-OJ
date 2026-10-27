@@ -22,7 +22,7 @@ export const m = {
   Output: 'Output',
   Sample_Input: 'Sample Input',
   Sample_Explanation: 'Sample Explanation',
-  Sample_Explanation_Placeholder: 'Explain how this sample gets its output; leave empty to hide it',
+  Sample_Explanation_Placeholder: 'Explain how this sample gets its output, with Markdown and $formulas$; leave empty to hide it',
   Data_Range: 'Constraints',
   Optional_Hidden_When_Empty: 'Optional, hidden when empty',
   Sample_Output: 'Sample Output',

@@ -7,9 +7,26 @@ from utils.api import UsernameSerializer, serializers
 from utils.constants import Difficulty
 from utils.serializers import LanguageNameMultiChoiceField, SPJLanguageNameChoiceField, LanguageNameChoiceField
 
+from utils.xss_filter import XSSHtml
+
 from .models import (Problem, ProblemRuleType, ProblemTag, ProblemIOMode,
                      ProblemJudgeMode, RemoteOJ)
+from .remote.common import markdown_to_html
 from .utils import parse_problem_template
+
+HTML_TAG = re.compile(r"<[a-zA-Z/][^>]*>")
+
+
+def clean_sample_explanation(value):
+    """Explanations are rich text kept inside the samples JSON, which skips the RichTextField cleaner.
+
+    The editor sends HTML; plain text or Markdown (older saves, ZIP packages) is converted first."""
+    if not value or not value.strip():
+        return ""
+    if not HTML_TAG.search(value):
+        value = markdown_to_html(value)
+    with XSSHtml() as parser:
+        return parser.clean(value)
 
 
 class TestCaseUploadForm(forms.Form):
@@ -20,8 +37,10 @@ class TestCaseUploadForm(forms.Form):
 class CreateSampleSerializer(serializers.Serializer):
     input = serializers.CharField(trim_whitespace=False)
     output = serializers.CharField(trim_whitespace=False)
-    # Plain text, never HTML: samples are stored as JSON and skip the rich-text cleaner.
     explanation = serializers.CharField(trim_whitespace=False, allow_blank=True, required=False, default="")
+
+    def validate_explanation(self, value):
+        return clean_sample_explanation(value)
 
 
 class CreateTestCaseScoreSerializer(serializers.Serializer):

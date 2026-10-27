@@ -142,7 +142,7 @@
         <div class="section-heading is-inline">
           <div>
             <h3>样例</h3>
-            <p>样例按题面展示顺序排列；样例解释为纯文本，可用 $...$ 书写公式。</p>
+            <p>样例按题面展示顺序排列；样例解释与题面一样支持 Markdown、公式和图片。</p>
           </div>
           <el-button type="primary" size="small" @click="addSample">
             <Icon type="plus" />{{$t('m.Add_Sample')}}
@@ -165,8 +165,8 @@
             </div>
             <el-form-item class="optional-field">
               <template #label>{{ $t('m.Sample_Explanation') }}<small>{{ $t('m.Optional_Hidden_When_Empty') }}</small></template>
-              <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" v-model="sample.explanation"
-                        :placeholder="$t('m.Sample_Explanation_Placeholder')"></el-input>
+              <Simditor v-model="sample.explanation" compact :image-upload="imageUpload"
+                        :placeholder="$t('m.Sample_Explanation_Placeholder')"></Simditor>
             </el-form-item>
           </article>
         </div>
@@ -335,7 +335,7 @@
     },
     computed: {
       imageUpload () {
-        // Pictures belong in the description and hint; input, output and limits stay text.
+        // Pictures belong in the description, hint and sample explanations; input, output and limits stay text.
         const action = this.service.imageUploadAction
         return action ? { action, data: this.service.imageUploadData || {} } : null
       },
