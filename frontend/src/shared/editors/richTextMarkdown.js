@@ -72,6 +72,10 @@ function visibleText (element) {
 // annotation; rows saved by earlier versions hold KaTeX after the server
 // sanitizer dropped the MathML wrapper, so the glyph text is followed by the
 // TeX source inside .katex-mathml.
+function sortedCharacters (value) {
+  return [...String(value || '').replace(/[\s\u200b]/g, '')].sort().join('')
+}
+
 function katexSource (node) {
   const annotation = node.querySelector('annotation[encoding="application/x-tex"]')
   if (annotation) return annotation.textContent || ''
@@ -82,6 +86,17 @@ function katexSource (node) {
   const glyphs = visual ? visibleText(visual) : ''
   if (glyphs && source.startsWith(glyphs) && glyphs.length < source.length) {
     return source.slice(glyphs.length)
+  }
+  // Sub/superscript layout reorders the glyphs, so the visual text is no
+  // prefix of the MathML text: find the split whose glyph half still carries
+  // exactly the characters the reader saw.
+  const target = sortedCharacters(glyphs)
+  if (target) {
+    for (let index = 1; index < source.length; index += 1) {
+      const candidate = source.slice(index)
+      if (!/[\\^_]/.test(candidate)) continue
+      if (sortedCharacters(source.slice(0, index)) === target) return candidate
+    }
   }
   // The split is ambiguous; keep what the reader saw instead of the duplicate.
   return glyphs
