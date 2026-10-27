@@ -1057,6 +1057,9 @@
       color: var(--color-text);
     }
     p.content { margin: 0 2px 15px; font-size: 14px; line-height: 1.75; }
+    // A picture alone in its paragraph is a figure: centred, slightly rounded.
+    .content :deep(img) { border-radius: 4px; }
+    .content :deep(p > img:only-child) { display: block; margin: 6px auto; }
     .sample { align-items: stretch; flex-direction: column; }
     .sample-input, .sample-output { width: 100%; flex: 1 1 auto; display: flex; flex-direction: column; margin: 0; }
     .sample-output .title, .sample-explanation .title { margin-top: 15px; }

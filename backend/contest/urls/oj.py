@@ -5,7 +5,8 @@ from ..views.oj import ContestPasswordVerifyAPI, ContestAccessAPI
 from ..views.oj import ContestRegistrationAPI
 from ..views.oj import ContestListAPI, ContestAPI
 from ..views.oj import ContestRankAPI
-from ..views.prep import (ContestPrepCompileSPJAPI, ContestPrepFeedbackAPI, ContestPrepImportProblemAPI,
+from ..views.prep import (ContestPrepCompileSPJAPI, ContestPrepFeedbackAPI, ContestPrepImageUploadAPI,
+                          ContestPrepImportProblemAPI,
                           ContestPrepInviteAcceptAPI, ContestPrepInviteAPI, ContestPrepMemberAPI,
                           ContestPrepPlanAPI, ContestPrepProblemAPI, ContestPrepProblemCountAPI,
                           ContestPrepProblemOrderAPI, ContestPrepPublicProblemAPI,
@@ -40,6 +41,8 @@ urlpatterns = [
             name="contest_prep_import_problem_api"),
     re_path(r"^contest/prep/publish/?$", ContestPrepPublishAPI.as_view(), name="contest_prep_publish_api"),
     re_path(r"^contest/prep/feedback/?$", ContestPrepFeedbackAPI.as_view(), name="contest_prep_feedback_api"),
+    re_path(r"^contest/prep/upload_image/?$", ContestPrepImageUploadAPI.as_view(),
+            name="contest_prep_image_upload_api"),
     re_path(r"^contest/prep/rank/?$", ContestPrepRankAPI.as_view(), name="contest_prep_rank_api"),
     re_path(r"^contest/prep/invite/?$", ContestPrepInviteAPI.as_view(), name="contest_prep_invite_api"),
     re_path(r"^contest/prep/invite/accept/?$", ContestPrepInviteAcceptAPI.as_view(),

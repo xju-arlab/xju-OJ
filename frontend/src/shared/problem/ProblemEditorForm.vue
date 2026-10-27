@@ -114,12 +114,12 @@
         <div class="section-heading">
           <div>
             <h3>题面内容</h3>
-            <p>原文模式用于直接编辑 Markdown，预览模式可在渲染后的富文本中继续编辑；数据范围与提示留空时不在题面显示。</p>
+            <p>原文模式用于直接编辑 Markdown，预览模式可在渲染后的富文本中继续编辑；描述和提示可插入或粘贴图片（自动压缩为 WebP）；数据范围与提示留空时不在题面显示。</p>
           </div>
         </div>
 
         <el-form-item prop="description" :label="$t('m.Description')" required>
-          <Simditor v-model="problem.description"></Simditor>
+          <Simditor v-model="problem.description" :image-upload="imageUpload"></Simditor>
         </el-form-item>
         <div class="field-grid statement-grid">
           <el-form-item prop="input_description" :label="$t('m.Input_Description')" required>
@@ -134,7 +134,7 @@
           <Simditor v-model="problem.data_range"></Simditor>
         </el-form-item>
         <el-form-item :label="$t('m.Hint')">
-          <Simditor v-model="problem.hint"></Simditor>
+          <Simditor v-model="problem.hint" :image-upload="imageUpload"></Simditor>
         </el-form-item>
       </section>
 
@@ -279,7 +279,8 @@
   //   getLanguages(), getProblemTagList({keyword}), getContest(id), getProblem(id)
   //   resolve to response payloads; compileSPJ(data) and saveProblem(problem, mode)
   //   resolve or reject like the API clients; testCaseUploadAction is the upload
-  //   URL and testCaseUploadData extra multipart fields.
+  //   URL and testCaseUploadData extra multipart fields; imageUploadAction and
+  //   imageUploadData do the same for statement images.
   export default {
     name: 'ProblemEditorForm',
     components: {
@@ -333,6 +334,11 @@
       }
     },
     computed: {
+      imageUpload () {
+        // Pictures belong in the description and hint; input, output and limits stay text.
+        const action = this.service.imageUploadAction
+        return action ? { action, data: this.service.imageUploadData || {} } : null
+      },
       uploadData () {
         return {...(this.service.testCaseUploadData || {}), spj: this.problem.spj}
       },

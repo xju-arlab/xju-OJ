@@ -43,7 +43,8 @@
             return api[`${action}${contest ? 'ContestProblem' : 'Problem'}`](problem)
           },
           testCaseUploadAction: '/api/admin/test_case',
-          testCaseUploadData: {}
+          testCaseUploadData: {},
+          imageUploadAction: '/api/admin/upload_image'
         }
       }
     },

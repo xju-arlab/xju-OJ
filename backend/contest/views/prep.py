@@ -28,6 +28,7 @@ from problem.views.admin import CompileSPJAPI, ImportProblemAPI, ProblemBase, Te
 from utils.api import APIError, APIView, validate_serializer
 from utils.constants import CacheKey, ContestPrepRole, PREP_INVITE_DAYS
 from utils.shortcuts import datetime2str
+from utils.views import ImageUploadError, save_uploaded_image
 from ..models import Contest, ContestPrepInvite, ContestPrepMember, ContestPrepPlanItem, ContestProblemFeedback
 from ..prep_publish import publish_prep_contest
 from ..prep_rank import review_rank
@@ -570,3 +571,16 @@ class ContestPrepInviteAcceptAPI(APIView):
             invite.used_time = now()
             invite.save(update_fields=["used_by", "used_time"])
         return self.success({"contest_id": contest.id, "title": contest.title, "role": invite.role})
+
+
+class ContestPrepImageUploadAPI(APIView):
+    """Images in problem statements; organizers cannot reach the admin upload."""
+    request_parsers = ()
+
+    @login_required
+    def post(self, request):
+        load_prep_contest(request, request.POST.get("contest_id"))
+        try:
+            return self.success({"file_path": save_uploaded_image(request)})
+        except ImageUploadError as e:
+            return self.error(str(e))

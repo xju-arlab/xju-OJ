@@ -1,8 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
+import io
+import os
+import tempfile
 import time
 import uuid
 
-from django.test import SimpleTestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase, override_settings
+from PIL import Image
 from django_redis import get_redis_connection
 from rest_framework.test import APIClient
 
@@ -42,6 +47,30 @@ class UploadCsrfTests(APITestCase):
         for url in ("/api/admin/upload_image/", "/api/admin/upload_file/", "/api/admin/import_fps",
                     "/api/admin/import_problem", "/api/admin/test_case"):
             self.assertEqual(client.post(url, {}, format="multipart").status_code, 403)
+
+
+class AdminImageUploadTests(APITestCase):
+    def setUp(self):
+        self.create_super_admin("image-admin", "password")
+        self.upload_root = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(UPLOAD_DIR=self.upload_root.name)
+        self.settings_override.enable()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.upload_root.cleanup()
+
+    def test_webp_is_accepted_and_disguised_files_are_not(self):
+        buffer = io.BytesIO()
+        Image.new("RGBA", (2, 2), (0, 0, 0, 0)).save(buffer, format="WEBP", lossless=True)
+        response = self.client.post("/api/admin/upload_image/", {
+            "image": SimpleUploadedFile("diagram.webp", buffer.getvalue())}, format="multipart")
+        self.assertTrue(response.data["success"])
+        self.assertTrue(response.data["file_path"].endswith(".webp"))
+        response = self.client.post("/api/admin/upload_image/", {
+            "image": SimpleUploadedFile("page.png", b"<html>not an image</html>")}, format="multipart")
+        self.assertFalse(response.data["success"])
+        self.assertEqual(len(os.listdir(self.upload_root.name)), 1)
 
 
 class RichTextSafetyTests(SimpleTestCase):

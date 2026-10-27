@@ -1,5 +1,6 @@
 import os
 from django.conf import settings
+from PIL import Image
 from account.serializers import ImageUploadForm, FileUploadForm
 from utils.shortcuts import rand_str
 from utils.api import APIView
@@ -7,42 +8,54 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Pillow format name -> stored suffix. The content decides the format, never the file name.
+IMAGE_SUFFIXES = {"GIF": ".gif", "JPEG": ".jpg", "PNG": ".png", "BMP": ".bmp", "WEBP": ".webp"}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+class ImageUploadError(Exception):
+    pass
+
+
+def save_uploaded_image(request):
+    """Store the request's "image" file under the public upload directory and return its URL path."""
+    form = ImageUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        raise ImageUploadError("Upload failed")
+    img = form.cleaned_data["image"]
+    if img.size > MAX_IMAGE_BYTES:
+        raise ImageUploadError("Image is larger than 10 MB")
+    try:
+        with Image.open(img) as picture:
+            image_format = picture.format
+            picture.verify()
+    except Exception:
+        raise ImageUploadError("Unsupported file format")
+    suffix = IMAGE_SUFFIXES.get(image_format)
+    if suffix is None:
+        raise ImageUploadError("Unsupported file format")
+    img.seek(0)
+    img_name = rand_str(10) + suffix
+    try:
+        with open(os.path.join(settings.UPLOAD_DIR, img_name), "wb") as img_file:
+            for chunk in img.chunks():
+                img_file.write(chunk)
+            os.fchmod(img_file.fileno(), 0o644)
+    except IOError as e:
+        logger.error(e)
+        raise ImageUploadError("Upload Error")
+    return f"{settings.UPLOAD_PREFIX}/{img_name}"
+
 
 class SimditorImageUploadAPIView(APIView):
     request_parsers = ()
 
     def post(self, request):
-        form = ImageUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            img = form.cleaned_data["image"]
-        else:
-            return self.response({
-                "success": False,
-                "msg": "Upload failed",
-                "file_path": ""})
-
-        suffix = os.path.splitext(img.name)[-1].lower()
-        if suffix not in [".gif", ".jpg", ".jpeg", ".bmp", ".png"]:
-            return self.response({
-                "success": False,
-                "msg": "Unsupported file format",
-                "file_path": ""})
-        img_name = rand_str(10) + suffix
         try:
-            with open(os.path.join(settings.UPLOAD_DIR, img_name), "wb") as imgFile:
-                for chunk in img:
-                    imgFile.write(chunk)
-                os.fchmod(imgFile.fileno(), 0o644)
-        except IOError as e:
-            logger.error(e)
-            return self.response({
-                "success": False,
-                "msg": "Upload Error",
-                "file_path": ""})
-        return self.response({
-            "success": True,
-            "msg": "Success",
-            "file_path": f"{settings.UPLOAD_PREFIX}/{img_name}"})
+            file_path = save_uploaded_image(request)
+        except ImageUploadError as e:
+            return self.response({"success": False, "msg": str(e), "file_path": ""})
+        return self.response({"success": True, "msg": "Success", "file_path": file_path})
 
 
 class SimditorFileUploadAPIView(APIView):

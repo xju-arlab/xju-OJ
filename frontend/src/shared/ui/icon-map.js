@@ -23,6 +23,7 @@ import {
   HelpCircle,
   Grid2X2,
   Home,
+  ImagePlus,
   Info,
   LayoutDashboard,
   Link2,
@@ -71,6 +72,7 @@ import {
 
 const iconMap = {
   home: Home,
+  image: ImagePlus,
   'ios-home': Home,
   'ios-keypad': Grid2X2,
   keypad: Grid2X2,

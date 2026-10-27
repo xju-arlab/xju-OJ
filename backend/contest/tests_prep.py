@@ -1,6 +1,7 @@
 import copy
 import io
 import json
+import os
 import tempfile
 from datetime import timedelta
 from unittest import mock
@@ -10,6 +11,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
+from PIL import Image as PILImage
 
 from judge.statistics import refresh_submission_statistics
 from problem.contest_authoring import alphabetic_display_id, order_contest_problems
@@ -804,3 +806,44 @@ class ContestPrepInviteTest(ContestPrepTestBase):
         token = self.create_invite()
         self.assertFailed(self.accept(self.newcomer, token), "Too many invalid invite links, try again later")
         self.assertSuccess(self.accept(self.other, token))
+
+
+class ContestPrepImageUploadTest(ContestPrepTestBase):
+    def setUp(self):
+        super().setUp()
+        self.url = self.reverse("contest_prep_image_upload_api")
+        self.upload_root = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(UPLOAD_DIR=self.upload_root.name)
+        self.settings_override.enable()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.upload_root.cleanup()
+
+    @staticmethod
+    def image_file(name, image_format):
+        buffer = io.BytesIO()
+        PILImage.new("RGB", (4, 3), (200, 40, 40)).save(buffer, format=image_format)
+        return SimpleUploadedFile(name, buffer.getvalue())
+
+    def upload(self, image):
+        return self.client.post(self.url, data={"contest_id": self.contest.id, "image": image}, format="multipart")
+
+    def test_organizers_upload_images_named_by_their_real_format(self):
+        self.login(self.organizer)
+        response = self.upload(self.image_file("statement.webp", "WEBP"))
+        self.assertSuccess(response)
+        path = response.data["data"]["file_path"]
+        self.assertTrue(path.startswith("/public/upload/") and path.endswith(".webp"))
+        self.assertTrue(os.path.isfile(os.path.join(self.upload_root.name, os.path.basename(path))))
+        # A PNG called .gif is stored as what it is.
+        response = self.upload(self.image_file("figure.gif", "PNG"))
+        self.assertTrue(response.data["data"]["file_path"].endswith(".png"))
+
+    def test_non_images_and_strangers_are_refused(self):
+        self.login(self.organizer)
+        self.assertFailed(self.upload(SimpleUploadedFile("evil.png", b"<script>alert(1)</script>")),
+                          "Unsupported file format")
+        self.login(self.stranger)
+        self.assertFailed(self.upload(self.image_file("a.png", "PNG")), "Contest does not exist")
+        self.assertEqual(os.listdir(self.upload_root.name), [])

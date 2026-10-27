@@ -8,6 +8,16 @@
         <button type="button" title="删除线" aria-label="删除线" @mousedown.prevent @click="applyFormat('strikethrough')"><s>S</s></button>
         <button type="button" title="行内代码" aria-label="行内代码" @mousedown.prevent @click="applyFormat('code')"><span>&lt;/&gt;</span></button>
         <button type="button" title="行内公式" aria-label="行内公式" @mousedown.prevent @click="applyFormat('formula')"><span>∑</span></button>
+        <template v-if="imageUpload">
+          <span class="markdown-toolbar-divider" aria-hidden="true"></span>
+          <button type="button" class="markdown-image-button" :disabled="uploadingImages > 0"
+                  :title="uploadingImages ? '图片上传中…' : '插入图片（也可直接粘贴截图）'" aria-label="插入图片"
+                  @mousedown.prevent @click="pickImage">
+            <Icon :type="uploadingImages ? 'loading' : 'image'" :class="{ 'is-spinning': uploadingImages }" />
+          </button>
+          <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
+                 multiple hidden @change="onImagePicked">
+        </template>
       </div>
       <div class="markdown-mode-switch" role="group" aria-label="编辑模式">
         <button type="button" :class="{ active: mode === 'raw' }" @click="setMode('raw')">原文</button>
@@ -19,7 +29,8 @@
               v-model="source"
               class="markdown-raw-editor"
               spellcheck="false"
-              @input="emitMarkdown"></textarea>
+              @input="emitMarkdown"
+              @paste="onPaste"></textarea>
     <div v-show="mode === 'preview'"
          ref="previewEditor"
          class="markdown-preview markdown-body"
@@ -29,6 +40,7 @@
          spellcheck="true"
          v-html="previewHtml"
          @input="onPreviewInput"
+         @paste="onPaste"
          @blur="syncPreviewHtml"
          v-katex
          v-highlight></div>
@@ -40,6 +52,8 @@ import markdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
+import { csrfHeaders } from '@/utils/csrf'
+import { compressImageToWebP } from '@/utils/imageCompress'
 
 const renderer = markdownIt({
   html: true,
@@ -97,7 +111,9 @@ export default {
   name: 'RichTextEditorAdapter',
   props: {
     value: { type: String, default: '' },
-    modelValue: { type: String, default: undefined }
+    modelValue: { type: String, default: undefined },
+    // { action, data }: where statement images go. Without it there is no image button.
+    imageUpload: { type: Object, default: null }
   },
   emits: ['input', 'change', 'update:value', 'update:modelValue'],
   data () {
@@ -106,7 +122,8 @@ export default {
       source: '',
       previewHtml: '',
       lastRenderedHtml: '',
-      turndown: null
+      turndown: null,
+      uploadingImages: 0
     }
   },
   computed: {
@@ -212,6 +229,108 @@ export default {
       selection.removeAllRanges()
       selection.addRange(range)
     },
+    pickImage () {
+      this.savedRange = this.mode === 'preview' ? this.previewRange() : null
+      const input = this.$refs.imageInput
+      if (!input) return
+      input.value = ''
+      input.click()
+    },
+    previewRange () {
+      const editor = this.$refs.previewEditor
+      const selection = window.getSelection()
+      if (!editor || !selection || !selection.rangeCount) return null
+      const range = selection.getRangeAt(0)
+      return editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null
+    },
+    onImagePicked (event) {
+      this.uploadImages(Array.from(event.target.files || []))
+    },
+    onPaste (event) {
+      if (!this.imageUpload) return
+      const files = Array.from((event.clipboardData && event.clipboardData.files) || [])
+        .filter(file => file.type.startsWith('image/'))
+      if (!files.length) return
+      event.preventDefault()
+      if (this.mode === 'preview') this.savedRange = this.previewRange()
+      this.uploadImages(files)
+    },
+    async uploadImages (files) {
+      const images = files.filter(file => file.type.startsWith('image/'))
+      if (!images.length) return
+      this.uploadingImages += 1
+      try {
+        for (const original of images) {
+          const file = await compressImageToWebP(original)
+          this.insertImage(await this.uploadImage(file), original.name)
+        }
+      } catch (error) {
+        if (this.$error) this.$error(error.message || '图片上传失败')
+      } finally {
+        this.uploadingImages -= 1
+      }
+    },
+    async uploadImage (file) {
+      const form = new FormData()
+      Object.entries(this.imageUpload.data || {}).forEach(([key, value]) => form.append(key, value))
+      form.append('image', file, file.name)
+      const response = await fetch(this.imageUpload.action, {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+        headers: csrfHeaders()
+      })
+      let body = {}
+      try {
+        body = await response.json()
+      } catch (_) {
+        // Not JSON: reported below.
+      }
+      // The admin upload answers {success, file_path, msg}; the prep upload {error, data}.
+      const path = body.file_path || (body.data && body.data.file_path)
+      if (!response.ok || !path) {
+        throw new Error(body.msg || (typeof body.data === 'string' ? body.data : '') || '图片上传失败')
+      }
+      return path
+    },
+    insertImage (path, name) {
+      const alt = String(name || '').replace(/\.[^.]*$/, '').replace(/[[\]()]/g, '').trim() || 'image'
+      if (this.mode === 'raw') {
+        const editor = this.$refs.rawEditor
+        const start = editor ? editor.selectionStart : this.source.length
+        const end = editor ? editor.selectionEnd : start
+        const before = this.source.slice(0, start)
+        const after = this.source.slice(end)
+        // Its own paragraph, so the statement can lay the picture out as a figure.
+        const lead = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n'
+        const trail = !after ? '\n' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n'
+        const snippet = `${lead}![${alt}](${path})${trail}`
+        this.source = before + snippet + after
+        this.emitMarkdown()
+        this.$nextTick(() => {
+          if (!editor) return
+          const caret = before.length + snippet.length
+          editor.focus()
+          editor.setSelectionRange(caret, caret)
+        })
+        return
+      }
+      const editor = this.$refs.previewEditor
+      const selection = window.getSelection()
+      if (!editor || !selection) return
+      editor.focus()
+      let range = this.savedRange
+      if (!range) {
+        range = document.createRange()
+        range.selectNodeContents(editor)
+        range.collapse(false)
+      }
+      selection.removeAllRanges()
+      selection.addRange(range)
+      document.execCommand('insertImage', false, path)
+      this.savedRange = this.previewRange()
+      this.onPreviewInput()
+    },
     wrapSelection (before, after, placeholder) {
       this.$nextTick(() => {
         const editor = this.$refs.rawEditor
@@ -239,6 +358,13 @@ export default {
 .markdown-format-actions, .markdown-mode-switch { display: flex; align-items: center; gap: 2px; }
 .markdown-editor-toolbar button { appearance: none; display: inline-grid; min-width: 30px; height: 30px; place-items: center; padding: 0 7px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-muted); cursor: pointer; font-family: var(--font-sans); font-size: 13px; transition: color var(--transition), background-color var(--transition); }
 .markdown-editor-toolbar button:hover, .markdown-editor-toolbar button:focus-visible { background: var(--color-bg-subtle); color: var(--color-text); outline: none; }
+.markdown-toolbar-divider { width: 1px; height: 18px; margin: 0 4px; background: var(--color-border); }
+.markdown-image-button :deep(.legacy-icon) { display: inline-flex; }
+.markdown-image-button :deep(svg) { width: 16px; height: 16px; }
+.markdown-image-button:disabled { cursor: wait; opacity: .7; }
+.markdown-image-button .is-spinning { animation: markdown-image-spin .9s linear infinite; }
+@keyframes markdown-image-spin { to { transform: rotate(360deg); } }
+.markdown-preview :deep(img) { max-width: 100%; height: auto; }
 .markdown-mode-switch { padding: 2px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg-subtle); }
 .markdown-mode-switch button { display: inline-flex; min-width: 62px; height: 26px; align-items: center; justify-content: center; border-radius: 4px; font-size: 12px; line-height: 1; }
 .markdown-mode-switch button.active { background: var(--color-bg); color: var(--color-text); box-shadow: 0 1px 3px rgba(55, 53, 47, .09); }

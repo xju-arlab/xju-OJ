@@ -16,6 +16,8 @@ export function prepProblemService (contestID) {
       return mode === 'edit' ? api.editPrepProblem(payload) : api.createPrepProblem(payload)
     },
     testCaseUploadAction: '/api/contest/prep/test_case',
-    testCaseUploadData: { contest_id: contestID }
+    testCaseUploadData: { contest_id: contestID },
+    imageUploadAction: '/api/contest/prep/upload_image',
+    imageUploadData: { contest_id: contestID }
   }
 }
