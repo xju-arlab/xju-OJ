@@ -27,6 +27,40 @@ const renderer = markdownIt({
 const MATH_PATTERN = /\$\$[\s\S]*?\$\$|\$[^$]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/g
 const PLACEHOLDER = 'MARKDOWNMATHPLACEHOLDER'
 
+// Markdown has no image-size syntax; the editor adds `![alt](src){width=60%}`.
+// The size becomes real <img> attributes, which the statement sanitizer keeps.
+const IMAGE_SIZE = /^\{\s*([^}]*?)\s*\}/
+const SIZE_VALUE = /^\d+(?:\.\d+)?(?:px|%)?$/
+
+function imageSize (md) {
+  md.core.ruler.push('image_size', state => {
+    for (const token of state.tokens) {
+      if (token.type !== 'inline' || !token.children) continue
+      const children = token.children
+      for (let index = 0; index < children.length; index += 1) {
+        const image = children[index]
+        if (image.type !== 'image') continue
+        const next = children[index + 1]
+        if (!next || next.type !== 'text') continue
+        const match = IMAGE_SIZE.exec(next.content)
+        if (!match) continue
+        const sizes = {}
+        for (const part of match[1].split(/\s+/)) {
+          const [name, value] = part.split('=')
+          if (!['width', 'height'].includes(name) || !SIZE_VALUE.test(value || '')) continue
+          sizes[name] = value
+        }
+        if (!Object.keys(sizes).length) continue
+        for (const [name, value] of Object.entries(sizes)) image.attrSet(name, value)
+        next.content = next.content.slice(match[0].length)
+        if (!next.content) children.splice(index + 1, 1)
+      }
+    }
+  })
+}
+
+renderer.use(imageSize)
+
 const htmlEscapes = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 
 function escapeHtml (value) {
@@ -47,6 +81,21 @@ export function createTurndown () {
   })
   service.use(gfm)
   service.keep(['u'])
+  service.addRule('sizedImage', {
+    filter: node => node.nodeName === 'IMG' &&
+      (SIZE_VALUE.test(node.getAttribute('width') || '') || SIZE_VALUE.test(node.getAttribute('height') || '')),
+    replacement: (content, node) => {
+      const src = node.getAttribute('src') || ''
+      if (!src) return ''
+      const alt = String(node.getAttribute('alt') || '').replace(/([[\]])/g, '\\$1')
+      const sizes = []
+      for (const name of ['width', 'height']) {
+        const value = node.getAttribute(name)
+        if (value && SIZE_VALUE.test(value)) sizes.push(`${name}=${value}`)
+      }
+      return `![${alt}](${src}){${sizes.join(' ')}}`
+    }
+  })
   return service
 }
 
