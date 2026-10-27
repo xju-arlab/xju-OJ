@@ -794,7 +794,7 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
             problem_info["template"][language] = build_problem_template(
                 value["prepend"], value["template"], value["append"]
             )
-        for field in ("description", "input_description", "output_description", "hint"):
+        for field in ("description", "input_description", "output_description", "data_range", "hint"):
             formatted = problem_info[field]
             problem_info[field] = (
                 markdown_to_html(formatted["value"])
@@ -840,6 +840,7 @@ class ImportProblemAPI(APIView, TestCaseZipProcessor):
                 description=problem_info["description"],
                 input_description=problem_info["input_description"],
                 output_description=problem_info["output_description"],
+                data_range=problem_info["data_range"],
                 hint=problem_info["hint"],
                 test_case_score=test_case_score,
                 time_limit=problem_info["time_limit"],

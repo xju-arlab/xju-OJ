@@ -74,10 +74,11 @@ testcase/
   "description": {"format": "markdown", "value": "题目描述"},
   "input_description": {"format": "markdown", "value": "输入描述"},
   "output_description": {"format": "markdown", "value": "输出描述"},
+  "data_range": {"format": "markdown", "value": "$1 \\le n \\le 10^5$"},
   "hint": {"format": "markdown", "value": ""},
   "time_limit": 1000,
   "memory_limit": 256,
-  "samples": [{"input": "1\n", "output": "1\n"}],
+  "samples": [{"input": "1\n", "output": "1\n", "explanation": "样例解释，可省略"}],
   "template": {},
   "spj": null,
   "rule_type": "ACM",
@@ -87,6 +88,10 @@ testcase/
   "visible": false
 }
 ```
+
+`data_range`（数据范围）可省略，旧题包照常导入；值为空时题面不显示该段。
+每个样例的 `explanation` 也可省略，它是纯文本（可写 `$...$` 公式），为空时不显示“样例解释”。
+导出的 `problem.json` 总会带上这两个字段。
 
 ## 安全与回滚
 

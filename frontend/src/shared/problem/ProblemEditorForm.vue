@@ -68,6 +68,7 @@
                         @close="closeTag(tag)">{{tag}}</el-tag>
               </span>
               <el-autocomplete v-if="inputVisible"
+                               ref="tagInput"
                                size="small"
                                class="input-new-tag"
                                popper-class="problem-tag-poper"
@@ -75,8 +76,10 @@
                                :trigger-on-focus="false"
                                :fetch-suggestions="querySearch"
                                @keyup.enter="addTag"
-                               @select="addTag"></el-autocomplete>
-              <el-button v-else class="button-new-tag" size="small" @click="inputVisible = true">
+                               @keyup.esc="cancelTag"
+                               @select="addTag"
+                               @blur="onTagBlur"></el-autocomplete>
+              <el-button v-else class="button-new-tag" size="small" @click="showTagInput">
                 + {{$t('m.New_Tag')}}
               </el-button>
             </div>
@@ -95,7 +98,7 @@
         </div>
 
         <div class="toggle-row">
-          <!-- A preparation contest picks its problems on the selection tab instead. -->
+          <!-- Every problem of a preparation contest takes part; the server keeps it visible. -->
           <label v-if="!contest.prep_state" class="toggle-field">
             <span><strong>{{$t('m.Visible')}}</strong><small>{{ visibleHint }}</small></span>
             <el-switch v-model="problem.visible"></el-switch>
@@ -111,7 +114,7 @@
         <div class="section-heading">
           <div>
             <h3>题面内容</h3>
-            <p>原文模式用于直接编辑 Markdown，预览模式可在渲染后的富文本中继续编辑。</p>
+            <p>原文模式用于直接编辑 Markdown，预览模式可在渲染后的富文本中继续编辑；数据范围与提示留空时不在题面显示。</p>
           </div>
         </div>
 
@@ -126,6 +129,10 @@
             <Simditor v-model="problem.output_description"></Simditor>
           </el-form-item>
         </div>
+        <el-form-item class="optional-field">
+          <template #label>{{ $t('m.Data_Range') }}<small>{{ $t('m.Optional_Hidden_When_Empty') }}</small></template>
+          <Simditor v-model="problem.data_range"></Simditor>
+        </el-form-item>
         <el-form-item :label="$t('m.Hint')">
           <Simditor v-model="problem.hint"></Simditor>
         </el-form-item>
@@ -135,7 +142,7 @@
         <div class="section-heading is-inline">
           <div>
             <h3>样例</h3>
-            <p>样例按题面展示顺序排列。</p>
+            <p>样例按题面展示顺序排列；样例解释为纯文本，可用 $...$ 书写公式。</p>
           </div>
           <el-button type="primary" size="small" @click="addSample">
             <Icon type="plus" />{{$t('m.Add_Sample')}}
@@ -156,6 +163,11 @@
                 <el-input :rows="6" type="textarea" :placeholder="$t('m.Output_Samples')" v-model="sample.output"></el-input>
               </el-form-item>
             </div>
+            <el-form-item class="optional-field">
+              <template #label>{{ $t('m.Sample_Explanation') }}<small>{{ $t('m.Optional_Hidden_When_Empty') }}</small></template>
+              <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" v-model="sample.explanation"
+                        :placeholder="$t('m.Sample_Explanation_Placeholder')"></el-input>
+            </el-form-item>
           </article>
         </div>
       </section>
@@ -170,11 +182,15 @@
                      :headers="csrfHeaders()"
                      :action="service.testCaseUploadAction"
                      name="file"
+                     accept=".zip"
                      :data="uploadData"
-                     :show-file-list="true"
+                     :show-file-list="false"
+                     :before-upload="beforeUpload"
                      :on-success="uploadSucceeded"
                      :on-error="uploadFailed">
-            <el-button size="small" type="primary"><Icon type="upload" />上传测试数据</el-button>
+            <el-button size="small" type="primary" :loading="uploading">
+              <Icon v-if="!uploading" type="upload" />{{ testCaseUploaded ? '重新上传' : '上传测试数据' }}
+            </el-button>
           </el-upload>
         </div>
 
@@ -216,6 +232,14 @@
           </div>
 
           <el-alert v-if="error.testCase" class="testcase-error" type="error" :closable="false" :title="error.testCase"></el-alert>
+          <div v-if="testCaseUploaded && problem.test_case_id" class="testcase-summary">
+            <span class="testcase-summary-icon"><Icon type="check" /></span>
+            <div>
+              <strong>已上传 {{ (problem.test_case_score || []).length }} 组测试数据</strong>
+              <small>{{ uploadedFileName || ('ID ' + problem.test_case_id) }}</small>
+            </div>
+            <el-button text type="danger" size="small" @click="clearTestCase"><Icon type="trash" />清除</el-button>
+          </div>
           <el-table v-if="problem.test_case_score && problem.test_case_score.length" :data="problem.test_case_score" class="testcase-table">
             <el-table-column prop="input_name" :label="$t('m.Input')"></el-table-column>
             <el-table-column prop="output_name" :label="$t('m.Output')"></el-table-column>
@@ -287,6 +311,8 @@
           io_mode: {'io_mode': 'Standard IO', 'input': 'input.txt', 'output': 'output.txt'}
         },
         testCaseUploaded: false,
+        uploading: false,
+        uploadedFileName: '',
         allLanguage: {},
         inputVisible: false,
         tagInput: '',
@@ -324,6 +350,7 @@
           description: '',
           input_description: '',
           output_description: '',
+          data_range: '',
           time_limit: 1000,
           memory_limit: 256,
           difficulty: 'Low',
@@ -333,7 +360,7 @@
           tags: [],
           languages: [],
           template: {},
-          samples: [{input: '', output: ''}],
+          samples: [{input: '', output: '', explanation: ''}],
           spj: false,
           spj_language: '',
           spj_code: '',
@@ -355,8 +382,6 @@
           this.service.getContest(this.contestId).then(contest => {
             this.contest = contest
             this.problem.rule_type = contest.rule_type
-            // Problems uploaded while preparing a contest start as unselected candidates.
-            if (this.mode !== 'edit' && contest.prep_state) this.problem.visible = false
           })
         }
 
@@ -371,6 +396,9 @@
             }
             data.spj_language = data.spj_language || 'C'
             data.source = this.normalizedSource(data)
+            data.data_range = data.data_range || ''
+            data.hint = data.hint || ''
+            data.samples = (data.samples || []).map(sample => ({...sample, explanation: sample.explanation || ''}))
             this.compiledSpj = {code: data.spj_code, language: data.spj_language}
             this.problem = data
             this.testCaseUploaded = data.judge_mode === 'REMOTE' || Boolean(data.test_case_id)
@@ -386,7 +414,25 @@
         }
       })
     },
+    beforeUnmount () {
+      clearTimeout(this.tagBlurTimer)
+    },
     watch: {
+      'problem.tags': {
+        handler (tags) {
+          if (tags && tags.length) this.error.tags = ''
+        },
+        deep: true
+      },
+      'problem.languages': {
+        handler (languages) {
+          if (languages && languages.length) this.error.languages = ''
+        },
+        deep: true
+      },
+      'problem.spj' (spj) {
+        if (!spj) this.error.spj = ''
+      },
       'problem.spj_code' () {
         if (this.compiledSpj && this.problem.spj_code !== this.compiledSpj.code) this.problem.spj_compile_ok = false
       },
@@ -443,27 +489,60 @@
       },
       resetTestCase () {
         this.testCaseUploaded = false
+        this.uploadedFileName = ''
         this.problem.test_case_score = []
         this.problem.test_case_id = ''
       },
+      clearTestCase () {
+        this.$confirm('清除后需要重新上传测试数据才能保存题目，是否继续？', '清除测试数据', {
+          confirmButtonText: '清除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          this.resetTestCase()
+        }).catch(() => {
+        })
+      },
+      showTagInput () {
+        this.inputVisible = true
+        this.$nextTick(() => {
+          if (this.$refs.tagInput) this.$refs.tagInput.focus()
+        })
+      },
       addTag () {
-        let inputValue = this.tagInput
-        if (inputValue) {
-          this.problem.tags.push(inputValue)
+        const name = String(this.tagInput || '').trim()
+        if (name && !this.problem.tags.includes(name)) {
+          this.problem.tags.push(name)
         }
         this.inputVisible = false
         this.tagInput = ''
+      },
+      cancelTag () {
+        this.inputVisible = false
+        this.tagInput = ''
+      },
+      onTagBlur () {
+        // Clicking a suggestion blurs the input first; let its select land before closing.
+        clearTimeout(this.tagBlurTimer)
+        this.tagBlurTimer = setTimeout(() => {
+          if (this.inputVisible) this.addTag()
+        }, 150)
       },
       closeTag (tag) {
         this.problem.tags.splice(this.problem.tags.indexOf(tag), 1)
       },
       addSample () {
-        this.problem.samples.push({input: '', output: ''})
+        this.problem.samples.push({input: '', output: '', explanation: ''})
       },
       deleteSample (index) {
         this.problem.samples.splice(index, 1)
       },
-      uploadSucceeded (response) {
+      beforeUpload () {
+        this.uploading = true
+        return true
+      },
+      uploadSucceeded (response, file) {
+        this.uploading = false
         if (response.error) {
           this.$error(response.data)
           return
@@ -477,9 +556,12 @@
         }
         this.problem.test_case_score = fileList
         this.testCaseUploaded = true
+        this.uploadedFileName = file && file.name ? file.name : ''
         this.problem.test_case_id = response.data.id
+        this.error.testCase = ''
       },
       uploadFailed () {
+        this.uploading = false
         this.$error('上传失败')
       },
       compileSPJ () {
@@ -512,6 +594,10 @@
         })
       },
       submit () {
+        if (!String(this.problem.title || '').trim()) {
+          this.$error('请输入题目标题')
+          return
+        }
         if (this.problem.judge_mode !== 'REMOTE' && !this.problem.samples.length) {
           this.$error('请至少添加一组样例')
           return
@@ -591,6 +677,7 @@
   .section-heading p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
   .section-heading.is-inline > :last-child { flex: none; }
   .section-actions { display: flex; flex: none; align-items: center; gap: 8px; }
+  .section-heading :deep(.el-button .legacy-icon), .subsection-heading :deep(.el-button .legacy-icon) { display: inline-flex; margin-right: 4px; }
   .field-grid { display: grid; gap: 0 var(--form-gap); }
   .basic-grid { grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); }
   .limit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -617,6 +704,35 @@
   .subsection-actions { display: flex; align-items: center; gap: 8px; }
   .spj-language-select { width: 132px; }
   .testcase-error { margin-bottom: 12px; }
+  .optional-field :deep(.el-form-item__label) small { margin-left: 6px; color: var(--color-text-faint); font-size: 11px; font-weight: 500; }
+  .testcase-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    > div { min-width: 0; flex: 1; }
+    strong, small { display: block; }
+    strong { color: var(--color-text); font-size: 13px; font-weight: 620; }
+    small { overflow: hidden; margin-top: 2px; color: var(--color-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    :deep(.el-button .legacy-icon) { display: inline-flex; margin-right: 4px; }
+  }
+  .testcase-summary-icon {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--tag-tools-bg);
+    color: var(--cat-tools);
+    :deep(.legacy-icon) { display: inline-flex; }
+    :deep(svg) { width: 14px; height: 14px; }
+  }
   .testcase-table { width: 100%; }
   .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 2px 0 6px; }
 

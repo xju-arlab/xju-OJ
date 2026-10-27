@@ -20,6 +20,8 @@ class TestCaseUploadForm(forms.Form):
 class CreateSampleSerializer(serializers.Serializer):
     input = serializers.CharField(trim_whitespace=False)
     output = serializers.CharField(trim_whitespace=False)
+    # Plain text, never HTML: samples are stored as JSON and skip the rich-text cleaner.
+    explanation = serializers.CharField(trim_whitespace=False, allow_blank=True, required=False, default="")
 
 
 class CreateTestCaseScoreSerializer(serializers.Serializer):
@@ -53,6 +55,7 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     description = serializers.CharField()
     input_description = serializers.CharField()
     output_description = serializers.CharField()
+    data_range = serializers.CharField(allow_blank=True, required=False, default="")
     samples = serializers.ListField(child=CreateSampleSerializer(), allow_empty=True)
     test_case_id = serializers.CharField(max_length=32, allow_blank=True)
     test_case_score = serializers.ListField(child=CreateTestCaseScoreSerializer(), allow_empty=True)
@@ -188,6 +191,7 @@ class ExportProblemSerializer(serializers.ModelSerializer):
     description = serializers.SerializerMethodField()
     input_description = serializers.SerializerMethodField()
     output_description = serializers.SerializerMethodField()
+    data_range = serializers.SerializerMethodField()
     test_case_score = serializers.SerializerMethodField()
     hint = serializers.SerializerMethodField()
     spj = serializers.SerializerMethodField()
@@ -210,8 +214,12 @@ class ExportProblemSerializer(serializers.ModelSerializer):
     def get_output_description(self, obj):
         return self._html_format_value(obj.output_description)
 
+    def get_data_range(self, obj):
+        return self._html_format_value(obj.data_range or "")
+
     def get_hint(self, obj):
-        return self._html_format_value(obj.hint)
+        # Legacy rows may hold NULL; the importer only accepts strings.
+        return self._html_format_value(obj.hint or "")
 
     def get_test_case_score(self, obj):
         return [{"score": item["score"] if obj.rule_type == ProblemRuleType.OI else 100,
@@ -234,7 +242,7 @@ class ExportProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
         fields = ("display_id", "title", "description", "tags",
-                  "input_description", "output_description",
+                  "input_description", "output_description", "data_range",
                   "test_case_score", "hint", "time_limit", "memory_limit", "samples",
                   "template", "spj", "rule_type", "source", "difficulty", "visible",
                   "languages")
@@ -288,6 +296,8 @@ class ImportProblemSerializer(serializers.Serializer):
     description = FormatValueSerializer()
     input_description = FormatValueSerializer()
     output_description = FormatValueSerializer()
+    # Optional so packages exported before the field existed still import.
+    data_range = FormatValueSerializer(required=False, default={"format": "html", "value": ""})
     hint = FormatValueSerializer()
     test_case_score = serializers.ListField(
         child=TestCaseScoreSerializer(), allow_null=True, required=False, default=list

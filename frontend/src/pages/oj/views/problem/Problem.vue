@@ -57,6 +57,11 @@
           <p class="title">{{$t('m.Output')}} <span v-if="problem.io_mode.io_mode=='File IO'">({{$t('m.ToFile')}}: {{ problem.io_mode.output }})</span></p>
           <div class="content" v-html=problem.output_description></div>
 
+          <template v-if="hasContent(problem.data_range)">
+            <p class="title">{{$t('m.Data_Range')}}</p>
+            <div class="content" v-html="problem.data_range"></div>
+          </template>
+
           <div v-for="(sample, index) of problem.samples" :key="index">
             <div class="flex-container sample">
               <div class="sample-input">
@@ -75,14 +80,17 @@
                 <p class="title">{{$t('m.Sample_Output')}} {{index + 1}}</p>
                 <pre>{{sample.output}}</pre>
               </div>
+              <!-- Plain text on purpose: samples are JSON and never pass the rich-text cleaner. -->
+              <div v-if="sample.explanation && sample.explanation.trim()" class="sample-explanation">
+                <p class="title">{{$t('m.Sample_Explanation')}} {{index + 1}}</p>
+                <div class="sample-explanation-body">{{sample.explanation}}</div>
+              </div>
             </div>
           </div>
 
-          <div v-if="problem.hint">
+          <div v-if="hasContent(problem.hint)">
             <p class="title">{{$t('m.Hint')}}</p>
-            <Card dis-hover>
-              <div class="content" v-html=problem.hint></div>
-            </Card>
+            <div class="content hint-box" v-html=problem.hint></div>
           </div>
 
           <div v-if="problem.source">
@@ -672,6 +680,12 @@
         this.acceptedCelebrationResolve = null
         if (resolve) resolve()
       },
+      hasContent (html) {
+        // Rich text editors leave markup like <p><br></p> behind when emptied.
+        if (!html) return false
+        if (/<(img|video|iframe|table)\b/i.test(html)) return true
+        return /\S/.test(String(html).replace(/<[^>]*>/g, '').replace(/&nbsp;|\u00a0/g, ' '))
+      },
       toggleFavorite () {
         const favorited = !this.problem.favorited
         this.favoriting = true
@@ -1003,6 +1017,8 @@
 
   #problem-content {
     margin-top: 0;
+    // Old-style figures shrink digits inside Chinese text and limits; keep them level.
+    font-variant-numeric: lining-nums;
     .title {
       font-size: 18px;
       font-weight: 600;
@@ -1043,7 +1059,21 @@
     p.content { margin: 0 2px 15px; font-size: 14px; line-height: 1.75; }
     .sample { align-items: stretch; flex-direction: column; }
     .sample-input, .sample-output { width: 100%; flex: 1 1 auto; display: flex; flex-direction: column; margin: 0; }
-    .sample-output .title { margin-top: 15px; }
+    .sample-output .title, .sample-explanation .title { margin-top: 15px; }
+    // Sample explanations and the hint are asides: one quiet box style for both.
+    .sample-explanation-body, .hint-box {
+      padding: 11px 14px;
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-subtle);
+      color: var(--color-text);
+      overflow-wrap: anywhere;
+    }
+    // Same size and rhythm as statement paragraphs.
+    .sample-explanation-body { font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
+    .hint-box :deep(p:first-child) { margin-top: 0; }
+    .hint-box :deep(p:last-child) { margin-bottom: 0; }
     .sample pre { flex: 1 1 auto; align-self: stretch; min-height: 76px; margin: 0; border: 1px solid var(--color-border); background: var(--color-bg); }
   }
 

@@ -430,6 +430,45 @@ class ProblemZipImportAPITest(APITestCase):
                         {"problem.json", "testcase/1.in", "testcase/1.out"},
                     )
 
+    def test_export_and_import_keep_data_range_and_sample_explanations(self):
+        info = self.problem_info("Round trip")
+        info["data_range"] = {"format": "markdown", "value": "$1 \\le n \\le 10^5$"}
+        info["samples"] = [{"input": "1\n", "output": "2\n", "explanation": "Add one to $n$."},
+                           {"input": "3\n", "output": "4\n"}]
+        self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(info)},
+                                            format="multipart"))
+        original = Problem.objects.get()
+        self.assertIn("10^5", original.data_range)
+        self.assertEqual([sample["explanation"] for sample in original.samples], ["Add one to $n$.", ""])
+
+        response = self.client.get(self.reverse("export_problem_api"), {"problem_id": [original.id]})
+        with ZipFile(io.BytesIO(b"".join(response.streaming_content))) as archive:
+            exported = json.loads(archive.read("problem.json"))
+        self.assertEqual(exported["data_range"], {"format": "html", "value": original.data_range})
+        self.assertEqual(exported["samples"][0]["explanation"], "Add one to $n$.")
+
+        self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(exported)},
+                                            format="multipart"))
+        copy_ = Problem.objects.exclude(id=original.id).get()
+        self.assertEqual(copy_.data_range, original.data_range)
+        self.assertEqual(copy_.samples, original.samples)
+
+    def test_packages_without_data_range_or_with_a_null_hint_still_import(self):
+        # Packages from before the field existed, or exported from rows with a NULL hint.
+        legacy = self.problem_info("Legacy")
+        self.assertNotIn("data_range", legacy)
+        self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(legacy)},
+                                            format="multipart"))
+        problem = Problem.objects.get()
+        self.assertEqual(problem.data_range, "")
+        Problem.objects.filter(id=problem.id).update(hint=None)
+        response = self.client.get(self.reverse("export_problem_api"), {"problem_id": [problem.id]})
+        with ZipFile(io.BytesIO(b"".join(response.streaming_content))) as archive:
+            exported = json.loads(archive.read("problem.json"))
+        self.assertEqual(exported["hint"], {"format": "html", "value": ""})
+        self.assertSuccess(self.client.post(self.url, data={"file": self.make_single_package(exported)},
+                                            format="multipart"))
+
     def test_import_requires_problem_permission(self):
         self.client.logout()
         response = self.client.post(
@@ -452,6 +491,29 @@ class ProblemAdminAPITest(ProblemCreateTestBase):
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"]["_id"], "1001")
         return resp
+
+    def test_data_range_and_sample_explanation_are_stored_and_served(self):
+        self.data["data_range"] = "<p>1 ≤ n ≤ 100</p><script>alert(1)</script>"
+        self.data["samples"] = [{"input": "1", "output": "1", "explanation": "  keep\n  spacing"},
+                                {"input": "2", "output": "4"}]
+        resp = self.client.post(self.url, data=self.data)
+        self.assertSuccess(resp)
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        # Rich text is cleaned like the other statement fields: the tag goes, inert text stays.
+        self.assertTrue(problem.data_range.startswith("<p>1 ≤ n ≤ 100</p>"))
+        self.assertNotIn("<script", problem.data_range)
+        self.assertEqual(problem.samples, [{"input": "1", "output": "1", "explanation": "  keep\n  spacing"},
+                                           {"input": "2", "output": "4", "explanation": ""}])
+        public = self.client.get(self.reverse("problem_api") + "?problem_id=" + problem._id)
+        self.assertSuccess(public)
+        self.assertEqual(public.data["data"]["data_range"], problem.data_range)
+        self.assertEqual(public.data["data"]["samples"][0]["explanation"], "  keep\n  spacing")
+
+    def test_problem_without_data_range_defaults_to_empty(self):
+        self.data.pop("data_range", None)
+        resp = self.client.post(self.url, data=self.data)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["data_range"], "")
 
     def test_display_id_is_assigned_sequentially(self):
         self.test_create_problem()
