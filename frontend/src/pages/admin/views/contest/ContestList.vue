@@ -16,8 +16,12 @@
         style="width: 100%">
         <el-table-column type="expand">
           <template #default="props">
-            <p>开始时间：{{ $filters.localtime(props.row.start_time) }}</p>
-            <p>结束时间：{{ $filters.localtime(props.row.end_time) }}</p>
+            <!-- A preparation workspace keeps no contest window; publishing picks it. -->
+            <p v-if="props.row.prep_state">比赛时间：发布时选择</p>
+            <template v-else>
+              <p>开始时间：{{ $filters.localtime(props.row.start_time) }}</p>
+              <p>结束时间：{{ $filters.localtime(props.row.end_time) }}</p>
+            </template>
             <p>创建时间：{{ $filters.localtime(props.row.create_time) }}</p>
             <p>创建者：{{props.row.created_by.username}}</p>
           </template>

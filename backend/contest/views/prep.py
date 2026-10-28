@@ -5,7 +5,8 @@ Every view resolves its contest through load_prep_contest, which hides the
 contest from everyone outside the team (the creator, organizers and super
 admins). Every uploaded problem belongs to the contest. The team plans the
 problem set by difficulty and organizer, the workspace is always open for
-setting problems, and review rounds run beside it as 5-hour mock contests.
+setting problems, and review rounds run beside it as mock contests that go on
+until their creator ends them.
 """
 import hashlib
 import secrets
@@ -108,7 +109,7 @@ def close_label_gaps(contest):
 
 
 class ContestPrepReviewAPI(APIView):
-    """Start a review round: a fresh 5-hour mock contest of the contest's problems."""
+    """Start a review round: a mock contest that runs until its creator ends it."""
 
     @validate_serializer(ContestPrepReviewSerializer)
     @login_required
@@ -129,7 +130,7 @@ class ContestPrepReviewAPI(APIView):
 
     @login_required
     def delete(self, request):
-        """End the running review round early; its board keeps the runs made so far."""
+        """End the running review round; its board keeps the runs made so far."""
         contest = load_prep_contest(request, request.GET.get("contest_id"), MANAGE)
         if not contest.review_running():
             return self.error("No review round is running")

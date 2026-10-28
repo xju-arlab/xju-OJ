@@ -14,7 +14,7 @@ from account.models import User
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
-from utils.constants import CacheKey, ContestPrepState, ContestRuleType, PREP_REVIEW_HOURS
+from utils.constants import CacheKey, ContestPrepState, ContestRuleType, PREP_PLACEHOLDER_DAYS
 from utils.shortcuts import rand_str
 from utils.tasks import delete_files
 from ..models import Contest, ContestAnnouncement, ACMContestRank
@@ -38,10 +38,10 @@ class ContestAPI(APIView):
                 return self.error("Preparation contests support ACM and OI only")
             data["prep_state"] = ContestPrepState.PREPARATION
             data["visible"] = True
-            # The real window is chosen on publish; until then the contest
-            # starts when it is created and spans the 5-hour review.
+            # The real window is chosen on publish; until then the row carries a
+            # placeholder that never looks like a finished contest.
             data["start_time"] = now()
-            data["end_time"] = data["start_time"] + timedelta(hours=PREP_REVIEW_HOURS)
+            data["end_time"] = data["start_time"] + timedelta(days=PREP_PLACEHOLDER_DAYS)
         elif not data.get("start_time") or not data.get("end_time"):
             return self.error("Start time and end time are required")
         else:

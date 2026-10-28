@@ -76,7 +76,7 @@
           <button type="button" class="prep-action" @click="openReview">
             <Icon type="flask" />
             <span>{{ $t('m.Prep_Review') }}</span>
-            <span v-if="reviewRunning" class="prep-live" :title="$t('m.Prep_Review_Countdown')"></span>
+            <span v-if="reviewRunning" class="prep-live" :title="$t('m.Prep_State_Review')"></span>
           </button>
           <template v-if="canManagePrep">
             <button type="button" class="prep-publish" @click="openPublish">{{ $t('m.Prep_Publish') }}</button>
@@ -166,13 +166,13 @@
 
     <LegacyDialog v-if="canManagePrep" :title="$t('m.Prep_Review')" width="480px"
                   :visible="reviewVisible" @update:visible="reviewVisible = $event">
-      <p class="prep-dialog-note">{{ $t('m.Prep_Review_Note', { hours: reviewHours }) }}</p>
+      <p class="prep-dialog-note">{{ $t('m.Prep_Review_Note') }}</p>
       <p :class="['prep-dialog-count', { 'is-warning': selectionIssue }]">
         <Icon :type="selectionIssue ? 'alert-circle' : 'check-circle'" />
         <span>{{ selectionSummary }}</span>
       </p>
       <p v-if="reviewRunning" class="prep-dialog-running">
-        <span class="prep-live"></span>{{ $t('m.Prep_Review_Running', { time: countdownValue }) }}
+        <span class="prep-live"></span>{{ $t('m.Prep_Review_Running') }}
       </p>
       <el-form label-position="top" @submit.prevent>
         <el-form-item :label="$t('m.Contest_Password')">
@@ -231,7 +231,7 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
-  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PREP_REVIEW_HOURS } from '@/utils/constants'
+  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
@@ -248,7 +248,6 @@
         routeName: '',
         contestID: '',
         timer: null,
-        reviewHours: PREP_REVIEW_HOURS,
         reviewVisible: false,
         reviewPassword: '',
         startingReview: false,
@@ -314,11 +313,11 @@
         return value ? this.$filters.localtime(value, 'YYYY-MM-DD HH:mm') : '—'
       },
       syncClock () {
-        // Tick while a contest or a review is still running.
+        // A review round has no countdown; only a published contest ticks.
         clearInterval(this.timer)
         this.timer = null
-        const end = this.isPrepContest ? this.reviewEndsAt : moment(this.contest.end_time)
-        if (end && end.isAfter(moment(this.now))) {
+        if (this.isPrepContest) return
+        if (moment(this.contest.end_time).isAfter(moment(this.now))) {
           this.timer = setInterval(() => this.$store.commit(types.NOW_ADD_1S), 1000)
         }
       },
@@ -483,7 +482,7 @@
         let end = moment(this.contest.end_time)
         if (!start.isAfter(moment(this.now))) {
           start = moment(this.now).add(1, 'day').startOf('day').hour(9)
-          end = start.clone().add(PREP_REVIEW_HOURS, 'hours')
+          end = start.clone().add(PUBLISH_DEFAULT_HOURS, 'hours')
         }
         this.publishForm = {
           title: this.contest.title,
@@ -644,14 +643,12 @@
         return item ? this.$t(`m.${item.name.replace(/ /g, '_')}`) : this.$t('m.Status')
       },
       reviewEndsAt () {
-        // Every review round restarts a 5-hour clock, like a fresh contest; the creator may end it early.
+        // A review round has no time limit; only the creator ends it.
         if (!this.isPrepContest || !this.contest.review_started_at) return null
-        const end = moment(this.contest.review_started_at).add(PREP_REVIEW_HOURS, 'hours')
-        const ended = this.contest.review_ended_at && moment(this.contest.review_ended_at)
-        return ended && ended.isBefore(end) ? ended : end
+        return this.contest.review_ended_at ? moment(this.contest.review_ended_at) : null
       },
       reviewRunning () {
-        return Boolean(this.reviewEndsAt && this.reviewEndsAt.isAfter(this.now))
+        return Boolean(this.isPrepContest && this.contest.review_started_at && !this.contest.review_ended_at)
       },
       reviewStatusLabel () {
         if (this.reviewRunning) return this.$t('m.Prep_State_Review')
@@ -659,7 +656,7 @@
       },
       countdownCaption () {
         if (this.isPrepContest) {
-          if (this.reviewRunning) return this.$t('m.Prep_Review_Countdown')
+          if (this.reviewRunning) return this.$t('m.Prep_State_Review')
           return this.$t(this.contest.review_started_at ? 'm.Prep_Review_Ended' : 'm.Prep_Review_Not_Started')
         }
         if (this.contestStatus === CONTEST_STATUS.NOT_START) return this.$t('m.Not_Started')
@@ -668,7 +665,7 @@
       },
       countdownValue () {
         if (this.isPrepContest) {
-          return this.reviewRunning ? this.formatCountdown(this.reviewEndsAt.diff(this.now, 'seconds')) : '—'
+          return this.reviewRunning ? this.$t('m.Prep_Review_Unlimited') : '—'
         }
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
         const target = this.contestStatus === CONTEST_STATUS.NOT_START ? this.contest.start_time : this.contest.end_time
@@ -676,7 +673,9 @@
         return this.formatCountdown(moment(target).diff(this.now, 'seconds'))
       },
       durationLabel () {
-        if (this.isPrepContest) return this.isPrepReviewView ? `${PREP_REVIEW_HOURS}h` : '—'
+        if (this.isPrepContest) {
+          return this.isPrepReviewView && this.contest.review_started_at ? this.$t('m.Prep_Review_Unlimited') : '—'
+        }
         if (!this.contest.start_time || !this.contest.end_time) return '—'
         const hours = Math.abs(moment(this.contest.end_time).diff(moment(this.contest.start_time), 'minutes')) / 60
         if (hours >= 24) return `${Number((hours / 24).toFixed(1))}d`

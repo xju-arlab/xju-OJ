@@ -19,11 +19,15 @@ UNFINISHED = (JudgeStatus.PENDING, JudgeStatus.JUDGING)
 
 
 def review_runs(contest):
-    """Finished runs of the latest review round, which ends early when the creator stops it."""
+    """Finished runs of the latest review round; a round runs until the creator stops it."""
     runs = Submission.objects.filter(contest=contest).exclude(result__in=UNFINISHED)
     window = contest.review_window()
     if window:
-        runs = runs.filter(create_time__gte=window[0], create_time__lt=window[1])
+        start, end = window
+        runs = runs.filter(create_time__gte=start)
+        # An open round has no end, so every later run still counts.
+        if end is not None:
+            runs = runs.filter(create_time__lt=end)
     return runs
 
 

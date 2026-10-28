@@ -6,12 +6,16 @@ Copies share test data directories by test_case_id, like AddContestProblemAPI;
 uploading new data always allocates a new directory, so edits never leak back.
 Once the published contest ends, its new problems join the public library.
 """
+from datetime import timedelta
+
 from django.db import transaction
+from django.utils.timezone import now
 
 from problem.contest_authoring import alphabetic_display_id, order_contest_problems
 from problem.models import Problem
 from problem.tasks import schedule_contest_problem_publication
 from utils.api import APIError
+from utils.constants import PUBLISH_DEFAULT_HOURS
 from .models import Contest, ContestAnnouncement
 
 
@@ -26,8 +30,10 @@ def publish_prep_contest(prep_contest, overrides):
         raise APIError(f"This contest takes {prep.prep_problem_count} problems, "
                        f"but {len(problems)} are uploaded")
 
-    start_time = overrides.get("start_time", prep.start_time)
-    end_time = overrides.get("end_time", prep.end_time)
+    # A preparation contest has no real window before it is published, so a
+    # publish without explicit times gets a fresh one starting now.
+    start_time = overrides.get("start_time") or now()
+    end_time = overrides.get("end_time") or start_time + timedelta(hours=PUBLISH_DEFAULT_HOURS)
     if end_time <= start_time:
         raise APIError("Start time must occur earlier than end time")
     # The review password stays with the review; the real contest gets its own.

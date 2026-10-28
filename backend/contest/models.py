@@ -1,11 +1,9 @@
-from datetime import timedelta
-
 from utils.constants import ContestRuleType  # noqa
 from django.db import models
 from django.utils.timezone import now
 from utils.models import JSONField
 
-from utils.constants import PREP_REVIEW_HOURS, ContestPrepRole, ContestStatus, ContestType
+from utils.constants import ContestPrepRole, ContestStatus, ContestType
 from account.models import User
 from utils.models import RichTextField
 
@@ -40,7 +38,8 @@ class Contest(models.Model):
     # When the latest review round started; the review leaderboard counts
     # submissions from this moment, like a contest start time.
     review_started_at = models.DateTimeField(null=True, blank=True)
-    # Set when the creator ends that round before its PREP_REVIEW_HOURS run out.
+    # Set when the creator ends that round; a round has no time limit, so it
+    # runs until then.
     review_ended_at = models.DateTimeField(null=True, blank=True)
     # How many problems the creator plans for the contest. The plan holds at
     # most this many items and publishing needs exactly this many problems.
@@ -88,17 +87,17 @@ class Contest(models.Model):
         return cache[user.id]
 
     def review_window(self):
-        """(start, end) of the latest review round, or None if there never was one."""
+        """(start, end) of the latest review round, or None if there never was one.
+
+        A round has no time limit, so end stays None until the creator ends it.
+        """
         if not self.review_started_at:
             return None
-        end = self.review_started_at + timedelta(hours=PREP_REVIEW_HOURS)
-        if self.review_ended_at and self.review_ended_at < end:
-            end = self.review_ended_at
-        return self.review_started_at, end
+        return self.review_started_at, self.review_ended_at
 
     def review_running(self):
         window = self.review_window()
-        return window is not None and window[0] <= now() < window[1]
+        return window is not None and window[1] is None
 
     def prep_can_manage(self, user):
         return self.prep_role(user) == ContestPrepRole.CREATOR

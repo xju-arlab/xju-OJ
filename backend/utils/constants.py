@@ -36,10 +36,15 @@ class ContestPrepRole(Choices):
     ORGANIZER = "Organizer"
 
 
-# Every review round of a preparation contest runs as a 5-hour contest.
-PREP_REVIEW_HOURS = 5
 # A preparation invite link works once and only within this many days.
 PREP_INVITE_DAYS = 7
+# A preparation workspace has no contest window before it is published, so its
+# row keeps a placeholder far enough that it never looks like a finished
+# contest. Reviews have no time limit: a round runs until its creator ends it.
+PREP_PLACEHOLDER_DAYS = 3650
+# The suggested length of the real contest a preparation contest is published
+# as, used when the publish call leaves the window out.
+PUBLISH_DEFAULT_HOURS = 5
 
 
 class CacheKey:

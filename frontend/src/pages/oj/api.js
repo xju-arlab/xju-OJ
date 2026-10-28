@@ -318,7 +318,7 @@ export default {
       data: { ...data, preparation: true }
     })
   },
-  // Starts a fresh 5-hour review round; the password is kept for publishing.
+  // Starts a fresh review round that runs until the creator ends it; the password is kept for publishing.
   startPrepReview (contestId, password) {
     return ajax('contest/prep/review', 'post', {
       data: { contest_id: contestId, password }

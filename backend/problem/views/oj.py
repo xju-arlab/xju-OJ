@@ -110,8 +110,7 @@ class ContestProblemAPI(APIView):
             result__in=(JudgeStatus.PENDING, JudgeStatus.JUDGING))
         # While a review round runs, count it like a contest; otherwise every run counts.
         if self.contest.review_running():
-            start, end = self.contest.review_window()
-            runs = runs.filter(create_time__gte=start, create_time__lt=end)
+            runs = runs.filter(create_time__gte=self.contest.review_started_at)
         counts = {item["problem_id"]: item for item in runs.values("problem_id").annotate(
             total=Count("id"), accepted=Count("id", filter=Q(result=JudgeStatus.ACCEPTED)))}
         my_status = {}

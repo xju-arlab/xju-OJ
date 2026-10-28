@@ -20,7 +20,8 @@ from problem.publication import publish_due_contest_problems
 from problem.tests import DEFAULT_PROBLEM_DATA
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
-from utils.constants import CacheKey, ContestPrepRole, ContestPrepState
+from utils.constants import (CacheKey, ContestPrepRole, ContestPrepState, PREP_PLACEHOLDER_DAYS,
+                             PUBLISH_DEFAULT_HOURS)
 from .models import (ACMContestRank, Contest, ContestAnnouncement, ContestPrepInvite, ContestPrepMember,
                      ContestPrepPlanItem)
 
@@ -82,9 +83,9 @@ class ContestPrepCreationTest(ContestPrepTestBase):
         contest = Contest.objects.get(id=response.data["data"]["id"])
         self.assertEqual(contest.prep_state, ContestPrepState.PREPARATION)
         self.assertTrue(contest.visible)
-        # The window is only chosen on publish; until then it starts at creation.
+        # The window is only chosen on publish; the workspace keeps a placeholder.
         self.assertGreaterEqual(contest.start_time, before)
-        self.assertEqual(contest.end_time - contest.start_time, timedelta(hours=5))
+        self.assertEqual(contest.end_time - contest.start_time, timedelta(days=PREP_PLACEHOLDER_DAYS))
 
         normal = dict(PREP_CONTEST_DATA, visible=True)
         self.assertFailed(self.client.post(self.reverse("contest_admin_api"), data=normal),
@@ -481,6 +482,18 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.login(self.creator)
         self.assertSuccess(self.client.post(self.url, data={"contest_id": self.contest.id}))
 
+    def test_publish_without_times_starts_a_fresh_default_window(self):
+        # The preparation window is only a placeholder, so a publish that leaves
+        # the times out gets the usual default length starting now.
+        self.login(self.creator)
+        before = timezone.now()
+        response = self.client.post(self.url, data={"contest_id": self.contest.id})
+        self.assertSuccess(response)
+        published = Contest.objects.get(id=response.data["data"]["id"])
+        self.assertGreaterEqual(published.start_time, before)
+        self.assertEqual(published.end_time - published.start_time,
+                         timedelta(hours=PUBLISH_DEFAULT_HOURS))
+
     def test_publish_needs_exactly_the_planned_number_of_problems(self):
         self.contest.prep_problem_count = 3
         self.contest.save()
@@ -679,7 +692,27 @@ class ContestPrepReviewTest(ContestPrepTestBase):
         self.start_review()
         self.assertGreater(self.contest.review_started_at, started)
 
-    def test_the_creator_ends_a_round_early(self):
+    def test_a_round_has_no_time_limit(self):
+        # A round keeps running however long the team takes; only the creator ends it.
+        self.start_review()
+        Contest.objects.filter(id=self.contest.id).update(
+            review_started_at=timezone.now() - timedelta(hours=30))
+        self.contest.refresh_from_db()
+        self.assertEqual(self.contest.review_window(), (self.contest.review_started_at, None))
+        self.assertTrue(self.contest.review_running())
+        # A run made a day into the round still reaches the board and the counts.
+        self.run_as(self.teammate, self.released, JudgeStatus.ACCEPTED, 29 * 60)
+        self.login(self.teammate)
+        board = self.client.get(self.reverse("contest_prep_rank_api")
+                                + f"?contest_id={self.contest.id}").data["data"]
+        self.assertEqual({row["user"]["username"]: row["accepted_number"] for row in board["results"]},
+                         {"teammate": 1, "organizer": 0, "creator": 0})
+        problems = self.client.get(self.reverse("contest_problem_api")
+                                   + f"?contest_id={self.contest.id}").data["data"]
+        self.assertEqual([(item["_id"], item["submission_number"], item["accepted_number"])
+                          for item in problems], [("A", 1, 1), ("B", 0, 0)])
+
+    def test_the_creator_ends_a_round(self):
         url = self.review_url + f"?contest_id={self.contest.id}"
         self.login(self.creator)
         self.assertFailed(self.client.delete(url), "No review round is running")
