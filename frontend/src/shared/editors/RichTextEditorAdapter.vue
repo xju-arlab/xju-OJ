@@ -11,7 +11,7 @@
         <template v-if="imageUpload">
           <span class="markdown-toolbar-divider" aria-hidden="true"></span>
           <button type="button" class="markdown-image-button" :disabled="uploadingImages > 0"
-                  :title="uploadingImages ? '图片上传中…' : '插入图片（也可直接粘贴截图）'" aria-label="插入图片"
+                  :title="uploadingImages ? '图片上传中…' : '插入图片（也可直接粘贴截图）；缩放：![说明](图片地址){width=60%}'" aria-label="插入图片"
                   @mousedown.prevent @click="pickImage">
             <Icon :type="uploadingImages ? 'loading' : 'image'" :class="{ 'is-spinning': uploadingImages }" />
           </button>
