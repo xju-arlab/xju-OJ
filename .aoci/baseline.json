@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-29T13:04:24Z",
+  "updated_at": "2026-10-29T13:34:04Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -40,9 +40,9 @@
     },
     ".env.example": {
       "role": "index",
-      "sha256": "3ebebd08497d2904fbc171194355ec2537565f2693ff82a8a5ce929cb075318d",
-      "size": 5357,
-      "normalized_sha256": "3ebebd08497d2904fbc171194355ec2537565f2693ff82a8a5ce929cb075318d"
+      "sha256": "29efb378f608d694025ec3680d2e5305caa1123e9da25421d53c8fbfb7900992",
+      "size": 5540,
+      "normalized_sha256": "29efb378f608d694025ec3680d2e5305caa1123e9da25421d53c8fbfb7900992"
     },
     ".gitattributes": {
       "role": "index",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "8d05005d9a81aaaa66e7c286b6f9a882da4e4f286d961ed55f9e28f4a318117d",
-      "size": 212682,
-      "normalized_sha256": "8d05005d9a81aaaa66e7c286b6f9a882da4e4f286d961ed55f9e28f4a318117d"
+      "sha256": "f411d9d848ab3b448c496435a392c7c487bda7867e0ceacda2d6e89f7a5a6229",
+      "size": 213063,
+      "normalized_sha256": "f411d9d848ab3b448c496435a392c7c487bda7867e0ceacda2d6e89f7a5a6229"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -332,9 +332,9 @@
     },
     "backend/Dockerfile": {
       "role": "index",
-      "sha256": "9db9d6190166cfea820fa0bf0d190322156031e05df9dc3b9ad7cce91aa4363d",
-      "size": 4088,
-      "normalized_sha256": "9db9d6190166cfea820fa0bf0d190322156031e05df9dc3b9ad7cce91aa4363d"
+      "sha256": "c7d370fb1b54e841a8da4ea428ba7e7c56b484a10fca8e9f12660275e2ec4615",
+      "size": 4240,
+      "normalized_sha256": "c7d370fb1b54e841a8da4ea428ba7e7c56b484a10fca8e9f12660275e2ec4615"
     },
     "backend/LICENSE": {
       "role": "index",
@@ -1915,9 +1915,9 @@
     },
     "deploy.sh": {
       "role": "index",
-      "sha256": "8e89b1953e54554b958c4ed6b115a5fd8b23ec477952b86ebf8990d02a9ebb88",
-      "size": 61282,
-      "normalized_sha256": "8e89b1953e54554b958c4ed6b115a5fd8b23ec477952b86ebf8990d02a9ebb88"
+      "sha256": "6699d49823928981562198e64834ca7cabb15c679072792be880a6bd5409ee21",
+      "size": 62418,
+      "normalized_sha256": "6699d49823928981562198e64834ca7cabb15c679072792be880a6bd5409ee21"
     },
     "deploy/images/postgres/Dockerfile": {
       "role": "index",
@@ -1987,9 +1987,9 @@
     },
     "docker-bake.hcl": {
       "role": "index",
-      "sha256": "cf8cb9e63babe8c94f077b66c24d43abf844ecf461f9da612a3f6f84ce69916f",
-      "size": 3640,
-      "normalized_sha256": "cf8cb9e63babe8c94f077b66c24d43abf844ecf461f9da612a3f6f84ce69916f"
+      "sha256": "47a6d002106f99e1e26f989f2dbf98b0222f01b15589a47fff22d04448cd41e9",
+      "size": 3863,
+      "normalized_sha256": "47a6d002106f99e1e26f989f2dbf98b0222f01b15589a47fff22d04448cd41e9"
     },
     "docker-compose.yml": {
       "role": "index",

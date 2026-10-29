@@ -2,7 +2,7 @@
 
 ===/home/winbeau/xju-arlab/xju-oj/===
 .dockerignore[FV5T]: F:限制根构建上下文，排除依赖、运行数据和私钥 | R:code:server/Dockerfile | A:Docker ignore patterns | S:以根目录构建的判题镜像依赖本文件，子目录构建另有排除规则
-.env.example[FC8S]: F:提供部署身份、镜像、代理信任、OIDC和外部密钥路径的配置模板 | R:code:deploy.sh,code:compose.yaml | A:COMPOSE_PROJECT_NAME；DEPLOY_ROOT；DEPLOY_MODE；TRUSTED_PROXY_CIDRS；AUTHENTIK_OIDC_* | S:项目名和数据根首次部署后保持稳定；pull模式要求digest；只保存密钥路径；可信代理填frontend实际看到的地址，空值表示不信任代理头
+.env.example[FC8S]: F:提供部署身份、镜像、构建网络与Debian源、代理信任、OIDC和外部密钥路径的配置模板 | R:code:deploy.sh,code:compose.yaml | A:COMPOSE_PROJECT_NAME；DEPLOY_ROOT；DEPLOY_MODE；DEBIAN_MIRROR；TRUSTED_PROXY_CIDRS；AUTHENTIK_OIDC_* | S:项目名和数据根首次部署后保持稳定；pull模式要求digest；只保存密钥路径；可信代理填frontend实际看到的地址，空值表示不信任代理头；DEBIAN_MIRROR留空即由deploy探测华为云内网源
 .gitattributes[FV3T]: F:为导入的三个上游源码树保留历史空白检查兼容性 | R:- | A:backend/**；frontend/**；server/** | S:这里只关闭空白告警，不执行换行转换
 .gitignore[FS6T]: F:排除环境配置、凭据、评测数据、运行资产和机器绑定的MCP配置 | R:code:.env.example | A:Git ignore patterns | S:忽略.env及其变体但保留.env.example；已跟踪文件仍须独立审查
 AGENTS.md[SG7S]: F:规定前端开发桥、提交校验与AOCI认知和维护合同 | R:code:compose.dev.yaml,code:deploy.sh | A:./deploy.sh --dev frontend；AOCI MCP工作流 | S:生产不得加载开发覆盖；压缩恢复必须重新完整交付索引；语义只能由模型依据源码创作
@@ -10,8 +10,8 @@ README.en.md[SG5S]: F:英文说明产品能力、宿主要求、部署配置和�
 README.md[SG6M]: F:说明宿主要求、统一部署、OIDC关联、前端发布、自托管字体及AI工作台运维入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md,code:ai/README.md,code:deploy/ops/fetch-fonts.py | A:部署与运维说明 | S:仅前端发布需既有完整发布且变更限frontend或AOCI索引；Java和文件IO需Landlock ABI3；AI计算服务另行部署；站点字体须在服务器运行fetch-fonts生成
 compose.dev.yaml[OR7T]: F:为宿主Vite开放仅回环可用的后端端口和开发CSRF来源 | R:code:deploy.sh,code:backend/oj/production_settings.py | A:backend-api开发覆盖 | S:仅由--dev frontend加载；直接Compose调用可绕过部署脚本对绑定地址的校验
 compose.yaml[OR9M]: F:编排OJ数据、API与Worker、判题、前端及初始化服务并挂接AI认证文件 | R:code:deploy.sh,code:backend/deploy/entrypoint.sh,code:server/judge-server/server/entrypoint.sh,code:ai/compose.yaml | A:Compose服务；init profile；RUNTIME_ROOT；TRUSTED_PROXY_CIDRS；AI_WORKER_TOKEN_FILE | S:生产仅frontend公开端口；AI计算另行编排，后端令牌来自私有data/config文件；项目名决定网络卷身份；判题只读rootfs保留降权能力；Worker健康不等于消费成功
-deploy.sh[OV9L]: F:验证源码配置与宿主能力，复用或构建组件镜像并备份迁移发布和验证服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl,code:deploy/ops/check-judge-host.py | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按镜像真实修订复用；全栈及开发构建前检查Landlock，frontend-only与config-only跳过；frontend-only只允许frontend和AOCI索引变更；containerd镜像存储下本机前端基础镜像按摘要引用；私有pg_dump成功才迁移，备份不含文件和Redis；HTTP、Worker与新鲜心跳均通过才更新发布指针
-docker-bake.hcl[OV8S]: F:声明前端基础与应用、后端、判题工具链及服务和数据库构建目标 | R:code:frontend/Dockerfile,code:backend/Dockerfile,code:server/Dockerfile | A:GIT_SHA；IMAGE_REGISTRY；CACHE_REGISTRY；BUILD_NETWORK；Buildx targets | S:默认仅linux/amd64；前后端子目录构建而判题和Postgres使用根上下文；GIT_SHA负责标签与OCI修订号但不校验工作树
+deploy.sh[OV9L]: F:验证源码配置与宿主能力，复用或构建组件镜像并备份迁移发布和验证服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl,code:deploy/ops/check-judge-host.py | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按镜像真实修订复用；全栈及开发构建前检查Landlock，frontend-only与config-only跳过；frontend-only只允许frontend和AOCI索引变更；containerd镜像存储下本机前端基础镜像按摘要引用；构建前探测华为云内网Debian源，不通则用公网源；私有pg_dump成功才迁移，备份不含文件和Redis；HTTP、Worker与新鲜心跳均通过才更新发布指针；磁盘写满时状态文件写失败也会判构建失败
+docker-bake.hcl[OV8S]: F:声明前端基础与应用、后端、判题工具链及服务和数据库构建目标 | R:code:frontend/Dockerfile,code:backend/Dockerfile,code:server/Dockerfile | A:GIT_SHA；IMAGE_REGISTRY；CACHE_REGISTRY；BUILD_NETWORK；DEBIAN_MIRROR；Buildx targets | S:默认仅linux/amd64；前后端子目录构建而判题和Postgres使用根上下文；GIT_SHA负责标签与OCI修订号但不校验工作树；只有后端目标接收DEBIAN_MIRROR
 docker-compose.yml[OR4T]: F:保留旧Redis4、Postgres10和一体后端的部署定义 | R:code:compose.yaml | A:旧docker-compose入口 | S:会公开80和443端口并使用旧数据目录；当前生产入口明确使用compose.yaml，不可混用
 
 ===/home/winbeau/xju-arlab/xju-oj/.github/workflows/===
@@ -23,7 +23,7 @@ regression.yml[OQ7S]: F:在推送和PR中验证前后端、部署、传统判题
 .dockerignore[FV5T]: F:排除后端构建中的运行数据、密钥、依赖和旧网关配置 | R:code:backend/Dockerfile | A:Docker ignore patterns | S:旧nginx和supervisor仅留作参考，不进入后端镜像
 .flake8[FQ3T]: F:设置后端Python风格检查范围、行长和引号规范 | R:- | A:flake8配置 | S:-
 .gitignore[FV3T]: F:排除Python构建产物、测试报告和旧后端运行目录 | R:- | A:Git ignore patterns | S:-
-Dockerfile[OV8S]: F:以锁定uv依赖构建后端环境并提供API和Worker共用运行镜像，运行层含XeLaTeX与中文排版支持 | R:code:backend/pyproject.toml,code:backend/deploy/entrypoint.sh,code:backend/contest/statement_pdf.py | A:backend-deps；backend-build；backend-runtime | S:运行阶段复制虚拟环境且不重新解依赖；入口先准备密钥后降权；源码目录构建，根dockerignore不生效；题面PDF所需TeX包和fonts-texgyre装在运行层，镜像约增240MB
+Dockerfile[OV8S]: F:以锁定uv依赖构建后端环境并提供API和Worker共用运行镜像，运行层含XeLaTeX与中文排版支持 | R:code:backend/pyproject.toml,code:backend/deploy/entrypoint.sh,code:backend/contest/statement_pdf.py,code:docker-bake.hcl | A:backend-deps；backend-build；backend-runtime；DEBIAN_MIRROR | S:运行阶段复制虚拟环境且不重新解依赖；入口先准备密钥后降权；源码目录构建，根dockerignore不生效；题面PDF所需TeX包装在运行层，镜像约增240MB；Debian源取DEBIAN_MIRROR，默认华为云公网源，PyPI仍用阿里云
 LICENSE[SG2T]: F:保留上游后端MIT授权及版权声明 | R:- | A:MIT许可 | S:-
 README-CN.md[SG2T]: F:保留上游OnlineJudge2.0功能和安装说明 | R:code:backend/README.md | A:历史中文文档 | S:旧版本说明不代表当前依赖
 README.md[SG5S]: F:说明后端模块边界、锁定环境、运行入口与历史兼容约束 | R:code:backend/pyproject.toml,code:backend/deploy/entrypoint.sh | A:开发与运维命令 | S:Redis DB1用于会话缓存，DB4用于任务；历史JSON迁移需保持可加载
