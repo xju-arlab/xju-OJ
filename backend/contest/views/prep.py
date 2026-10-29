@@ -9,12 +9,15 @@ setting problems, and review rounds run beside it as mock contests that go on
 until their creator ends them.
 """
 import hashlib
+import json
 import secrets
 from datetime import timedelta
+from urllib.parse import quote
 
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import HttpResponse
 from django.utils.timezone import now
 
 from account.decorators import login_required
@@ -33,10 +36,12 @@ from utils.views import ImageUploadError, save_uploaded_image
 from ..models import Contest, ContestPrepInvite, ContestPrepMember, ContestPrepPlanItem, ContestProblemFeedback
 from ..prep_publish import publish_prep_contest
 from ..prep_rank import review_rank
+from ..statement_pdf import PDF_TIMEOUT_SECONDS, StatementPDFError, compile_statement_pdf
 from ..serializers import (AcceptContestPrepInviteSerializer, ContestPrepMemberSerializer, ContestPrepPlanItemSerializer,
                            ContestPrepProblemCountSerializer, ContestPrepProblemOrderSerializer,
                            ContestPrepPublicProblemSerializer, ContestPrepPublishSerializer,
-                           ContestPrepReviewSerializer, ContestProblemFeedbackSerializer,
+                           ContestPrepReviewSerializer, ContestPrepStatementPDFSerializer,
+                           ContestProblemFeedbackSerializer,
                            CreateContestPrepInviteSerializer, CreateContestPrepMemberSerializer,
                            CreateContestPrepPlanItemSerializer, CreateContestProblemFeedbackSerializer,
                            EditContestPrepPlanItemSerializer, EditContestProblemFeedbackSerializer)
@@ -585,3 +590,39 @@ class ContestPrepImageUploadAPI(APIView):
             return self.success({"file_path": save_uploaded_image(request)})
         except ImageUploadError as e:
             return self.error(str(e))
+
+
+def statement_filename(title):
+    name = "".join(char for char in title if char not in '\\/:*?"<>|\r\n\t').strip() or "contest"
+    return f"{name}-题面.pdf"
+
+
+class ContestPrepStatementPDFAPI(APIView):
+    """The contest's problems as one printable PDF, typeset by XeLaTeX."""
+
+    @validate_serializer(ContestPrepStatementPDFSerializer)
+    @login_required
+    def post(self, request):
+        # validated_data holds the date as a date; request.data has it serialized back to text.
+        data = request.serializer.validated_data
+        contest = load_prep_contest(request, data["contest_id"])
+        # One typesetting run per contest at a time; XeLaTeX is the slow part.
+        lock = f"prep_statement_pdf:{contest.id}"
+        if not cache.add(lock, 1, timeout=PDF_TIMEOUT_SECONDS * 3):
+            return self.error("This contest's PDF is already being typeset")
+        try:
+            problems = list(order_contest_problems(Problem.objects.filter(contest=contest)))
+            pdf, errors = compile_statement_pdf(data["title"], data["date"], problems,
+                                                subtitle=data.get("subtitle", ""))
+        except StatementPDFError as e:
+            return self.error(str(e))
+        finally:
+            cache.delete(lock)
+        response = HttpResponse(pdf, content_type="application/pdf")
+        filename = statement_filename(data["title"])
+        response["Content-Disposition"] = f"attachment; filename=\"statements.pdf\"; filename*=UTF-8''{quote(filename)}"
+        if errors:
+            # TeX recovered from these; the setter should still look at the named problems.
+            response["X-Statement-Warnings"] = json.dumps(
+                [{"problem": error["problem"], "message": error["message"]} for error in errors[:10]])
+        return response

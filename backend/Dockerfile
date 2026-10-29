@@ -76,6 +76,16 @@ RUN --mount=type=cache,target=/var/cache/apt,id=backend-apt-${TARGETARCH},sharin
         libjpeg62-turbo \
         libpq5 \
         zlib1g; \
+    # XeLaTeX with Chinese support typesets contest statement PDFs (contest/statement_pdf.py).
+    apt-get install -y --no-install-recommends \
+        fonts-texgyre \
+        lmodern \
+        texlive-fonts-recommended \
+        texlive-lang-chinese \
+        texlive-latex-recommended \
+        texlive-pictures \
+        texlive-plain-generic \
+        texlive-xetex; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=backend-build /app/.venv /app/.venv

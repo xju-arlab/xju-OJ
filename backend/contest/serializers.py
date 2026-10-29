@@ -124,6 +124,15 @@ class ContestPrepReviewSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
 
 
+class ContestPrepStatementPDFSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    # The official contest name and day printed on the cover and in the page header.
+    title = serializers.CharField(max_length=128)
+    # The round under the name on the cover, e.g. 正式赛 or 热身赛; blank leaves it out.
+    subtitle = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
+    date = serializers.DateField()
+
+
 class ContestPrepMemberSerializer(serializers.ModelSerializer):
     # The team sees each other's real names on the members tab.
     user = UsernameSerializer(need_real_name=True)

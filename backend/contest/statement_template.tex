@@ -1,0 +1,130 @@
+% Contest problem statements (XeLaTeX). Filled by contest/statement_pdf.py.
+\documentclass[a4paper,11pt]{article}
+\usepackage[fontset=fandol,scheme=plain]{ctex}
+\usepackage[a4paper,top=3cm,bottom=2.5cm,left=2.2cm,right=2.2cm,
+            headheight=30pt,headsep=16pt,footskip=28pt]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{fancyhdr}
+\usepackage{longtable,array}
+\usepackage{xeCJKfntef}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+
+\setsansfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold,
+  ItalicFont=*-italic, BoldItalicFont=*-bolditalic]
+\linespread{1.22}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{3pt plus 1pt}
+\setlength{\emergencystretch}{2em}
+\raggedbottom
+
+\definecolor{xjuink}{HTML}{2B2A27}
+\definecolor{xjuaccent}{HTML}{2383E2}
+\definecolor{xjumuted}{HTML}{6F6E69}
+\definecolor{xjufaint}{HTML}{E6E3DC}
+
+\hypersetup{pdftitle={%%CONTEST_TITLE_PLAIN%%}, pdfcreator={XJU-OJ}, pdfproducer={XeLaTeX}}
+
+% KaTeX conveniences the web statements may use.
+\providecommand{\lt}{<}
+\providecommand{\gt}{>}
+\providecommand{\N}{\mathbb{N}}
+\providecommand{\Z}{\mathbb{Z}}
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\Q}{\mathbb{Q}}
+\providecommand{\C}{\mathbb{C}}
+\providecommand{\bold}[1]{\mathbf{#1}}
+\providecommand{\Bbb}[1]{\mathbb{#1}}
+\providecommand{\lcm}{\operatorname{lcm}}
+\providecommand{\mod}{\bmod}
+
+% ---------------------------------------------------------------- logo
+% The tile: ink square with "XJ" and a blue prompt cursor.
+\newcommand{\xjutile}{%
+  \fill[xjuink, rounded corners=2.4pt] (0,0) rectangle (0.8,0.8);
+  \node[text=white, font=\sffamily\bfseries\fontsize{10.5}{11}\selectfont, inner sep=0, anchor=base]
+    at (0.36,0.29) {XJ};
+  \fill[xjuaccent, rounded corners=0.25pt] (0.585,0.16) rectangle (0.69,0.215);}
+
+% Header logo: the tile and the wordmark on one line, centred on each other.
+\newcommand{\xjulogo}{%
+  \begin{tikzpicture}[baseline={(0,0)}]
+    \xjutile
+    \node[anchor=base west, text=xjuink, font=\sffamily\bfseries\fontsize{14}{14}\selectfont, inner sep=0]
+      at (0.98,0.225) {XJU-OJ};
+  \end{tikzpicture}}
+
+% Cover emblem: the Xinjiang University seal (statement_assets/xju-emblem.jpg, copied into the build).
+\newcommand{\xjuemblem}{\includegraphics[width=5cm]{xju-emblem.jpg}}
+
+% ---------------------------------------------------------------- page frame
+\newsavebox{\xjufitbox}
+\newcommand{\xjufit}[2]{\sbox{\xjufitbox}{#2}%
+  \ifdim\wd\xjufitbox>#1\resizebox{#1}{!}{\usebox{\xjufitbox}}\else\usebox{\xjufitbox}\fi}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrule}{\vspace{3pt}{\color{xjuink}\hrule height 0.7pt}}
+\renewcommand{\footrule}{{\color{xjuink}\hrule height 0.4pt}\vspace{-0.4pt}}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancyhead[L]{\xjulogo}
+% The logo tile sits on the rule; the title and date are centred on the tile.
+\fancyhead[C]{\raisebox{0.21cm}{\xjufit{0.5\textwidth}{\sffamily\bfseries\fontsize{13.5}{16}\selectfont %%CONTEST_TITLE%%}}}
+\fancyhead[R]{\raisebox{0.25cm}{\sffamily\small\color{xjuink}%%CONTEST_DATE%%}}
+\fancyfoot[C]{\small Page \thepage\ of \pageref*{xju-last-page}}
+\AtEndDocument{\label{xju-last-page}}
+
+% ---------------------------------------------------------------- statement parts
+\newcommand{\xjuproblem}[3]{%
+  \clearpage
+  \phantomsection\pdfbookmark[1]{Problem #1. #3}{xju-problem-#1}%
+  {\noindent\sffamily\bfseries\fontsize{17}{21}\selectfont Problem #1.\ #2\par}%
+  \vspace{7pt}}
+\newenvironment{xjulimits}
+  {\par\noindent\begin{tabular}{@{\hspace{1.4em}}l@{\hspace{1.6em}}l@{}}}
+  {\end{tabular}\par\vspace{9pt}}
+\newcommand{\xjulimit}[2]{#1 & #2\\[1pt]}
+% Break before a heading rather than leave it alone at the foot of a page.
+\newcommand{\xjukeep}[1]{\par\vskip 0pt plus #1\penalty-200\vskip 0pt plus -#1\relax}
+\newcommand{\xjusection}[1]{\xjukeep{6\baselineskip}\vspace{11pt plus 3pt}%
+  {\noindent\sffamily\bfseries\fontsize{14}{17}\selectfont #1\par}\nopagebreak\vspace{3pt}}
+\newcommand{\xjusubheading}[1]{\par\vspace{4pt}{\noindent\bfseries #1\par}\nopagebreak}
+\newcommand{\xjuexample}[1]{\xjukeep{4\baselineskip}\vspace{5pt}{\noindent\sffamily\small\color{xjumuted}#1\par}\nopagebreak}
+
+\newlength{\xjusamplewidth}
+\newenvironment{xjusamples}[2]{%
+  \setlength{\xjusamplewidth}{\dimexpr(\linewidth-4\tabcolsep-3\arrayrulewidth)/2\relax}%
+  \setlength{\LTleft}{0pt}\setlength{\LTright}{0pt}%
+  \setlength{\LTpre}{4pt}\setlength{\LTpost}{2pt}%
+  \begin{longtable}{|>{\raggedright\arraybackslash}p{\xjusamplewidth}|>{\raggedright\arraybackslash}p{\xjusamplewidth}|}
+  \hline
+  \multicolumn{1}{|c|}{\rule{0pt}{2.7ex}\ttfamily #1} & \multicolumn{1}{c|}{\ttfamily #2}\\[2pt] \hline
+  \endhead}
+  {\end{longtable}}
+\newcommand{\xjusamplecell}[1]{\ttfamily\fontsize{10}{12.6}\selectfont\rule{0pt}{2.7ex}#1\par\vspace{4pt}}
+
+\newenvironment{xjucode}
+  {\par\begin{list}{}{\setlength{\leftmargin}{2em}\setlength{\topsep}{3pt}\setlength{\parsep}{0pt}}%
+   \item[]\ttfamily\small\raggedright}
+  {\end{list}}
+
+\newlength{\xjuimagewidth}
+\newcommand{\xjuimage}[2]{\setlength{\xjuimagewidth}{#1}%
+  \ifdim\xjuimagewidth>\linewidth\setlength{\xjuimagewidth}{\linewidth}\fi
+  \includegraphics[width=\xjuimagewidth]{#2}}
+\newcommand{\xjumissingimage}{\fbox{\footnotesize\color{xjumuted}[image unavailable]}}
+
+\let\xjuolditemize\itemize
+\renewcommand{\itemize}{\xjuolditemize\setlength{\itemsep}{1pt}\setlength{\parsep}{0pt}}
+\let\xjuoldenumerate\enumerate
+\renewcommand{\enumerate}{\xjuoldenumerate\setlength{\itemsep}{1pt}\setlength{\parsep}{0pt}}
+
+\begin{document}
+
+%%COVER%%
+
+%%PROBLEMS%%
+
+\end{document}

@@ -416,6 +416,10 @@ export default {
       data
     })
   },
+  // Resolves to the raw response: a PDF blob, or a JSON error that also arrives as a blob.
+  exportPrepStatements (data) {
+    return axios.post('contest/prep/statement_pdf', data, { responseType: 'blob', timeout: 180000 })
+  },
   publishPrepContest (data) {
     return ajax('contest/prep/publish', 'post', {
       data

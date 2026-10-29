@@ -11,6 +11,7 @@ from ..views.prep import (ContestPrepCompileSPJAPI, ContestPrepFeedbackAPI, Cont
                           ContestPrepPlanAPI, ContestPrepProblemAPI, ContestPrepProblemCountAPI,
                           ContestPrepProblemOrderAPI, ContestPrepPublicProblemAPI,
                           ContestPrepPublishAPI, ContestPrepRankAPI, ContestPrepReviewAPI,
+                          ContestPrepStatementPDFAPI,
                           ContestPrepTestCaseAPI, ContestPrepUserSearchAPI)
 
 urlpatterns = [
@@ -43,6 +44,8 @@ urlpatterns = [
     re_path(r"^contest/prep/feedback/?$", ContestPrepFeedbackAPI.as_view(), name="contest_prep_feedback_api"),
     re_path(r"^contest/prep/upload_image/?$", ContestPrepImageUploadAPI.as_view(),
             name="contest_prep_image_upload_api"),
+    re_path(r"^contest/prep/statement_pdf/?$", ContestPrepStatementPDFAPI.as_view(),
+            name="contest_prep_statement_pdf_api"),
     re_path(r"^contest/prep/rank/?$", ContestPrepRankAPI.as_view(), name="contest_prep_rank_api"),
     re_path(r"^contest/prep/invite/?$", ContestPrepInviteAPI.as_view(), name="contest_prep_invite_api"),
     re_path(r"^contest/prep/invite/accept/?$", ContestPrepInviteAcceptAPI.as_view(),
