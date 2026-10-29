@@ -96,6 +96,22 @@ class StatementLatexTest(SimpleTestCase):
         self.assertNotIn("排版生成", source)
         self.assertTrue(os.path.isfile(os.path.join(self.workdir, "xju-emblem.jpg")))
 
+    def test_cover_figures_sit_beside_a_capped_emblem(self):
+        problems = [dict(PROBLEM, label=chr(65 + index)) for index in range(5)]
+        source = render_document("Contest", date(2026, 1, 1), problems, self.workdir, cover="table")
+        # Five problems would show the emblem at full size; with a figure it keeps the reference size.
+        self.assertIn(r"\scalebox{0.84}{\xjuemblem}\xjufigure{cover-table.png}{2.978cm}{0.583cm}{2.102cm}", source)
+        self.assertEqual(sorted(os.listdir(self.workdir)), ["cover-table.png", "xju-emblem.jpg"])
+        plain = render_document("Contest", date(2026, 1, 1), problems, tempfile.mkdtemp())
+        self.assertIn(r"\scalebox{1.0}{\xjuemblem}\par", plain)
+        self.assertNotIn(r"\xjufigure{", plain.split("\\begin{document}")[1])
+        # Lists too long for the emblem leave the figure out as well.
+        many = [dict(PROBLEM, label=f"P{index}") for index in range(23)]
+        crowded = render_document("Contest", date(2026, 1, 1), many, tempfile.mkdtemp(), cover="balloons")
+        self.assertNotIn(r"\xjufigure{", crowded.split("\\begin{document}")[1])
+        with self.assertRaisesMessage(StatementPDFError, "Unknown cover layout"):
+            render_document("Contest", date(2026, 1, 1), problems, tempfile.mkdtemp(), cover="nope")
+
     def test_errors_are_attributed_to_problems(self):
         log = "XJUOJ-PROBLEM:A\nXJUOJ-PROBLEM:B\n! Undefined control sequence.\nl.88 $\\foo\n  x$\n"
         self.assertEqual(latex_errors(log), [{"problem": "B", "message": "Undefined control sequence.",
@@ -143,7 +159,18 @@ class ContestPrepStatementPDFAPITest(ContestPrepTestBase):
         title, contest_date, problems = compile_pdf.call_args.args
         self.assertEqual((title, contest_date, [problem.title for problem in problems]),
                          ("2026 校赛", date(2026, 11, 15), ["first"]))
-        self.assertEqual(compile_pdf.call_args.kwargs["subtitle"], "正式赛")
+        self.assertEqual(compile_pdf.call_args.kwargs, {"subtitle": "正式赛", "cover": "plain"})
+        self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+
+    @mock.patch("contest.views.prep.compile_statement_pdf", return_value=(b"%PDF-1.5 preview", []))
+    def test_previews_open_in_the_page_with_the_chosen_cover(self, compile_pdf):
+        self.login(self.organizer)
+        response = self.client.post(self.url, data=dict(self.payload, cover="balloon", preview=True))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Disposition"].startswith("inline;"))
+        self.assertEqual(compile_pdf.call_args.kwargs["cover"], "balloon")
+        self.assertNotIn("X-Statement-Warnings", response)
+        self.assertFailed(self.client.post(self.url, data=dict(self.payload, cover="unicorn")))
 
     @mock.patch("contest.views.prep.compile_statement_pdf",
                 side_effect=StatementPDFError("Typesetting failed. Problem A: Missing $ inserted."))

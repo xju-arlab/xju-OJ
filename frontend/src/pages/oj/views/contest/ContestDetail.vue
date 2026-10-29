@@ -228,28 +228,8 @@
       </template>
     </LegacyDialog>
 
-    <LegacyDialog v-if="prepRole" :title="$t('m.Prep_Export_PDF')" width="460px" class="prep-export-dialog"
-                  :visible="exportVisible" @update:visible="exportVisible = $event">
-      <p class="prep-dialog-note">{{ $t('m.Prep_Export_Note') }}</p>
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="$t('m.Prep_Export_Title')">
-          <el-input v-model="exportForm.title" maxlength="128" :placeholder="$t('m.Prep_Export_Title')"></el-input>
-        </el-form-item>
-        <el-form-item :label="$t('m.Prep_Export_Subtitle')">
-          <el-input v-model="exportForm.subtitle" maxlength="32" :placeholder="$t('m.Prep_Export_Subtitle_Placeholder')"></el-input>
-        </el-form-item>
-        <el-form-item :label="$t('m.Prep_Export_Date')">
-          <el-date-picker v-model="exportForm.date" type="date" value-format="YYYY-MM-DD" format="YYYY 年 M 月 D 日"
-                          class="prep-export-date" style="width: 100%" :placeholder="$t('m.Prep_Export_Date_Placeholder')"></el-date-picker>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="exportVisible = false">{{ $t('m.Cancel') }}</el-button>
-        <el-button type="primary" :loading="exporting" :disabled="!exportReady" @click="exportStatements">
-          {{ exporting ? $t('m.Prep_Export_Working') : $t('m.Prep_Export_Confirm') }}
-        </el-button>
-      </template>
-    </LegacyDialog>
+    <PrepStatementExportDialog v-if="prepRole" v-model:visible="exportVisible"
+                               :contest-id="contestID" :contest-title="contest.title" />
   </div>
 </template>
 
@@ -258,9 +238,9 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
-  import storage from '@/utils/storage'
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
+  import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
   const PREP_CHANNEL = 'xju-oj-prep'
@@ -270,7 +250,7 @@
 
   export default {
     name: 'ContestDetail',
-    components: { ContestAnnouncementBanner },
+    components: { ContestAnnouncementBanner, PrepStatementExportDialog },
     data () {
       return {
         routeName: '',
@@ -289,9 +269,7 @@
         publishVisible: false,
         publishing: false,
         publishForm: {},
-        exportVisible: false,
-        exporting: false,
-        exportForm: { title: '', subtitle: '', date: '' }
+        exportVisible: false
       }
     },
     created () {
@@ -506,75 +484,8 @@
           this.startingReview = false
         }
       },
-      exportStorageKey () {
-        return `prepStatementExport_${this.contestID}`
-      },
       openExport () {
-        // The official name and day are asked every time, starting from the last export.
-        const saved = storage.get(this.exportStorageKey()) || {}
-        this.exportForm = {
-          title: saved.title || String(this.contest.title || '').replace(/\s*筹备\s*$/, ''),
-          subtitle: typeof saved.subtitle === 'string' ? saved.subtitle : this.$t('m.Prep_Export_Subtitle_Default'),
-          date: saved.date || ''
-        }
         this.exportVisible = true
-      },
-      async exportStatements () {
-        const form = {
-          contest_id: Number(this.contestID),
-          title: this.exportForm.title.trim(),
-          subtitle: this.exportForm.subtitle.trim(),
-          date: this.exportForm.date
-        }
-        this.exporting = true
-        try {
-          const res = await api.exportPrepStatements(form)
-          if (!String(res.headers['content-type'] || '').includes('pdf')) {
-            let message = this.$t('m.Prep_Export_Failed')
-            try {
-              const payload = JSON.parse(await res.data.text())
-              if (typeof payload.data === 'string') message = payload.data
-            } catch (_) {
-              // Not JSON: keep the generic message.
-            }
-            this.$error(message)
-            return
-          }
-          const encoded = /filename\*=UTF-8''([^;]+)/i.exec(res.headers['content-disposition'] || '')
-          this.saveFile(res.data, encoded ? decodeURIComponent(encoded[1]) : `${form.title}.pdf`)
-          storage.set(this.exportStorageKey(), { title: form.title, subtitle: form.subtitle, date: form.date })
-          this.exportVisible = false
-          let warnings = []
-          try {
-            warnings = JSON.parse(res.headers['x-statement-warnings'] || '[]')
-          } catch (_) {
-            warnings = []
-          }
-          if (warnings.length) {
-            // TeX recovered, but these problems deserve a look in the PDF.
-            const problems = [...new Set(warnings.map(item => item.problem).filter(Boolean))].join('、')
-            this.$Message.warning({ message: this.$t('m.Prep_Export_Warnings', { problems: problems || '?' }), duration: 8000 })
-          } else {
-            this.$success(this.$t('m.Prep_Export_Done'))
-          }
-        } catch (error) {
-          this.$error(this.$t('m.Prep_Export_Failed'))
-        } finally {
-          this.exporting = false
-        }
-      },
-      saveFile (blob, filename) {
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        try {
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-        } finally {
-          link.remove()
-          window.setTimeout(() => window.URL.revokeObjectURL(url), 1000)
-        }
       },
       openPublish () {
         // The contest window is set here; keep a future one, otherwise
@@ -635,9 +546,6 @@
         contestAccess: state => state.contest.access,
         now: state => state.contest.now
       }),
-      exportReady () {
-        return Boolean(this.exportForm.title.trim() && this.exportForm.date)
-      },
       ...mapGetters([
         'contestMenuDisabled', 'contestRuleType', 'contestStatus', 'isContestAdmin',
         'isAuthenticated', 'OIContestRealTimePermission',

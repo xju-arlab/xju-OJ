@@ -481,12 +481,32 @@ def problem_to_latex(problem, renderer):
     return "\n\n".join(parts)
 
 
-def render_cover(contest_title, subtitle, contest_date, problems):
+# Cover layouts: none, or a whale-girl figure beside the emblem. Each figure was placed on a reference
+# cover drawn at the 14-problem emblem size: (file, printed width, left edge measured from the centre
+# line, bottom edge below the emblem's bottom), all in cm.
+COVER_EMBLEM = 0.84
+COVERS = {
+    "plain": None,
+    "pointing": ("cover-pointing.png", 2.161, 2.168, 1.811),
+    "handing": ("cover-handing.png", 1.996, 2.375, 1.562),
+    "table": ("cover-table.png", 2.978, 2.683, 2.102),
+    "balloons": ("cover-balloons.png", 3.509, 2.373, 1.851),
+    "balloon": ("cover-balloon.png", 2.076, 2.357, 1.804),
+}
+
+
+def render_cover(contest_title, subtitle, contest_date, problems, cover="plain"):
     """Title page: name, round, day, emblem and the problem list; it carries no page number."""
     count = len(problems)
     # Long problem lists leave less room for the emblem.
     emblem = 1.0 if count <= 10 else 0.84 if count <= 16 else 0.62 if count <= 22 else 0
     compact = count > 10
+    figure = COVERS.get(cover) if emblem else None
+    if figure:
+        # The emblem keeps at most its reference size so the figure never overlaps it. The figure is
+        # placed from the centre line and the emblem's bottom; the list starts a fixed distance below
+        # that bottom, which keeps "table" resting on the list's top rule.
+        emblem = min(emblem, COVER_EMBLEM)
     rows = "\n".join(rf"{escape(problem['label'])} & {text_to_latex(problem['title'])} \\" for problem in problems)
     parts = [
         r"\begin{titlepage}",
@@ -499,7 +519,11 @@ def render_cover(contest_title, subtitle, contest_date, problems):
         parts += [r"\vspace{0.6cm}", r"{\fontsize{22}{26}\selectfont " + text_to_latex(subtitle, math=False) + r"\par}"]
     parts += [r"\vspace{0.5cm}", r"{\large " + format_date(contest_date) + r"\par}"]
     if emblem:
-        parts += [r"\vspace{0.9cm}", rf"\scalebox{{{emblem}}}{{\xjuemblem}}\par"]
+        line = rf"\scalebox{{{emblem}}}{{\xjuemblem}}"
+        if figure:
+            name, width, left, drop = figure
+            line += rf"\xjufigure{{{name}}}{{{width}cm}}{{{left - 2.5 * emblem:.3f}cm}}{{{drop}cm}}"
+        parts += [r"\vspace{0.9cm}", line + r"\par"]
     parts += [
         r"\vspace{0.8cm}" if emblem else r"\vspace{1.4cm}",
         r"{\sffamily\bfseries\large 试题列表\par}",
@@ -521,9 +545,11 @@ def render_cover(contest_title, subtitle, contest_date, problems):
 ASSET_DIR = os.path.join(os.path.dirname(__file__), "statement_assets")
 
 
-def render_document(contest_title, contest_date, problems, workdir, subtitle=""):
-    # TeX may only read the build directory, so the fixed artwork is copied in.
-    for name in os.listdir(ASSET_DIR):
+def render_document(contest_title, contest_date, problems, workdir, subtitle="", cover="plain"):
+    if cover not in COVERS:
+        raise StatementPDFError("Unknown cover layout")
+    # TeX may only read the build directory, so the artwork this document uses is copied in.
+    for name in ["xju-emblem.jpg"] + ([COVERS[cover][0]] if COVERS[cover] else []):
         shutil.copy(os.path.join(ASSET_DIR, name), os.path.join(workdir, name))
     renderer = LatexRenderer(ImageStore(workdir))
     body = "\n\n".join(problem_to_latex(problem, renderer) for problem in problems)
@@ -532,7 +558,7 @@ def render_document(contest_title, contest_date, problems, workdir, subtitle="")
     return (source.replace("%%CONTEST_TITLE%%", text_to_latex(contest_title, math=False))
                   .replace("%%CONTEST_TITLE_PLAIN%%", escape(contest_title))
                   .replace("%%CONTEST_DATE%%", format_date(contest_date))
-                  .replace("%%COVER%%", render_cover(contest_title, subtitle, contest_date, problems))
+                  .replace("%%COVER%%", render_cover(contest_title, subtitle, contest_date, problems, cover))
                   .replace("%%PROBLEMS%%", body))
 
 
@@ -570,7 +596,7 @@ def latex_errors(log):
     return errors
 
 
-def compile_statement_pdf(contest_title, contest_date, problems, subtitle=""):
+def compile_statement_pdf(contest_title, contest_date, problems, subtitle="", cover="plain"):
     """Return (pdf_bytes, errors); errors are recoverable TeX errors worth showing to the setter."""
     if not isinstance(contest_date, date_type):
         raise StatementPDFError("Invalid contest date")
@@ -580,7 +606,7 @@ def compile_statement_pdf(contest_title, contest_date, problems, subtitle=""):
     if xelatex is None:
         raise StatementPDFError("PDF export is unavailable: XeLaTeX is not installed on the server")
     with tempfile.TemporaryDirectory(prefix="xjuoj-statements-") as workdir:
-        source = render_document(contest_title, contest_date, problem_dicts(problems), workdir, subtitle)
+        source = render_document(contest_title, contest_date, problem_dicts(problems), workdir, subtitle, cover)
         with open(os.path.join(workdir, "statements.tex"), "w", encoding="utf-8") as tex_file:
             tex_file.write(source)
         env = {

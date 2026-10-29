@@ -58,6 +58,9 @@
 
 % Cover emblem: the Xinjiang University seal (statement_assets/xju-emblem.jpg, copied into the build).
 \newcommand{\xjuemblem}{\includegraphics[width=5cm]{xju-emblem.jpg}}
+% A cover figure set after the emblem without taking room: #1 file, #2 width, #3 gap after the
+% emblem's right edge, #4 how far the figure's bottom sits below the emblem's bottom.
+\newcommand{\xjufigure}[4]{\makebox[0pt][l]{\hspace{#3}\raisebox{-#4}[0pt][0pt]{\includegraphics[width=#2]{#1}}}}
 
 % ---------------------------------------------------------------- page frame
 \newsavebox{\xjufitbox}

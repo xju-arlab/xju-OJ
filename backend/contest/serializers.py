@@ -1,6 +1,7 @@
 from utils.api import UsernameSerializer, serializers
 
 from utils.constants import Difficulty
+from .statement_pdf import COVERS
 from .models import (Contest, ContestAnnouncement, ContestPrepMember, ContestPrepPlanItem, ContestProblemFeedback,
                      ContestRuleType)
 from .models import ACMContestRank, OIContestRank
@@ -131,6 +132,9 @@ class ContestPrepStatementPDFSerializer(serializers.Serializer):
     # The round under the name on the cover, e.g. 正式赛 or 热身赛; blank leaves it out.
     subtitle = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
     date = serializers.DateField()
+    cover = serializers.ChoiceField(choices=list(COVERS), required=False, default="plain")
+    # A preview is shown in the page; an export is downloaded.
+    preview = serializers.BooleanField(required=False, default=False)
 
 
 class ContestPrepMemberSerializer(serializers.ModelSerializer):

@@ -613,14 +613,15 @@ class ContestPrepStatementPDFAPI(APIView):
         try:
             problems = list(order_contest_problems(Problem.objects.filter(contest=contest)))
             pdf, errors = compile_statement_pdf(data["title"], data["date"], problems,
-                                                subtitle=data.get("subtitle", ""))
+                                                subtitle=data.get("subtitle", ""), cover=data.get("cover", "plain"))
         except StatementPDFError as e:
             return self.error(str(e))
         finally:
             cache.delete(lock)
         response = HttpResponse(pdf, content_type="application/pdf")
         filename = statement_filename(data["title"])
-        response["Content-Disposition"] = f"attachment; filename=\"statements.pdf\"; filename*=UTF-8''{quote(filename)}"
+        disposition = "inline" if data.get("preview") else "attachment"
+        response["Content-Disposition"] = f"{disposition}; filename=\"statements.pdf\"; filename*=UTF-8''{quote(filename)}"
         if errors:
             # TeX recovered from these; the setter should still look at the named problems.
             response["X-Statement-Warnings"] = json.dumps(
