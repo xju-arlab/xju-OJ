@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-29T15:17:50Z",
+  "updated_at": "2026-10-29T15:36:59Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -40,9 +40,9 @@
     },
     ".env.example": {
       "role": "index",
-      "sha256": "29efb378f608d694025ec3680d2e5305caa1123e9da25421d53c8fbfb7900992",
-      "size": 5540,
-      "normalized_sha256": "29efb378f608d694025ec3680d2e5305caa1123e9da25421d53c8fbfb7900992"
+      "sha256": "d79447cb5a9cce9cac68715d92ab9f1a58502a9179cc2596ed369fad7a11dedd",
+      "size": 5649,
+      "normalized_sha256": "d79447cb5a9cce9cac68715d92ab9f1a58502a9179cc2596ed369fad7a11dedd"
     },
     ".gitattributes": {
       "role": "index",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "7ccc7bfba22dd7c2317907f5146ad0aac50c3b7375faac73bb6757cdbf389eaa",
-      "size": 214959,
-      "normalized_sha256": "7ccc7bfba22dd7c2317907f5146ad0aac50c3b7375faac73bb6757cdbf389eaa"
+      "sha256": "2d32a9676ae17c3923558a24501360c676029cfeec707af5da84073005a29d95",
+      "size": 215227,
+      "normalized_sha256": "2d32a9676ae17c3923558a24501360c676029cfeec707af5da84073005a29d95"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1915,9 +1915,9 @@
     },
     "deploy.sh": {
       "role": "index",
-      "sha256": "6699d49823928981562198e64834ca7cabb15c679072792be880a6bd5409ee21",
-      "size": 62418,
-      "normalized_sha256": "6699d49823928981562198e64834ca7cabb15c679072792be880a6bd5409ee21"
+      "sha256": "98bd7e314dfa130bce6d22053c063b879af53f68c08bbf68e60912277794109d",
+      "size": 63121,
+      "normalized_sha256": "98bd7e314dfa130bce6d22053c063b879af53f68c08bbf68e60912277794109d"
     },
     "deploy/images/postgres/Dockerfile": {
       "role": "index",
@@ -1987,9 +1987,9 @@
     },
     "docker-bake.hcl": {
       "role": "index",
-      "sha256": "47a6d002106f99e1e26f989f2dbf98b0222f01b15589a47fff22d04448cd41e9",
-      "size": 3863,
-      "normalized_sha256": "47a6d002106f99e1e26f989f2dbf98b0222f01b15589a47fff22d04448cd41e9"
+      "sha256": "a2790642fd228b95175768fb444ad94a4b2ac500c55f7c021f25b5bddf38db2f",
+      "size": 4044,
+      "normalized_sha256": "a2790642fd228b95175768fb444ad94a4b2ac500c55f7c021f25b5bddf38db2f"
     },
     "docker-compose.yml": {
       "role": "index",
@@ -2617,9 +2617,9 @@
     },
     "frontend/Dockerfile": {
       "role": "index",
-      "sha256": "e2cfb4f63344401d3d867d6fa8d9f00ef120def988eb6fd19abd2e625399963e",
-      "size": 2686,
-      "normalized_sha256": "e2cfb4f63344401d3d867d6fa8d9f00ef120def988eb6fd19abd2e625399963e"
+      "sha256": "ace43572fe9ae2f23877531f818eea28e3037949855236d5d2d4c8d1600644b1",
+      "size": 2914,
+      "normalized_sha256": "ace43572fe9ae2f23877531f818eea28e3037949855236d5d2d4c8d1600644b1"
     },
     "frontend/LICENSE": {
       "role": "index",
