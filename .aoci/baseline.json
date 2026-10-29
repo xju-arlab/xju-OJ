@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-29T14:45:56Z",
+  "updated_at": "2026-10-29T15:17:50Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "b9205ea4ac455281ecd9bf0dd3519f6e97392bdcfb6d6c4899c7bea606a9d53e",
-      "size": 213845,
-      "normalized_sha256": "b9205ea4ac455281ecd9bf0dd3519f6e97392bdcfb6d6c4899c7bea606a9d53e"
+      "sha256": "7ccc7bfba22dd7c2317907f5146ad0aac50c3b7375faac73bb6757cdbf389eaa",
+      "size": 214959,
+      "normalized_sha256": "7ccc7bfba22dd7c2317907f5146ad0aac50c3b7375faac73bb6757cdbf389eaa"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -332,9 +332,9 @@
     },
     "backend/Dockerfile": {
       "role": "index",
-      "sha256": "c7d370fb1b54e841a8da4ea428ba7e7c56b484a10fca8e9f12660275e2ec4615",
-      "size": 4240,
-      "normalized_sha256": "c7d370fb1b54e841a8da4ea428ba7e7c56b484a10fca8e9f12660275e2ec4615"
+      "sha256": "c03e0fd88d09cebfb2c4355b8e1b6fc504e7753b3ce8a86a6417ba836291d263",
+      "size": 4332,
+      "normalized_sha256": "c03e0fd88d09cebfb2c4355b8e1b6fc504e7753b3ce8a86a6417ba836291d263"
     },
     "backend/LICENSE": {
       "role": "index",
@@ -350,9 +350,9 @@
     },
     "backend/README.md": {
       "role": "index",
-      "sha256": "cb8ca42837d28076fbbc0c387b3b717f93505a71b05b84e48dd1c159544a4c4a",
-      "size": 6537,
-      "normalized_sha256": "cb8ca42837d28076fbbc0c387b3b717f93505a71b05b84e48dd1c159544a4c4a"
+      "sha256": "79701d3776ee959fa09549fd85d918702e6b1eda6727c8e49d3e22b83776f36d",
+      "size": 6629,
+      "normalized_sha256": "79701d3776ee959fa09549fd85d918702e6b1eda6727c8e49d3e22b83776f36d"
     },
     "backend/account/__init__.py": {
       "role": "index",
@@ -1897,9 +1897,9 @@
     },
     "backend/uv.lock": {
       "role": "index",
-      "sha256": "6a466e4b7a252a75d2ff184d1cf5a94dd59ef1c7552d8b8a03ecbe0293781d7d",
-      "size": 75347,
-      "normalized_sha256": "6a466e4b7a252a75d2ff184d1cf5a94dd59ef1c7552d8b8a03ecbe0293781d7d"
+      "sha256": "f1f51c1b1dafe00b7320c8017d7fc9547b8a259d62a4cfbfa29cc5191317f830",
+      "size": 66922,
+      "normalized_sha256": "f1f51c1b1dafe00b7320c8017d7fc9547b8a259d62a4cfbfa29cc5191317f830"
     },
     "compose.dev.yaml": {
       "role": "index",
@@ -2689,9 +2689,9 @@
     },
     "frontend/package.json": {
       "role": "index",
-      "sha256": "23bb9a2792a56195c42659054e2e968780d34a2609c901b028fd914b3faa981a",
-      "size": 2145,
-      "normalized_sha256": "23bb9a2792a56195c42659054e2e968780d34a2609c901b028fd914b3faa981a"
+      "sha256": "5e686dcb37bd7e634d64f57456a3728731c1a05f9712d3e331b40887033929ab",
+      "size": 2174,
+      "normalized_sha256": "5e686dcb37bd7e634d64f57456a3728731c1a05f9712d3e331b40887033929ab"
     },
     "frontend/playwright.config.mjs": {
       "role": "index",
@@ -2701,15 +2701,15 @@
     },
     "frontend/pnpm-lock.yaml": {
       "role": "index",
-      "sha256": "129b5724d34358875e6848eb3b219d8d95b4c904b4ba882e736fa3d50d26ae5b",
-      "size": 66153,
-      "normalized_sha256": "129b5724d34358875e6848eb3b219d8d95b4c904b4ba882e736fa3d50d26ae5b"
+      "sha256": "26dcee9ad0cb1db270fe193db8d98b08a33e8dff332ca9d3d8ebc12ac3a32d1a",
+      "size": 66490,
+      "normalized_sha256": "26dcee9ad0cb1db270fe193db8d98b08a33e8dff332ca9d3d8ebc12ac3a32d1a"
     },
     "frontend/pnpm-workspace.yaml": {
       "role": "index",
-      "sha256": "833772748f4bb2ae5c4e0f99c9267d51575eb7c3927b425d8bc39e32f9e935c4",
-      "size": 91,
-      "normalized_sha256": "833772748f4bb2ae5c4e0f99c9267d51575eb7c3927b425d8bc39e32f9e935c4"
+      "sha256": "93186217e86d3a8fd89a3aa391795d6d1d3f8fc2fcdb245bf3b3ede89b8accf4",
+      "size": 241,
+      "normalized_sha256": "93186217e86d3a8fd89a3aa391795d6d1d3f8fc2fcdb245bf3b3ede89b8accf4"
     },
     "frontend/runtime-config.js": {
       "role": "index",
@@ -3246,9 +3246,9 @@
     },
     "frontend/src/pages/oj/views/contest/PrepStatementExportDialog.vue": {
       "role": "index",
-      "sha256": "0e3d2bde4573c3228b69d90a009fa8fd75f840353d2e4b84ed3843ff484c4b3d",
-      "size": 13434,
-      "normalized_sha256": "0e3d2bde4573c3228b69d90a009fa8fd75f840353d2e4b84ed3843ff484c4b3d"
+      "sha256": "b4a2b012e73bb671bee0af96131efc29e07ca20ca96b83604181818e84da3352",
+      "size": 13149,
+      "normalized_sha256": "b4a2b012e73bb671bee0af96131efc29e07ca20ca96b83604181818e84da3352"
     },
     "frontend/src/pages/oj/views/contest/children/ACMContestRank.vue": {
       "role": "index",
@@ -3556,6 +3556,12 @@
       "size": 32965,
       "normalized_sha256": "6db65efde359a149f32d113e099b1313acbeedc111e5cc7d228653ec85891d93"
     },
+    "frontend/src/shared/ui/PdfPages.vue": {
+      "role": "index",
+      "sha256": "6a5226b362ae25ac4302dc78e93e5bb7b840634de3acddd744acf1b35b4dc8fc",
+      "size": 8727,
+      "normalized_sha256": "6a5226b362ae25ac4302dc78e93e5bb7b840634de3acddd744acf1b35b4dc8fc"
+    },
     "frontend/src/shared/ui/UserAvatar.vue": {
       "role": "index",
       "sha256": "b580235309101e56af84cd8d359ca1a6e2cfb4d4465603dbdf7f1931b5fa1ce7",
@@ -3828,9 +3834,9 @@
     },
     "frontend/vite.config.mjs": {
       "role": "index",
-      "sha256": "72efff898cd48dedff5b40e59512c70d5603aeb5be40ec706e6ae83c127f660c",
-      "size": 7651,
-      "normalized_sha256": "72efff898cd48dedff5b40e59512c70d5603aeb5be40ec706e6ae83c127f660c"
+      "sha256": "14ac396f39259733d2e066dab96bcc55eea37d8ad3cdd58653d1fbb141d95471",
+      "size": 9116,
+      "normalized_sha256": "14ac396f39259733d2e066dab96bcc55eea37d8ad3cdd58653d1fbb141d95471"
     },
     "ops/configure-authentik-oidc.py": {
       "role": "index",

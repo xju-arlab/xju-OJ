@@ -23,14 +23,14 @@ regression.yml[OQ7S]: F:在推送和PR中验证前后端、部署、传统判题
 .dockerignore[FV5T]: F:排除后端构建中的运行数据、密钥、依赖和旧网关配置 | R:code:backend/Dockerfile | A:Docker ignore patterns | S:旧nginx和supervisor仅留作参考，不进入后端镜像
 .flake8[FQ3T]: F:设置后端Python风格检查范围、行长和引号规范 | R:- | A:flake8配置 | S:-
 .gitignore[FV3T]: F:排除Python构建产物、测试报告和旧后端运行目录 | R:- | A:Git ignore patterns | S:-
-Dockerfile[OV8S]: F:以锁定uv依赖构建后端环境并提供API和Worker共用运行镜像，运行层含XeLaTeX与中文排版支持 | R:code:backend/pyproject.toml,code:backend/deploy/entrypoint.sh,code:backend/contest/statement_pdf.py,code:docker-bake.hcl | A:backend-deps；backend-build；backend-runtime；DEBIAN_MIRROR | S:运行阶段复制虚拟环境且不重新解依赖；入口先准备密钥后降权；源码目录构建，根dockerignore不生效；题面PDF所需TeX包装在运行层，镜像约增240MB；Debian源取DEBIAN_MIRROR，默认华为云公网源，PyPI仍用阿里云
+Dockerfile[OV8S]: F:以锁定uv依赖构建后端环境并提供API和Worker共用运行镜像，运行层含XeLaTeX与中文排版支持 | R:code:backend/pyproject.toml,code:backend/uv.lock,code:backend/deploy/entrypoint.sh,code:backend/contest/statement_pdf.py,code:docker-bake.hcl | A:backend-deps；backend-build；backend-runtime；DEBIAN_MIRROR；PYPI_INDEX_URL | S:运行阶段复制虚拟环境且不重新解依赖；入口先准备密钥后降权；源码目录构建，根dockerignore不生效；TeX包装在运行层，镜像约增240MB；Debian源默认华为云公网源；PYPI_INDEX_URL须与uv.lock写死的华为云地址一致，单改则--locked失败
 LICENSE[SG2T]: F:保留上游后端MIT授权及版权声明 | R:- | A:MIT许可 | S:-
 README-CN.md[SG2T]: F:保留上游OnlineJudge2.0功能和安装说明 | R:code:backend/README.md | A:历史中文文档 | S:旧版本说明不代表当前依赖
-README.md[SG5S]: F:说明后端模块边界、锁定环境、运行入口与历史兼容约束 | R:code:backend/pyproject.toml,code:backend/deploy/entrypoint.sh | A:开发与运维命令 | S:Redis DB1用于会话缓存，DB4用于任务；历史JSON迁移需保持可加载
+README.md[SG5S]: F:说明后端模块边界、锁定环境与华为云PyPI镜像、运行入口与历史兼容约束 | R:code:backend/pyproject.toml,code:backend/uv.lock,code:backend/deploy/entrypoint.sh | A:开发与运维命令 | S:Redis DB1用于会话缓存，DB4用于任务；历史JSON迁移需保持可加载；换镜像须重锁审查，不得解除--locked
 init_db.sh[XD4T]: F:启动旧版本地Postgres和Redis开发容器并可初始化数据库 | R:code:backend/manage.py | A:POSTGRES_USER；POSTGRES_PASSWORD；--migrate | S:会强制重建命名开发容器；不应对生产执行；现推荐根开发入口
 manage.py[EG5T]: F:加载oj.settings并执行Django管理命令 | R:code:backend/oj/settings.py | A:命令行Django管理入口 | S:命令输出前额外打印Django版本，自动解析JSON需处理前缀
 pyproject.toml[FV7T]: F:声明后端Python版本范围及精确锁定的运行、测试和风格依赖 | R:code:backend/uv.lock,code:backend/Dockerfile | A:uv项目；dependency-groups | S:仅支持Python3.10且不打包本项目；历史迁移仍依赖jsonfield
-uv.lock[FV7L]: F:锁定后端Python3.10依赖图、包来源及分发文件摘要 | R:code:backend/pyproject.toml,code:backend/Dockerfile | A:uv frozen sync锁文件 | S:分发地址绑定阿里云镜像；依赖升级需由解析器更新并验证，不能手改hash
+uv.lock[FV7L]: F:锁定后端Python3.10依赖图、包来源及分发文件摘要 | R:code:backend/pyproject.toml,code:backend/Dockerfile | A:uv frozen sync锁文件 | S:分发地址写死华为云公网PyPI镜像，镜像索引不给size和上传时间；换源用uv重锁并核对版本与hash不变，不能手改
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/.github/===
 issue_template.md[SQ2T]: F:保留上游问题报告所需的复现和日志信息模板 | R:- | A:问题报告说明 | S:嵌套目录模板不会成为根仓库模板
@@ -59,7 +59,7 @@ tests_security.py[TI7S]: F:回归并发权限隔离、会话撤销归属、角�
 0006_user_session_keys.py[PD4T]: F:增加会话键集合并将手机号字段改作GitHub资料 | R:code:backend/account/migrations/0005_auto_20170830_1154.py | A:account迁移0006 | S:-
 0008_auto_20171011_1214.py[PD5S]: F:将会话及做题状态迁移到PostgreSQL JSONB并整理字段长度 | R:code:backend/account/migrations/0006_user_session_keys.py | A:account迁移0008 | S:历史导入保留postgres JSONField，现代状态由后续迁移对齐
 0009_auto_20171125_1514.py[PD3T]: F:把默认头像路径切换到public资源入口 | R:code:backend/account/migrations/0008_auto_20171011_1214.py | A:account迁移0009 | S:-
-0010_auto_20180501_0436.py[PD4S]: F:把用户及资料的多个限长字符串字段改为文本字段 | R:code:backend/account/models.py | A:account迁移0010 | S:-
+0010_auto_20180501_0436.py[PD4T]: F:把用户及资料的多个限长字符串字段改为文本字段 | R:code:backend/account/models.py | A:account迁移0010 | S:-
 0011_auto_20180501_0456.py[PD3T]: F:把用户邮箱改为可空文本字段 | R:code:backend/account/models.py | A:account迁移0011 | S:-
 0012_userprofile_language.py[PD3T]: F:为用户资料恢复可空语言偏好字段 | R:code:backend/account/models.py | A:account迁移0012 | S:-
 0013_alter_user_session_keys_and_more.py[PD6T]: F:将会话及做题状态的迁移状态对齐Django内置JSONField | R:code:backend/account/models.py | A:account迁移0013 | S:仅改变迁移状态，不执行数据库DDL，保留现有JSONB数据
@@ -140,7 +140,7 @@ serializers.py[EB7M]: F:定义比赛创建、公开详情、公告报名排名�
 tests.py[TB6M]: F:覆盖比赛CRUD、密码验证、报名幂等和比赛公告接口 | R:code:backend/contest/views/oj.py,code:backend/contest/views/admin.py | A:Django比赛API测试 | S:排名类只有非test命名帮助函数，未验证排名输出；公告样例未提供必填visible却只检查列表成功
 tests_safety.py[TB7T]: F:验证气球助手的比赛归属授权及历史题目缺失时排名导出 | R:code:backend/contest/views/admin.py,code:backend/contest/views/oj.py | A:ContestManagementSafetyTests | S:分别检验其他管理员越权及跨比赛rank_id；ACM和OI导出都覆盖隐藏题历史
 prep_publish.py[DB8T]: F:把筹备比赛的题目、设置和公告复制为新的普通公开比赛，并让新题赛后进入公开题库 | R:code:backend/contest/models.py,code:backend/problem/contest_authoring.py,code:backend/problem/tasks.py,code:backend/utils/constants.py | A:publish_prep_contest(prep_contest,overrides) | S:行锁串行化并发发布；已上传题数须等于计划题数，未设时至少一题；密码只取发布参数，不继承验题密码；未给时间时从now起取PUBLISH_DEFAULT_HOURS而非占位窗口；题号重排为A起，按test_case_id共享测试目录并清零统计；题库来源的题不再排队，其余赛后由发布任务分配新编号；原筹备比赛保持私有且可重复发布
-prep_rank.py[DB7T]: F:根据最近一轮验题的终态提交按ACM或OI规则计算筹备比赛验题榜 | R:code:backend/judge/statistics.py,code:backend/submission/models.py,code:backend/contest/models.py | A:review_rank；review_runs | S:判题统计跳过筹备赛，榜单每次从提交重算；开放轮次只按开始过滤，已结束轮次再加结束上界；成员无提交也列出并带出题标签；ACM罚时20分钟且CE和SE不罚，OI取最后一次得分
+prep_rank.py[DB7S]: F:根据最近一轮验题的终态提交按ACM或OI规则计算筹备比赛验题榜 | R:code:backend/judge/statistics.py,code:backend/submission/models.py,code:backend/contest/models.py | A:review_rank；review_runs | S:判题统计跳过筹备赛，榜单每次从提交重算；开放轮次只按开始过滤，已结束轮次再加结束上界；成员无提交也列出并带出题标签；ACM罚时20分钟且CE和SE不罚，OI取最后一次得分
 tests_prep.py[TB7L]: F:回归筹备比赛私密性与验题密码、非成员管理员隔离、组织者权限、题目规划与进度、题包导入、排序、发布复制与赛后入库、不限时验题轮次、备注与真实姓名、题面图片上传和一次性邀请 | R:code:backend/contest/views/prep.py,code:backend/contest/prep_publish.py,code:backend/contest/prep_rank.py,code:backend/problem/publication.py,code:backend/submission/models.py,code:backend/utils/views.py | A:ContestPrepVisibilityTest；ContestPrepPlanTest；ContestPrepPublishTest；ContestPrepReviewTest；ContestPrepInviteTest；ContestPrepImageUploadTest | S:判题与赛后发布调度用替身，不跑真实沙箱；题包、测试数据和图片写入临时目录；不限时靠回填review_started_at而非等待；邀请节流计数在Redis跨测试保留，用例前按用户清理
 statement_pdf.py[DB8L]: F:把筹备比赛题面HTML转成LaTeX，并用XeLaTeX排成带可选鲸鱼娘封面、页眉页脚和样例表的olymp风格PDF | R:code:backend/contest/statement_template.tex,code:backend/contest/views/prep.py,code:backend/problem/models.py,code:backend/utils/views.py | A:compile_statement_pdf；render_document；render_cover；COVERS；LatexRenderer；ImageStore | S:公式安全才直传TeX，含文件读写、重定义、^^转义或括号不平衡时改印原文；图片只取上传目录普通文件名，转PNG按CSS像素定宽不超栏宽；封面人物按参考图拟合，锚定校徽底边与中线，选人物时校徽不超0.84倍，超22题无校徽也无人物；TeX只读构建目录，只复制所用素材；两遍编译、禁shell escape、文件访问paranoid
 statement_template.tex[FB6S]: F:定义题面PDF的字体、页眉logo与比赛名日期、页脚页码、封面校徽与人物及题目、限制、小节、样例表和图片宏 | R:code:backend/contest/statement_pdf.py | A:xjulogo；xjuemblem；xjufigure；xjuproblem；xjusection；xjusamples | S:%%占位符由statement_pdf替换；依赖fandol、TeX Gyre Heros与需ulem的xeCJKfntef；xjufigure零宽零高叠放在校徽右侧；封面titlepage不计页
@@ -450,11 +450,11 @@ Dockerfile[OV8T]: F:以固定Node和Nginx构建锁定依赖、双SPA及浏览器
 LICENSE[SG2T]: F:保留前端及附带上游组件的MIT许可和版权归属 | R:- | A:前端许可文本 | S:清理依赖时保留上游授权
 README.md[SV5T]: F:说明Vue3双入口前端栈、构建和全栈Vite开发入口 | R:code:frontend/package.json,code:docs/operations/dev-frontend.md | A:前端开发说明 | S:仅支持当前现代浏览器，不支持IE；旧上游徽标属于归属信息
 index.html[EU6T]: F:加载用户端运行配置、自托管字体、初始加载动画并挂载Vite应用 | R:code:frontend/src/pages/oj/index.js,code:frontend/static/css/loader.css,code:deploy/ops/fetch-fonts.py | A:/入口HTML | S:配置脚本同步先加载；字体样式表来自运行数据，构建时原样保留链接；旧IE提示不表示框架支持IE
-package.json[FV7T]: F:声明Vue3依赖与固定pnpm并提供构建和自动化回归命令 | R:code:frontend/pnpm-lock.yaml,code:frontend/playwright.config.mjs | A:dev；build；lint:modern；test:browser；test:remote-bridge；test:contest-submissions | S:生产DOMPurify与测试Playwright精确锁定；lint:modern只是栈扫描，不代替构建和浏览器测试
-pnpm-lock.yaml[FV7L]: F:固定前端生产及浏览器测试依赖图、分发摘要和peer组合 | R:code:frontend/package.json,code:frontend/Dockerfile | A:pnpm frozen-lockfile | S:包括DOMPurify和Playwright；升级必须由包管理器解析验证，不能手改摘要
-pnpm-workspace.yaml[FV6T]: F:限制前端依赖安装脚本并禁止特殊来源的传递依赖 | R:code:frontend/pnpm-lock.yaml | A:allowBuilds；blockExoticSubdeps | S:仅显式允许core-js、esbuild和highlight.js构建脚本，不再保留未使用的Tiptap例外
+package.json[FV7T]: F:声明Vue3与pdf.js等依赖、固定pnpm并提供构建和自动化回归命令 | R:code:frontend/pnpm-lock.yaml,code:frontend/playwright.config.mjs | A:dev；build；lint:modern；test:browser；test:remote-bridge；test:contest-submissions | S:生产DOMPurify、pdfjs-dist与测试Playwright精确锁定；lint:modern只是栈扫描，不代替构建和浏览器测试
+pnpm-lock.yaml[FV7L]: F:固定前端生产及浏览器测试依赖图、分发摘要和peer组合 | R:code:frontend/package.json,code:frontend/pnpm-workspace.yaml,code:frontend/Dockerfile | A:pnpm frozen-lockfile | S:含DOMPurify、pdfjs-dist和Playwright，记录忽略的可选依赖；升级必须由包管理器解析验证，不能手改摘要
+pnpm-workspace.yaml[FV6T]: F:限制前端依赖安装脚本、禁止特殊来源的传递依赖并跳过pdf.js只在Node下用的canvas | R:code:frontend/pnpm-lock.yaml | A:allowBuilds；blockExoticSubdeps；ignoredOptionalDependencies | S:仅显式允许core-js、esbuild和highlight.js构建脚本；浏览器构建从不加载@napi-rs/canvas
 runtime-config.js[FC6T]: F:提供本地浏览器域名、公开资源和认证展示的默认配置 | R:code:frontend/docker-entrypoint.d/20-runtime-config.sh,code:frontend/src/utils/runtime.js | A:window.__XJU_RUNTIME_CONFIG__ | S:已有全局配置时不覆盖；生产镜像启动脚本另行生成此资源
-vite.config.mjs[OV7M]: F:配置双SPA构建、受限本地资源及同源开发代理 | R:code:frontend/package.json,code:frontend/src/pages/oj/mocks/empty-fixtures.js | A:Vite配置；VITE_DEV_HOST；VITE_BACKEND_TARGET；开发运行配置 | S:传统样例仅显式开发开关启用，生产替换空模块；AI直接访问真实API；public拒绝路径上溯且不直接复制publicDir
+vite.config.mjs[OV7M]: F:配置双SPA构建、受限本地资源、同源开发代理及pdf.js的worker与CMap产物 | R:code:frontend/package.json,code:frontend/src/pages/oj/mocks/empty-fixtures.js,code:frontend/src/shared/ui/PdfPages.vue | A:Vite配置；VITE_DEV_HOST；VITE_BACKEND_TARGET；开发运行配置；pdfjsCMapAssets；worker输出 | S:样例仅显式开发开关启用，生产替换空模块；AI直接访问真实API；public拒绝路径上溯；worker须落static/js，否则落入SPA回退；CMap按pdfjs版本原名输出
 playwright.config.mjs[TQ6T]: F:配置单Worker的真实浏览器组件回归与独立Vite测试服务 | R:code:frontend/tests/browser/runtime.spec.mjs,code:frontend/vite.config.mjs | A:Playwright配置；CHROME_PATH | S:测试服务仅监听127.0.0.1:18173且端口冲突即失败；不使用生产会话
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/admin/===
@@ -582,7 +582,7 @@ index.js[EU3T]: F:导出比赛、筹备子页、题目分配页和邀请页的�
 PrepContestCreateDialog.vue[EU5S]: F:管理员在OJ比赛列表填写名称和赛制创建筹备比赛 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/views/contest/ContestList.vue | A:visible；update:visible；created | S:仅ACM与OI；不设时间，比赛时间在发布时选择
 PrepInvite.vue[EU7S]: F:兑换一次性筹备邀请链接成为组织者，未登录时引导登录后加入并展示加入结果 | R:code:frontend/src/pages/oj/views/contest/prepInvite.js,code:frontend/src/pages/oj/api.js,code:backend/contest/views/prep.py | A:/invite路由组件；accept；login | S:令牌只取自URL片段或本标签页暂存，兑换成功或失败后立即清除；资料晚到时由登录状态监听再兑换
 prepInvite.js[LS7T]: F:生成筹备邀请链接并读取、暂存和清除URL片段中的邀请令牌 | R:code:frontend/src/pages/oj/views/contest/PrepInvite.vue,code:frontend/src/pages/oj/views/user/Login.vue | A:inviteLink；readInviteToken；keepPendingInvite；hasPendingInvite；forgetInvite | S:令牌放在片段以免进入服务器日志和Referer；登录期间只存本标签页sessionStorage；清除时用replaceState去掉片段
-PrepStatementExportDialog.vue[EU7M]: F:填写正式比赛名称、副标题、日期并选择经典或五种鲸鱼娘封面，右侧实时预览服务器排出的整份题面PDF并导出下载 | R:code:frontend/src/pages/oj/api.js,code:backend/contest/views/prep.py,code:backend/contest/statement_pdf.py | A:PrepStatementExportDialog；visible；contestId；contestTitle；runPreview；exportStatements | S:改动后停顿700毫秒再排，同时只发一个请求，返回后参数已变再排；参数未变时导出复用预览PDF；封面键须与后端COVERS一致；表单按比赛记在本地存储；预览blob URL关闭时回收
+PrepStatementExportDialog.vue[EU7M]: F:填写正式比赛名称、副标题、日期并选择经典或五种鲸鱼娘封面，右侧以与表单等高的纯页面实时预览服务器排出的整份题面PDF并导出下载 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/shared/ui/PdfPages.vue,code:backend/contest/views/prep.py,code:backend/contest/statement_pdf.py | A:PrepStatementExportDialog；visible；contestId；contestTitle；runPreview；exportStatements | S:停顿700毫秒再排，同时只发一个请求，返回后参数已变再排；参数未变时导出复用预览；封面键须与后端COVERS一致；预览区无标题，由网格拉到表单高度，页面内部滚动
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/contest/children/===
 ACMContestRank.vue[EU7M]: F:渲染ACM通过数罚时排名、题目状态及前十队进度图 | R:code:frontend/src/pages/oj/views/contest/children/contestRankMixin.js | A:applyToChart；applyToTable；排名导出 | S:时间按累计小时显示以避免超过24小时回绕；AC列为通过题数比比赛题数而非提交数；成绩和首AC均由后端提供
@@ -661,6 +661,7 @@ richTextMarkdown.js[LG7S]: F:提供富文本编辑器的Markdown与HTML双向转
 UserAvatar.vue[EU4T]: F:显示圆形头像并在加载失败时回退用户名首字母 | R:- | A:src；username；alt；size | S:src变化重置失败状态
 icon-map.js[IU5S]: F:将历史及新增图标名称（含插入图片的image）映射到Lucide Vue组件 | R:code:frontend/src/shared/ui/legacy-ui.js | A:resolveIcon；iconMap | S:未知图标回退Sparkles而不报错
 legacy-ui.js[IU8M]: F:把旧iView组件事件、渲染函数、弹窗和加载接口适配到Element Plus | R:code:frontend/src/shared/ui/icon-map.js,code:frontend/src/pages/oj/index.js | A:LegacyUI.install；legacyH；全局兼容组件及方法 | S:旧props/on/scopedSlots转Vue3；model更新与change分开，避免重复on-change；Modal各提示类型和Loading.error保持旧调用兼容
+PdfPages.vue[EU6M]: F:用pdf.js把PDF渲染成只能滚动的纯页面列，新文档按可见优先逐页覆盖旧页而不闪白 | R:code:frontend/vite.config.mjs,code:frontend/src/pages/oj/views/contest/PrepStatementExportDialog.vue | A:PdfPages；source；loaded与error事件；load；paint | S:pdf.js对象不进响应式数据，代理会破坏私有字段；6版须销毁loadingTask；worker打包成js因nginx把mjs当octet-stream；中文字体靠cMapUrl；页存为压缩图片而非canvas以控内存
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/store/===
 compat.js[IU5T]: F:为旧组件映射方法提供Pinia外观的状态与动作访问器 | R:code:frontend/src/store/index.js | A:mapState；mapGetters；mapActions；mapMutations | S:支持数组及映射对象，不建立第二套状态
