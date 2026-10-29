@@ -47,7 +47,7 @@ Main modules are available below:
 
 Phase 3 uses Python `>=3.10,<3.11` with Django `5.2.17`, Psycopg `3.3.4`, DRF `3.18.0`, redis-py `7.4.1`, django-redis `7.0.0`, Dramatiq `2.2.0` and django-dramatiq `0.15.0`. `pyproject.toml` + `uv.lock` are the dependency source of truth; the runtime image never resolves dependencies at startup.
 
-为适配 huawei 构建网络，`uv.lock` 中的 registry 和 artifact URL 使用阿里云 PyPI 镜像；每个已锁定发行物的 SHA-256 保持不变。更换镜像必须重新生成并审查 lock，不能在生产构建中临时解除 `--locked`。
+为适配 huawei 构建网络，`uv.lock` 中的 registry 和 artifact URL 使用华为云 PyPI 公网镜像（`repo.huaweicloud.com`，与 PyPI 路径布局一致，本地和 CI 也能访问）；每个已锁定发行物的 SHA-256 保持不变。更换镜像必须重新生成并审查 lock，不能在生产构建中临时解除 `--locked`。
 
 ```bash
 uv sync --locked --group dev
