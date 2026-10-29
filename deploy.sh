@@ -113,7 +113,7 @@ allowed = {
     "HTTP_BIND_ADDRESS", "HTTP_PORT", "DEPLOY_ROOT", "RUNTIME_ROOT", "TRUSTED_PROXY_CIDRS",
     "BACKUP_ROOT", "SECRET_ROOT", "DEPLOY_MODE", "SECRET_PROVISION_MODE",
     "GIT_COMMIT", "BUILD_VERSION", "BUILD_CREATED", "BUILD_TARGETS",
-    "BUILD_NETWORK", "BUILD_HTTP_PROXY", "BUILD_HTTPS_PROXY", "BUILD_ALL_PROXY", "DEBIAN_MIRROR",
+    "BUILD_NETWORK", "BUILD_HTTP_PROXY", "BUILD_HTTPS_PROXY", "BUILD_ALL_PROXY", "DEBIAN_MIRROR", "NPM_REGISTRY",
     "CACHE_REGISTRY",
     "FRONTEND_IMAGE_REF", "FRONTEND_BASE_IMAGE", "BACKEND_IMAGE_REF", "JUDGE_IMAGE_REF",
     "JUDGE_TOOLCHAIN_IMAGE_REF", "POSTGRES_IMAGE_REF", "REDIS_IMAGE_REF",
@@ -1139,6 +1139,18 @@ PY
             esac
             log_info "[build] Debian mirror: $debian_mirror"
 
+            # npm registry for the frontend. Huawei's public mirror is fast inside
+            # Huawei Cloud too (there is no in-region npm mirror); NPM_REGISTRY overrides it.
+            npm_registry=${NPM_REGISTRY:-https://mirrors.huaweicloud.com/repository/npm/}
+            case "$npm_registry" in
+                http://*|https://*) ;;
+                *) fail "NPM_REGISTRY must be an http(s) URL" ;;
+            esac
+            case "$npm_registry" in
+                *[!A-Za-z0-9.:/_-]*) fail "NPM_REGISTRY contains unsupported characters" ;;
+            esac
+            log_info "[build] npm registry: $npm_registry"
+
             frontend_build_needed=0
             if target_is_requested frontend && ! target_skip_requested frontend; then
                 frontend_build_needed=1
@@ -1148,7 +1160,7 @@ PY
                 log_info "[build] frontend-base: START (image: $FRONTEND_BASE_IMAGE; log: $base_log)"
                 if ! stream_command "$base_log" env \
                     BUILD_NETWORK="$build_network" GIT_SHA="$git_sha" BUILD_VERSION="$build_version" \
-                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" \
+                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" NPM_REGISTRY="$npm_registry" \
                     docker buildx bake $build_allow --progress=plain --file "$ROOT/docker-bake.hcl" \
                     --set '*.platform=linux/amd64' \
                     --set frontend-base.tags="$FRONTEND_BASE_IMAGE" \
@@ -1224,7 +1236,7 @@ PY
                 log_info "[build] $build_target: START (image: $target_ref; log: $build_log)"
                 if ! stream_command "$build_log" env \
                     BUILD_NETWORK="$build_network" GIT_SHA="$git_sha" BUILD_VERSION="$build_version" \
-                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" \
+                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" NPM_REGISTRY="$npm_registry" \
                     docker buildx bake $build_allow --progress=plain --file "$ROOT/docker-bake.hcl" \
                     --set '*.platform=linux/amd64' \
                     --set "$build_target.args.HTTP_PROXY=$target_http_proxy" \

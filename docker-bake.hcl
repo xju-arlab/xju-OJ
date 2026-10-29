@@ -35,6 +35,11 @@ variable "DEBIAN_MIRROR" {
   default = "https://repo.huaweicloud.com"
 }
 
+# npm registry for the frontend dependencies.
+variable "NPM_REGISTRY" {
+  default = "https://mirrors.huaweicloud.com/repository/npm/"
+}
+
 group "default" {
   targets = ["postgres", "frontend", "backend", "judge-toolchain", "server"]
 }
@@ -72,6 +77,7 @@ target "frontend" {
   args       = {
     FRONTEND_BASE_IMAGE = "${FRONTEND_BASE_IMAGE}"
     PNPM_VERSION        = "${PNPM_VERSION}"
+    NPM_REGISTRY        = "${NPM_REGISTRY}"
   }
   tags       = ["${IMAGE_REGISTRY}/frontend:git-${GIT_SHA}"]
   cache-from = CACHE_REGISTRY != "" ? ["type=registry,ref=${CACHE_REGISTRY}/frontend:buildcache"] : []

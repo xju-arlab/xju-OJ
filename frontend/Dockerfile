@@ -5,6 +5,8 @@ ARG NODE_IMAGE=node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be9894382480
 ARG NGINX_IMAGE=nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 ARG PNPM_VERSION=11.22.0
 ARG FRONTEND_BASE_IMAGE=xju-oj-frontend-base:node-24.19.0-bookworm-slim-v1
+# pnpm-lock.yaml records no tarball URLs, so the registry can change without relocking.
+ARG NPM_REGISTRY=https://mirrors.huaweicloud.com/repository/npm/
 
 FROM ${NODE_IMAGE} AS frontend-base
 ARG PNPM_VERSION
@@ -24,10 +26,13 @@ RUN set -eux; \
 
 FROM ${FRONTEND_BASE_IMAGE} AS frontend-deps
 ARG TARGETOS TARGETARCH
+ARG NPM_REGISTRY
 WORKDIR /src
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-${TARGETOS:-linux}-${TARGETARCH:-amd64},target=/pnpm/store,sharing=locked \
-    pnpm config set store-dir /pnpm/store && pnpm fetch --frozen-lockfile
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set registry "${NPM_REGISTRY}" && \
+    pnpm fetch --frozen-lockfile
 
 FROM frontend-deps AS frontend-build
 ARG TARGETOS TARGETARCH
