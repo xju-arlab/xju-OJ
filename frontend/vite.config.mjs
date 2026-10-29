@@ -16,6 +16,32 @@ function copyStaticAssets () {
   }
 }
 
+// pdf.js fetches the Adobe CMaps for embedded CJK fonts from one directory by name, so they ship
+// unhashed under a versioned path; PdfPages.vue builds the same URL from pdfjs.version.
+const pdfjsCMaps = resolve('node_modules/pdfjs-dist/cmaps')
+const pdfjsVersion = JSON.parse(fs.readFileSync(resolve('node_modules/pdfjs-dist/package.json'), 'utf8')).version
+const pdfjsCMapPath = `/static/pdfjs-${pdfjsVersion}/cmaps/`
+
+function pdfjsCMapAssets () {
+  return {
+    name: 'pdfjs-cmap-assets',
+    configureServer (server) {
+      server.middlewares.use(pdfjsCMapPath, (req, res, next) => {
+        const name = decodeURIComponent((req.url || '').split('?')[0]).replace(/^\//, '')
+        if (!/^[\w.-]+\.bcmap$/.test(name)) return next()
+        fs.readFile(path.join(pdfjsCMaps, name), (error, data) => {
+          if (error) return next()
+          res.setHeader('Content-Type', 'application/octet-stream')
+          res.end(data)
+        })
+      })
+    },
+    closeBundle () {
+      fs.cpSync(pdfjsCMaps, resolve(`dist${pdfjsCMapPath}`), { recursive: true })
+    }
+  }
+}
+
 const DEFAULT_AUTHENTIK_REGISTER_URL = 'https://auth.icthub.top/if/flow/icthub-public-registration/'
 
 function envBoolean (name, fallback) {
@@ -139,7 +165,7 @@ export default defineConfig(({ mode }) => {
   const useDevelopmentFixtures = mode === 'development' && envBoolean('OJ_FRONTEND_DEV_MODE', false)
 
   return {
-    plugins: [devRuntimeConfigPlugin(), vue(), copyStaticAssets()],
+    plugins: [devRuntimeConfigPlugin(), vue(), copyStaticAssets(), pdfjsCMapAssets()],
     base: '/',
     publicDir: false,
     resolve: {
@@ -185,6 +211,16 @@ export default defineConfig(({ mode }) => {
               proxyReq.setHeader('Referer', target)
             })
           }
+        }
+      }
+    },
+    // Workers (the pdf.js renderer) land next to the other hashed chunks, which nginx serves as static files.
+    worker: {
+      rollupOptions: {
+        output: {
+          entryFileNames: 'static/js/[name]-[hash].js',
+          chunkFileNames: 'static/js/[name]-[hash].js',
+          assetFileNames: 'static/assets/[name]-[hash][extname]'
         }
       }
     },

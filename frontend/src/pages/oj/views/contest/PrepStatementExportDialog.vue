@@ -32,22 +32,19 @@
             </div>
           </el-form-item>
         </el-form>
+        <p v-if="previewProblems" class="export-warning">
+          {{ $t('m.Prep_Export_Warnings_Short', { problems: previewProblems }) }}
+        </p>
       </div>
 
+      <!-- Only the pages, as tall as the form beside it. -->
       <section class="export-preview" :aria-label="$t('m.Prep_Export_Preview')">
-        <header class="preview-head">
-          <strong>{{ $t('m.Prep_Export_Preview') }}</strong>
-          <small v-if="previewProblems">{{ $t('m.Prep_Export_Warnings_Short', { problems: previewProblems }) }}</small>
-        </header>
-        <div class="preview-frame">
-          <iframe v-if="preview.url" :key="preview.url" :src="`${preview.url}#navpanes=0&view=FitH`"
-                  :title="$t('m.Prep_Export_Preview')"></iframe>
-          <div v-if="!ready" class="preview-state">{{ $t('m.Prep_Export_Preview_Hint') }}</div>
-          <div v-else-if="loading" :class="['preview-state', { 'is-over': preview.url }]">
-            <Icon type="loading" class="is-spinning" />{{ $t('m.Prep_Export_Working') }}
-          </div>
-          <div v-else-if="error" class="preview-state is-error">{{ error }}</div>
+        <PdfPages v-if="preview.blob" :source="preview.blob" @error="renderFailed" />
+        <div v-if="!ready" class="preview-state">{{ $t('m.Prep_Export_Preview_Hint') }}</div>
+        <div v-else-if="loading" :class="['preview-state', { 'is-over': preview.blob }]">
+          <Icon type="loading" class="is-spinning" />{{ $t('m.Prep_Export_Working') }}
         </div>
+        <div v-else-if="error" class="preview-state is-error">{{ error }}</div>
       </section>
     </div>
     <template #footer>
@@ -62,6 +59,7 @@
 <script>
 import api from '@oj/api'
 import storage from '@/utils/storage'
+import PdfPages from '@/shared/ui/PdfPages.vue'
 import pointing from '@/assets/statement-covers/pointing.webp'
 import handing from '@/assets/statement-covers/handing.webp'
 import table from '@/assets/statement-covers/table.webp'
@@ -102,6 +100,7 @@ function problemsWithWarnings (res) {
 // exporting reuses the preview when nothing changed since.
 export default {
   name: 'PrepStatementExportDialog',
+  components: { PdfPages },
   props: {
     visible: { type: Boolean, default: false },
     contestId: { type: [String, Number], required: true },
@@ -112,7 +111,7 @@ export default {
     return {
       covers: COVERS,
       form: { title: '', subtitle: '', date: '', cover: 'plain' },
-      preview: { url: '', key: '', blob: null, filename: '', problems: '' },
+      preview: { key: '', blob: null, filename: '', problems: '' },
       loading: false,
       rerun: false,
       error: '',
@@ -165,8 +164,7 @@ export default {
     close () {
       clearTimeout(this.timer)
       this.rerun = false
-      if (this.preview.url) window.URL.revokeObjectURL(this.preview.url)
-      this.preview = { url: '', key: '', blob: null, filename: '', problems: '' }
+      this.preview = { key: '', blob: null, filename: '', problems: '' }
     },
     payload (previewing) {
       return {
@@ -199,10 +197,8 @@ export default {
           this.error = await readError(res, this.$t('m.Prep_Export_Failed'))
           return
         }
-        if (this.preview.url) window.URL.revokeObjectURL(this.preview.url)
         const encoded = /filename\*=UTF-8''([^;]+)/i.exec(res.headers['content-disposition'] || '')
         this.preview = {
-          url: window.URL.createObjectURL(res.data),
           key,
           blob: res.data,
           filename: encoded ? decodeURIComponent(encoded[1]) : `${this.form.title.trim()}.pdf`,
@@ -218,6 +214,9 @@ export default {
           this.schedulePreview(0)
         }
       }
+    },
+    renderFailed () {
+      this.error = this.$t('m.Prep_Export_Failed')
     },
     async exportStatements () {
       this.exporting = true
@@ -276,7 +275,6 @@ export default {
   display: grid;
   grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
   gap: 22px;
-  align-items: start;
 }
 .export-note { margin: 0 0 14px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
 .export-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
@@ -312,27 +310,21 @@ export default {
   :deep(svg) { width: 26px; height: 26px; }
 }
 .cover-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
-.preview-head {
-  display: flex;
-  min-height: 22px;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  strong { color: var(--color-text); font-size: 13px; font-weight: 650; }
-  small { color: var(--cat-course); font-size: 12px; }
-}
-.preview-frame {
+.export-warning { margin: 4px 0 0; color: var(--cat-course); font-size: 12px; line-height: 1.6; }
+// Stretched to the form's height by the grid; the pages scroll inside instead of growing it.
+.export-preview {
   position: relative;
   overflow: hidden;
-  height: min(70vh, 640px);
+  min-height: 420px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-bg-subtle);
-  iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+  > .pdf-pages { position: absolute; inset: 0; }
 }
 .preview-state {
   position: absolute;
   inset: 0;
+  background: var(--color-bg-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -341,7 +333,7 @@ export default {
   color: var(--color-text-muted);
   font-size: 13px;
   text-align: center;
-  &.is-over { inset: auto 12px 12px auto; padding: 6px 12px; border-radius: 999px; background: rgba(15, 15, 15, .72); color: #fff; }
+  &.is-over { inset: auto 14px 14px auto; padding: 6px 12px; border-radius: 999px; background: rgba(15, 15, 15, .72); color: #fff; }
   &.is-error { color: var(--oj-danger); }
   :deep(.legacy-icon) { display: inline-flex; }
 }
@@ -350,6 +342,6 @@ export default {
 
 @media (max-width: 820px) {
   .export-layout { grid-template-columns: 1fr; }
-  .preview-frame { height: 60vh; }
+  .export-preview { min-height: 0; height: 60vh; }
 }
 </style>

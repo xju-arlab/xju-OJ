@@ -3,3 +3,6 @@ allowBuilds:
   esbuild: true
   highlight.js: true
 blockExoticSubdeps: true
+# pdfjs-dist only needs @napi-rs/canvas when it runs under Node; the browser build never loads it.
+ignoredOptionalDependencies:
+  - '@napi-rs/canvas'

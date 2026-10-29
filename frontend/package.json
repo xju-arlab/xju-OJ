@@ -40,6 +40,7 @@
     "markdown-it": "15.0.0",
     "moment": "2.30.1",
     "papaparse": "5.5.3",
+    "pdfjs-dist": "6.4.299",
     "pinia": "4.0.3",
     "screenfull": "6.0.2",
     "turndown": "7.2.4",
