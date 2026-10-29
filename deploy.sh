@@ -113,7 +113,7 @@ allowed = {
     "HTTP_BIND_ADDRESS", "HTTP_PORT", "DEPLOY_ROOT", "RUNTIME_ROOT", "TRUSTED_PROXY_CIDRS",
     "BACKUP_ROOT", "SECRET_ROOT", "DEPLOY_MODE", "SECRET_PROVISION_MODE",
     "GIT_COMMIT", "BUILD_VERSION", "BUILD_CREATED", "BUILD_TARGETS",
-    "BUILD_NETWORK", "BUILD_HTTP_PROXY", "BUILD_HTTPS_PROXY", "BUILD_ALL_PROXY",
+    "BUILD_NETWORK", "BUILD_HTTP_PROXY", "BUILD_HTTPS_PROXY", "BUILD_ALL_PROXY", "DEBIAN_MIRROR",
     "CACHE_REGISTRY",
     "FRONTEND_IMAGE_REF", "FRONTEND_BASE_IMAGE", "BACKEND_IMAGE_REF", "JUDGE_IMAGE_REF",
     "JUDGE_TOOLCHAIN_IMAGE_REF", "POSTGRES_IMAGE_REF", "REDIS_IMAGE_REF",
@@ -1119,6 +1119,26 @@ PY
             build_allow=
             [ "$build_network" = host ] && build_allow=--allow=network.host
 
+            # Debian packages for image builds. Inside Huawei Cloud the in-region
+            # mirror is several times faster than any public one; elsewhere use
+            # Huawei's public mirror. DEBIAN_MIRROR in the env file overrides both.
+            debian_mirror=${DEBIAN_MIRROR:-}
+            if [ -z "$debian_mirror" ]; then
+                debian_mirror=https://repo.huaweicloud.com
+                if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 3 -o /dev/null \
+                    http://mirrors.myhuaweicloud.com/debian/dists/bookworm/Release 2>/dev/null; then
+                    debian_mirror=http://mirrors.myhuaweicloud.com
+                fi
+            fi
+            case "$debian_mirror" in
+                http://*|https://*) ;;
+                *) fail "DEBIAN_MIRROR must be an http(s) URL" ;;
+            esac
+            case "$debian_mirror" in
+                *[!A-Za-z0-9.:/_-]*) fail "DEBIAN_MIRROR contains unsupported characters" ;;
+            esac
+            log_info "[build] Debian mirror: $debian_mirror"
+
             frontend_build_needed=0
             if target_is_requested frontend && ! target_skip_requested frontend; then
                 frontend_build_needed=1
@@ -1128,7 +1148,7 @@ PY
                 log_info "[build] frontend-base: START (image: $FRONTEND_BASE_IMAGE; log: $base_log)"
                 if ! stream_command "$base_log" env \
                     BUILD_NETWORK="$build_network" GIT_SHA="$git_sha" BUILD_VERSION="$build_version" \
-                    BUILD_CREATED="${BUILD_CREATED:-unknown}" \
+                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" \
                     docker buildx bake $build_allow --progress=plain --file "$ROOT/docker-bake.hcl" \
                     --set '*.platform=linux/amd64' \
                     --set frontend-base.tags="$FRONTEND_BASE_IMAGE" \
@@ -1204,7 +1224,7 @@ PY
                 log_info "[build] $build_target: START (image: $target_ref; log: $build_log)"
                 if ! stream_command "$build_log" env \
                     BUILD_NETWORK="$build_network" GIT_SHA="$git_sha" BUILD_VERSION="$build_version" \
-                    BUILD_CREATED="${BUILD_CREATED:-unknown}" \
+                    BUILD_CREATED="${BUILD_CREATED:-unknown}" DEBIAN_MIRROR="$debian_mirror" \
                     docker buildx bake $build_allow --progress=plain --file "$ROOT/docker-bake.hcl" \
                     --set '*.platform=linux/amd64' \
                     --set "$build_target.args.HTTP_PROXY=$target_http_proxy" \

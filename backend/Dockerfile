@@ -2,8 +2,12 @@
 ARG BASE_IMAGE=python:3.10-slim-bookworm@sha256:7ed92b32353e8d8bd865b5ba811e0315d3999c3b57b1c2df2b504a359d4a1707
 ARG UV_VERSION=0.12.5
 ARG PYPI_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+# Debian packages come from Huawei Cloud; deploy.sh switches to the in-region
+# mirror (mirrors.myhuaweicloud.com) when the build host can reach it.
+ARG DEBIAN_MIRROR=https://repo.huaweicloud.com
 
 FROM ${BASE_IMAGE} AS backend-deps
+ARG DEBIAN_MIRROR
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG UV_VERSION
@@ -21,10 +25,10 @@ RUN --mount=type=cache,target=/var/cache/apt,id=backend-apt-${TARGETARCH}-${TARG
     set -eux; \
     rm -f /etc/apt/apt.conf.d/docker-clean; \
     sed -i \
-        -e 's|http://deb.debian.org/debian-security|https://mirrors.aliyun.com/debian-security|g' \
-        -e 's|http://deb.debian.org/debian|https://mirrors.aliyun.com/debian|g' \
-        -e 's|https://deb.debian.org/debian-security|https://mirrors.aliyun.com/debian-security|g' \
-        -e 's|https://deb.debian.org/debian|https://mirrors.aliyun.com/debian|g' \
+        -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}/debian-security|g" \
+        -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}/debian|g" \
+        -e "s|https://deb.debian.org/debian-security|${DEBIAN_MIRROR}/debian-security|g" \
+        -e "s|https://deb.debian.org/debian|${DEBIAN_MIRROR}/debian|g" \
         /etc/apt/sources.list.d/debian.sources; \
     apt-get -o Acquire::Retries=5 update; \
     apt-get install -y --no-install-recommends \
@@ -48,6 +52,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,id=backend-uv-${TARGETARCH}-${TARG
     uv sync --locked --no-dev
 
 FROM ${BASE_IMAGE} AS backend-runtime
+ARG DEBIAN_MIRROR
 ARG TARGETARCH
 ARG VCS_REF=unknown
 ARG BUILD_VERSION=phase1
@@ -63,10 +68,10 @@ RUN --mount=type=cache,target=/var/cache/apt,id=backend-apt-${TARGETARCH},sharin
     set -eux; \
     rm -f /etc/apt/apt.conf.d/docker-clean; \
     sed -i \
-        -e 's|http://deb.debian.org/debian-security|https://mirrors.aliyun.com/debian-security|g' \
-        -e 's|http://deb.debian.org/debian|https://mirrors.aliyun.com/debian|g' \
-        -e 's|https://deb.debian.org/debian-security|https://mirrors.aliyun.com/debian-security|g' \
-        -e 's|https://deb.debian.org/debian|https://mirrors.aliyun.com/debian|g' \
+        -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}/debian-security|g" \
+        -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}/debian|g" \
+        -e "s|https://deb.debian.org/debian-security|${DEBIAN_MIRROR}/debian-security|g" \
+        -e "s|https://deb.debian.org/debian|${DEBIAN_MIRROR}/debian|g" \
         /etc/apt/sources.list.d/debian.sources; \
     apt-get -o Acquire::Retries=5 update; \
     apt-get install -y --no-install-recommends \

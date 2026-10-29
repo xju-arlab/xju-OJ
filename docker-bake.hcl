@@ -30,6 +30,11 @@ variable "PNPM_VERSION" {
   default = "11.22.0"
 }
 
+# Debian mirror for the backend image; deploy.sh picks the in-region one on Huawei Cloud.
+variable "DEBIAN_MIRROR" {
+  default = "https://repo.huaweicloud.com"
+}
+
 group "default" {
   targets = ["postgres", "frontend", "backend", "judge-toolchain", "server"]
 }
@@ -91,6 +96,9 @@ target "backend" {
   context    = "./backend"
   dockerfile = "Dockerfile"
   target     = "backend-runtime"
+  args       = {
+    DEBIAN_MIRROR = "${DEBIAN_MIRROR}"
+  }
   tags       = ["${IMAGE_REGISTRY}/backend:git-${GIT_SHA}"]
   cache-from = CACHE_REGISTRY != "" ? ["type=registry,ref=${CACHE_REGISTRY}/backend:buildcache"] : []
   cache-to   = CACHE_REGISTRY != "" ? ["type=registry,ref=${CACHE_REGISTRY}/backend:buildcache,mode=max"] : []
