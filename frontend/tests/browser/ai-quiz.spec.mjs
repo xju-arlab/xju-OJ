@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 const problem = {
   id: 'AI010', title: '宿舍用电量场景分析', type: 'quiz', metric: 'Score', points: 100, version: 1, cells: [], files: [],
-  objective: '阅读材料并作答', requirements: ['未作答的小题记 0 分'], signature: '', inputSpec: '', outputSpec: '',
+  objective: '预测下一小时用电量。\n- 阅读材料\n- 完成作答卡\n误差 $\\mathrm{RMSE}=\\sqrt{\\frac{1}{n}\\sum (\\hat y_i-y_i)^2}$', requirements: ['主观题由老师评阅'], signature: '', inputSpec: '', outputSpec: '',
   data: '', evaluation: '按小题计分', previous: null, next: null, maxAttempts: 2,
   quiz: {
     materials: [
@@ -16,7 +16,8 @@ const problem = {
       { id: 'task', kind: 'single', prompt: '这是什么任务？', options: ['回归', '分类'], points: 10, materials: ['fields'] },
       { id: 'leak', kind: 'multiple', prompt: '哪些特征会泄露未来信息？', options: ['temp', 'ac_on', 'hour'], points: 20, materials: [] },
       { id: 'rmse', kind: 'number', prompt: '计算 RMSE', unit: 'kWh', points: 30, materials: ['log'] },
-      { id: 'steps', kind: 'order', prompt: '排列处理步骤', options: ['划分数据集', '标准化', '训练'], points: 40, materials: [] }
+      { id: 'steps', kind: 'order', prompt: '排列处理步骤', options: ['划分数据集', '标准化', '训练'], points: 20, materials: [] },
+      { id: 'plan', kind: 'text', prompt: '给出建模方案：\n- 特征\n- 模型', points: 20, materials: [] }
     ]
   },
   media: { 'curve.png': PNG }
@@ -35,6 +36,13 @@ test.beforeEach(async ({ page }) => {
     if (path.includes('providers')) data = { authentik: { enabled: false }, local: { login_enabled: true, register_enabled: false } }
     if (path.includes('website')) data = { website_name: 'XJU-OJ', allow_register: false }
     if (path === '/api/ai/problems') data = { ...problem, ...(url.searchParams.get('contest_id') ? { practice: false, attemptsUsed: state.attemptsUsed } : {}) }
+    if (path === '/api/ai/contest') data = { id: '23', title: 'ACM 考核', rule_type: 'AI', contest_type: 'Public', status: '0', ranking: 'acm', scorePolicy: 'best',
+      start_time: '2026-10-31T06:00:00Z', end_time: '2026-10-31T08:00:00Z', registered: true, created_by: { username: 'teacher' }, description: '',
+      problems: [{ id: 'AI010', title: '线性回归', type: 'logic', points: 10 }, { id: 'AI011', title: 'Softmax', type: 'logic', points: 10 }], totalPoints: 20, accessError: '' }
+    if (path === '/api/contest/announcement') data = { results: [], total: 0 }
+    if (path === '/api/ai/leaderboard') data = { ranking: 'acm', selection: 'best', privatePublished: false, results: [
+      { rank: 1, userId: 1, username: 'ann', solved: 2, penalty: 2700, scores: { AI010: { accepted: true, tries: 1, time: 600, pending: 0 }, AI011: { accepted: true, tries: 0, time: 900, pending: 0 } } },
+      { rank: 2, userId: 2, username: 'bob', solved: 0, penalty: 0, scores: { AI010: { accepted: false, tries: 2, time: null, pending: 1 }, AI011: { accepted: false, tries: 3, time: null, pending: 0 } } }] }
     if (path === '/api/ai/draft') {
       if (req.method() === 'PUT') {
         if (body.revision !== state.draft.revision) { error = 'draft-conflict'; data = 'Draft changed in another window.' }
@@ -46,7 +54,7 @@ test.beforeEach(async ({ page }) => {
         const official = !!body.contest_id
         if (official) state.attemptsUsed += 1
         data = { id: body.id, problemId: problem.id, title: problem.title, type: 'quiz', kind: 'evaluation', contestId: body.contest_id || '',
-          official, status: 'PARTIAL', publicScore: 60, payload: { answers: body.answers }, createdAt: new Date().toISOString() }
+          official, status: body.answers.plan ? 'REVIEWING' : 'PARTIAL', publicScore: body.answers.plan ? null : 60, payload: { answers: body.answers }, createdAt: new Date().toISOString() }
         state.jobs.unshift(data)
       } else data = { results: state.jobs, total: state.jobs.length }
     }
@@ -60,7 +68,11 @@ test('quiz shows materials, saves structured answers and submits without a Noteb
   await expect(page.locator('.studio-material')).toHaveCount(3)
   await expect(page.locator('.studio-material table')).toContainText('下一时段空调开启数')
   await expect(page.locator('.studio-material img')).toHaveAttribute('alt', '训练与验证损失')
-  await expect(page.locator('.studio-quiz-question')).toHaveCount(4)
+  await expect(page.locator('.studio-quiz-question')).toHaveCount(5)
+  await expect(page.locator('.studio-prose .studio-statement-block li')).toHaveCount(2)
+  await expect(page.locator('.studio-prose .katex').first()).toBeVisible()
+  await expect(page.locator('.studio-prose h2').last()).toHaveText('作答说明')
+  await expect(page.locator('.studio-quiz-prompt li')).toHaveCount(2)
   await expect(page.locator('.cm-editor')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '运行全部' })).toHaveCount(0)
   await expect(page.locator('.studio-quiz-refs').first()).toContainText('字段说明')
@@ -76,19 +88,23 @@ test('quiz shows materials, saves structured answers and submits without a Noteb
   await page.getByRole('button', { name: '下移：划分数据集' }).click()
   await expect(page.locator('.studio-quiz-order li').first()).toContainText('标准化')
   await expect(page.getByRole('status')).toContainText('已保存至云端')
-  expect(state.draft.answers).toEqual({ task: 0, leak: [1, 2], rmse: 0.42, steps: [1, 0, 2] })
-  await expect(page.locator('.studio-notebook-status')).toContainText('已作答 4 / 4')
+  expect(state.draft.answers).toEqual({ task: 0, leak: [1, 2], rmse: 0.42, steps: [1, 0, 2], plan: null })
+  await expect(page.locator('.studio-notebook-status')).toContainText('已作答 4 / 5')
+  await page.getByRole('textbox', { name: '第 5 题作答' }).fill('独热编码 building，平方损失')
+  await expect(page.locator('.studio-quiz-text small')).toContainText('18 / 2000')
+  await expect(page.getByRole('status')).toContainText('已保存至云端')
+  expect(state.draft.answers.plan).toBe('独热编码 building，平方损失')
 
   await page.reload()
   await expect(number).toHaveValue('0.42')
   await expect(page.locator('.studio-quiz-options label.selected')).toHaveCount(3)
 
   await page.getByRole('button', { name: '提交作答' }).click()
-  await expect(page.getByRole('dialog')).toContainText('已作答 4 / 4 题')
+  await expect(page.getByRole('dialog')).toContainText('已作答 5 / 5 题')
   await page.getByRole('button', { name: '确认提交' }).click()
-  await expect(page.getByRole('dialog')).toContainText('本次得分 60 / 100')
+  await expect(page.getByRole('dialog')).toContainText('主观题等待老师评阅')
   const submitted = state.writes.filter(write => write.path === '/api/ai/jobs').at(-1).body
-  expect(submitted).toMatchObject({ problem_id: 'AI010', kind: 'evaluation', answers: { task: 0, leak: [1, 2], rmse: 0.42, steps: [1, 0, 2] } })
+  expect(submitted).toMatchObject({ problem_id: 'AI010', kind: 'evaluation', answers: { task: 0, leak: [1, 2], rmse: 0.42, steps: [1, 0, 2], plan: '独热编码 building，平方损失' } })
   expect(submitted.cells).toBeUndefined()
 })
 
@@ -103,4 +119,17 @@ test('contest quiz shows and enforces the attempt limit in the card', async ({ p
   await page.getByRole('button', { name: '关闭' }).click()
   await expect(page.getByRole('button', { name: '提交次数已用完' })).toBeDisabled()
   expect(state.writes.filter(write => write.path === '/api/ai/jobs').at(-1).body).toMatchObject({ contest_id: '23', answers: { steps: [0, 1, 2], task: null } })
+})
+
+test('ACM contests rank by solved problems and penalty', async ({ page }) => {
+  await page.goto('/ai-studio/contest/23')
+  await expect(page.locator('.contest-meta')).toContainText('ACM')
+  await page.getByRole('button', { name: '成绩' }).click()
+  const rows = page.locator('.ai-acm-board tbody tr')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.first()).toContainText('ann')
+  await expect(rows.first().locator('td').nth(3)).toHaveText('45')
+  await expect(rows.first().locator('td.acm-accepted').first()).toContainText('+1')
+  await expect(rows.nth(1).locator('td.acm-pending')).toHaveText('?')
+  await expect(rows.nth(1).locator('td.acm-failed')).toHaveText('−3')
 })

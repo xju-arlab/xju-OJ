@@ -14,7 +14,7 @@ import { LockKeyhole } from 'lucide-vue-next'
 const props = defineProps({ record: { type: Object, required: true }, inline: Boolean })
 const finite = value => typeof value === 'number' && Number.isFinite(value)
 const score = value => finite(value) ? value.toFixed(1) : '待返回'
-const labels = { PENDING: '排队中', JUDGING: '评测中', TRAINING: '训练中', SCORING: '评分中', RUNNING: '运行中', SUCCEEDED: '运行完成', CANCELLED: '已取消', COMPILE_ERROR: '编译错误', RUNTIME_ERROR: '运行失败', TIME_LIMIT: '超时', MEMORY_LIMIT: '内存超限', SYSTEM_ERROR: '系统错误', FAILED: '评测失败' }
+const labels = { PENDING: '排队中', JUDGING: '评测中', TRAINING: '训练中', SCORING: '评分中', RUNNING: '运行中', SUCCEEDED: '运行完成', CANCELLED: '已取消', COMPILE_ERROR: '编译错误', RUNTIME_ERROR: '运行失败', TIME_LIMIT: '超时', MEMORY_LIMIT: '内存超限', SYSTEM_ERROR: '系统错误', FAILED: '评测失败', REVIEWING: '待评阅', SUPERSEDED: '已被替代' }
 const label = computed(() => {
   const item = props.record
   if (item.status === 'SCORED' && item.type === 'challenge') return '公榜 ' + score(item.publicScore) + ' 分；' + (item.privatePublished ? '私榜 ' + score(item.privateScore) + ' 分' : '私榜未公布')
@@ -32,7 +32,8 @@ const tone = computed(() => {
   const status = props.record.status
   if (['ACCEPTED', 'SUCCEEDED'].includes(status)) return 'success'
   if (['WRONG_ANSWER', 'FAILED', 'RUNTIME_ERROR', 'SYSTEM_ERROR', 'TIME_LIMIT', 'MEMORY_LIMIT', 'CANCELLED'].includes(status)) return 'error'
-  if (['PENDING', 'COMPILE_ERROR'].includes(status)) return 'warning'
+  if (['PENDING', 'COMPILE_ERROR', 'REVIEWING'].includes(status)) return 'warning'
+  if (status === 'SUPERSEDED') return 'neutral'
   return 'info'
 })
 </script>

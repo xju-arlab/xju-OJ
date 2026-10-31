@@ -64,11 +64,15 @@ def main():
         return result["data"]
 
     while True:
+        delay = 0.5  # Poll briskly while idle; claim again at once after a job.
         try:
             if notebook:
                 notebook.reap_idle()
             job = call("claim")
+            if not job and notebook:
+                notebook.ensure_spare()
             if job:
+                delay = 0
                 log.info("Claimed %s %s", job["kind"], job["id"])
 
                 def heartbeat(**data):
@@ -91,9 +95,10 @@ def main():
                 log.info("Finished %s: %s", job["id"], result["status"])
         except (RemoteError, OSError) as exc:
             log.error("Compute service request failed: %s", type(exc).__name__)
+            delay = 3
         if args.once:
             return
-        time.sleep(2)
+        time.sleep(delay)
 
 
 if __name__ == "__main__":

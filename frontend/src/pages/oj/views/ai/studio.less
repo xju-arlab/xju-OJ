@@ -179,6 +179,16 @@
   .studio-quiz-options label:has(input:focus-visible) { outline: 2px solid var(--color-link); outline-offset: 2px; }
   .studio-quiz-letter { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 20px; height: 20px; margin-top: 1px; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--color-text-muted); font: 600 10px var(--font-mono); }
   .selected .studio-quiz-letter { border-color: var(--color-link); background: var(--color-link); color: white; }
+  .studio-quiz-text { margin-top: 12px; }
+  .studio-quiz-text textarea { display: block; width: 100%; min-height: 160px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--color-text); background: white; font: 14px/1.75 var(--font-sans); resize: vertical; }
+  .studio-quiz-text small { display: block; margin-top: 6px; color: var(--color-text-faint); font-size: 11px; text-align: right; }
+  .studio-statement-block > p + p, .studio-statement-block > p + ul, .studio-statement-block > p + ol, .studio-statement-block > ul + p, .studio-statement-block > ol + p { margin-top: 8px; }
+  .studio-statement-block ul, .studio-statement-block ol { margin: 6px 0 0; padding-left: 22px; }
+  .studio-statement-block li + li { margin-top: 4px; }
+  .studio-statement-block li > ul { margin-top: 4px; }
+  .studio-signature-list li { line-height: 1.85; }
+  .studio-signature-list code, .studio-requirements code { font-size: 12px; }
+  .studio-requirements { padding-left: 22px; color: var(--color-text-muted); font-size: 13px; }
   .studio-quiz-number { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
   .studio-quiz-number input { width: 200px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--color-text); background: white; font: 13px var(--font-mono); }
   .studio-quiz-number small { flex-basis: 100%; color: var(--cat-research); font-size: 11px; }

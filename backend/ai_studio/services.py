@@ -15,7 +15,7 @@ from utils.api import APIError
 from utils.constants import ContestRuleType, ContestStatus
 from .contracts import ACTIVE, MAX_PREDICTION_BYTES, cells_input, require
 from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIServiceState, AIWorker
-from .quiz import answers_input, grade
+from .quiz import answers_input, grade, manual_input, review_ceiling, text_questions
 
 
 def contest_access(request, contest_id, *, content=True, write=False):
@@ -96,7 +96,7 @@ def contest_detail(request, contest_id):
     contest, config = contest_access(request, contest_id, content=False)
     result = dict(ContestSerializer(contest).data)
     result.update({"id": str(contest.id), "now": now().isoformat(), "registered": contest.is_registered(request.user),
-                   "scorePolicy": config.selection, "privatePublished": config.private_published and contest.end_time < now(),
+                   "scorePolicy": config.selection, "ranking": config.ranking, "privatePublished": config.private_published and contest.end_time < now(),
                    "practiceEnabled": config.practice_enabled, "problems": [], "accessError": "",
                    "totalPoints": sum(AIContestProblem.objects.filter(contest=contest).values_list("points", flat=True))})
     try:
@@ -155,12 +155,61 @@ def create_quiz_job(request, data, problem, contest, job_id):
     if official and limit:
         # The user row lock above serializes this count against concurrent submissions.
         require(quiz_attempts(user, problem, contest) < limit, f"本题在比赛中最多提交 {limit} 次")
-    score = grade(problem.statement["quiz"], problem.judge["answers"], payload["answers"])
-    status = "ACCEPTED" if score >= problem.judge.get("pass_score", 100) else "PARTIAL" if score > 0 else "WRONG_ANSWER"
+    quiz, key, pass_score = problem.statement["quiz"], problem.judge["answers"], problem.judge.get("pass_score", 100)
+    fields = {"status": quiz_status(grade(quiz, key, payload["answers"]), pass_score),
+              "public_score": grade(quiz, key, payload["answers"]), "finished_at": stamp}
+    if review_ceiling(quiz, key, payload["answers"]) >= pass_score and any(payload["answers"][q["id"]] for q in text_questions(quiz)):
+        # Only a card that can still pass waits for a teacher; a newer card replaces an unreviewed one.
+        fields = {"status": "REVIEWING", "public_score": None, "finished_at": None, "message": "客观题已判分，主观题待老师评阅。"}
+        AIJob.objects.filter(user=user, problem=problem, contest=contest, kind="evaluation", status="REVIEWING").update(
+            status="SUPERSEDED", finished_at=stamp, message="已被新的提交替代，未评阅。")
     return AIJob.objects.create(id=job_id, user=user, problem=problem, contest=contest, kind="evaluation",
                                official=official, category="quiz", problem_version=problem.version,
-                               payload=payload, source_sha256=digest, judge=problem.judge.copy(),
-                               status=status, public_score=score, finished_at=stamp)
+                               payload=payload, source_sha256=digest, judge=problem.judge.copy(), **fields)
+
+
+def quiz_status(score, pass_score):
+    return "ACCEPTED" if score >= pass_score else "PARTIAL" if score > 0 else "WRONG_ANSWER"
+
+
+def reviewable_jobs(user):
+    """Quiz submissions this admin may score: own or All-permission problems, or contests they administer."""
+    jobs = AIJob.objects.filter(category="quiz", kind="evaluation").select_related("problem", "contest", "user", "user__userprofile")
+    if user.is_super_admin():
+        return jobs
+    owned = Q(problem__created_by=user) | Q(contest__created_by=user)
+    return jobs if user.can_mgmt_all_problem() else jobs.filter(owned)
+
+
+def review_item(job):
+    quiz, key = job.problem.statement.get("quiz", {}), job.judge.get("answers", {})
+    return {"id": str(job.id), "problemId": job.problem.code, "title": job.problem.title, "username": job.user.username,
+            "realName": getattr(getattr(job.user, "userprofile", None), "real_name", None),
+            "contestId": job.contest_id, "official": job.official, "createdAt": job.created_at.isoformat(),
+            "status": job.status, "publicScore": job.public_score, "review": job.output.get("review"),
+            "objectiveScore": grade(quiz, key, job.payload["answers"]),
+            "questions": [{"id": q["id"], "prompt": q["prompt"], "points": q["points"], "rubric": key[q["id"]]["rubric"],
+                           "answer": job.payload["answers"].get(q["id"])} for q in text_questions(quiz)]}
+
+
+@transaction.atomic
+def review_job(user, data):
+    try:
+        job_id = uuid.UUID(str(data.get("id", "")))
+    except ValueError:
+        raise APIError("Invalid submission ID")
+    job = reviewable_jobs(user).select_for_update(of=("self",)).filter(pk=job_id).first()
+    require(job is not None, "提交不存在或无评阅权限")
+    require(job.status == "REVIEWING", "该提交不在待评阅状态")
+    quiz, key = job.problem.statement["quiz"], job.judge["answers"]
+    manual = manual_input(quiz, job.payload["answers"], data.get("scores"))
+    job.public_score = grade(quiz, key, job.payload["answers"], manual)
+    job.status = quiz_status(job.public_score, job.judge.get("pass_score", 100))
+    job.output = {**job.output, "review": {"scores": manual, "reviewer": user.username, "at": now().isoformat()}}
+    job.message = ""
+    job.finished_at = now()
+    job.save()
+    return job
 
 
 @transaction.atomic
@@ -267,6 +316,38 @@ def problem_leaderboard(request, data):
     return {"privatePublished": private, "selection": selection, "results": rows}
 
 
+ACM_PENALTY_SECONDS = 20 * 60
+# Platform failures and unreviewed, replaced quiz cards never cost penalty time.
+ACM_IGNORED = ("SYSTEM_ERROR", "CANCELLED", "SUPERSEDED")
+
+
+def acm_leaderboard(contest, jobs):
+    rows = {}
+    for job in jobs.order_by("created_at", "id"):
+        row = rows.setdefault(job.user_id, {"userId": job.user_id, "username": job.user.username,
+                                            "solved": 0, "penalty": 0, "scores": {}})
+        cell = row["scores"].setdefault(job.problem.code, {"accepted": False, "tries": 0, "time": None, "pending": 0,
+                                                            "status": None, "submissionId": None})
+        if cell["accepted"] or job.status in ACM_IGNORED:
+            continue
+        if job.status in ACTIVE or job.status == "REVIEWING":
+            cell["pending"] += 1
+            continue
+        cell["status"], cell["submissionId"] = job.status, str(job.id)
+        if job.status == "ACCEPTED":
+            cell["accepted"] = True
+            cell["time"] = max(0, int((job.created_at - contest.start_time).total_seconds()))
+            row["solved"] += 1
+            row["penalty"] += cell["time"] + ACM_PENALTY_SECONDS * cell["tries"]
+        else:
+            cell["tries"] += 1
+    result = sorted(rows.values(), key=lambda row: (-row["solved"], row["penalty"], row["username"], row["userId"]))
+    for index, row in enumerate(result):
+        same = index and (row["solved"], row["penalty"]) == (result[index - 1]["solved"], result[index - 1]["penalty"])
+        row["rank"] = result[index - 1]["rank"] if same else index + 1
+    return result
+
+
 def leaderboard(request, contest_id):
     contest, config = contest_access(request, contest_id)
     require(contest.real_time_rank or contest.end_time < now() or request.user.is_contest_admin(contest),
@@ -274,6 +355,9 @@ def leaderboard(request, contest_id):
     private = config.private_published and contest.end_time < now()
     weights = dict(AIContestProblem.objects.filter(contest=contest).values_list("problem_id", "points"))
     jobs = AIJob.objects.filter(contest=contest, official=True, kind="evaluation", user__is_disabled=False).select_related("user", "problem")
+    if config.ranking == "acm":
+        return {"privatePublished": private, "selection": config.selection, "ranking": "acm",
+                "results": acm_leaderboard(contest, jobs)}
     selected = select_scores(jobs, config.selection, private)
     rows = {}
     for (user_id, problem_id), (job, score) in selected.items():
@@ -290,4 +374,4 @@ def leaderboard(request, contest_id):
             rank = index + 1
         row["rank"] = rank
         last_score = row["total"]
-    return {"privatePublished": private, "selection": config.selection, "results": result}
+    return {"privatePublished": private, "selection": config.selection, "ranking": "score", "results": result}

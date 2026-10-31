@@ -209,3 +209,100 @@ class QuizAPITests(APITestCase):
         self.assertEqual((copy.statement, copy.judge), (problem.statement, problem.judge))
         self.assertNotEqual(copy.code, problem.code)
         self.assertFalse(AIDraft.objects.exists())
+
+
+TEXT_CARD = {"questions": [
+    {"id": "q1", "kind": "single", "prompt": "任务类型", "options": ["回归", "分类"], "points": 40},
+    {"id": "essay", "kind": "text", "prompt": "说明你的建模方案", "points": 60},
+]}
+TEXT_KEY = {"q1": {"answer": 0}, "essay": {"rubric": "特征处理 20；模型与损失 20；验证方式 20"}}
+
+
+class QuizReviewAndACMTests(APITestCase):
+    def setUp(self):
+        self.root = tempfile.TemporaryDirectory()
+        self.addCleanup(self.root.cleanup)
+        settings = override_settings(DATA_DIR=self.root.name)
+        settings.enable(); self.addCleanup(settings.disable)
+        self.teacher = self.create_admin()
+        stream = io.BytesIO(quiz_fixture(card=TEXT_CARD, key=TEXT_KEY, media={}, evaluation={"pass_score": 80})); stream.name = "essay.zip"
+        upload = self.client.post("/api/admin/ai/packages", {"file": stream}, format="multipart")
+        confirm = self.client.post("/api/admin/ai/packages/confirm", {"id": upload.data["data"]["id"], "publish": False}, format="json")
+        self.problem = AIProblem.objects.get(code=confirm.data["data"]["result"][0]["id"])
+        self.contest = Contest.objects.create(title="ACM", description="", rule_type="AI", start_time=now() - timedelta(minutes=30),
+                                              end_time=now() + timedelta(minutes=30), real_time_rank=True, visible=True,
+                                              created_by=self.teacher)
+        AIContestConfig.objects.create(contest=self.contest, ranking="acm")
+        AIContestProblem.objects.create(contest=self.contest, problem=self.problem, position=0, points=10)
+        self.scope = {"contest_id": self.contest.id}
+
+    def submit(self, answers):
+        result = self.client.post("/api/ai/jobs", {"id": str(uuid.uuid4()), "problem_id": self.problem.code, "answers": answers,
+                                                  **self.scope}, format="json")
+        self.assertSuccess(result)
+        return result.data["data"]
+
+    def test_text_questions_require_rubric_and_bound_answers(self):
+        with self.assertRaises(PackageError):
+            parse_package(quiz_fixture(card=TEXT_CARD, key={**TEXT_KEY, "essay": {"answer": 1}}, media={}))
+        card = parse_package(quiz_fixture(card=TEXT_CARD, key=TEXT_KEY, media={}))[0]["metadata"]["quiz"]
+        self.assertEqual(answers_input(card, {"essay": "  "}), {"q1": None, "essay": None})
+        with self.assertRaises(Exception):
+            answers_input(card, {"essay": "x" * 2001})
+
+    def test_review_flow_supersedes_scores_and_ranks(self):
+        self.create_user("student", "student")
+        self.client.post("/api/contest/register", {"contest_id": self.contest.id}, format="json")
+        hopeless = self.submit({"q1": 1, "essay": "方案"})  # 0 + 60 < 80: decided at once, the essay is not reviewed
+        self.assertEqual((hopeless["status"], hopeless["publicScore"]), ("WRONG_ANSWER", 0))
+        first = self.submit({"q1": 0, "essay": "初稿"})
+        self.assertEqual((first["status"], first["publicScore"]), ("REVIEWING", None))
+        second = self.submit({"q1": 0, "essay": "完整方案"})
+        self.assertEqual(AIJob.objects.get(pk=first["id"]).status, "SUPERSEDED")
+        board = self.client.get("/api/ai/leaderboard", self.scope).data["data"]
+        cell = board["results"][0]["scores"][self.problem.code]
+        self.assertEqual((board["ranking"], cell["pending"], cell["tries"], cell["accepted"]), ("acm", 1, 1, False))
+        self.assertFailed(self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 50}}, format="json"))
+        self.client.force_login(self.teacher)
+        pending = self.client.get("/api/admin/ai/reviews").data["data"]["results"]
+        self.assertEqual([item["id"] for item in pending], [second["id"]])
+        self.assertEqual(pending[0]["questions"][0]["rubric"], TEXT_KEY["essay"]["rubric"])
+        self.assertEqual(pending[0]["questions"][0]["answer"], "完整方案")
+        self.assertFailed(self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 61}}, format="json"))
+        graded = self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 45}}, format="json")
+        self.assertSuccess(graded)
+        self.assertEqual((graded.data["data"]["status"], graded.data["data"]["publicScore"]), ("ACCEPTED", 85))
+        self.assertFailed(self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 60}}, format="json"))
+        row = self.client.get("/api/ai/leaderboard", self.scope).data["data"]["results"][0]
+        cell = row["scores"][self.problem.code]
+        # One wrong try before the accepted card; the superseded card costs nothing.
+        self.assertEqual((row["solved"], cell["tries"], cell["accepted"]), (1, 1, True))
+        self.assertEqual(row["penalty"], cell["time"] + 20 * 60)
+        self.assertEqual(self.client.get("/api/admin/ai/reviews").data["data"]["total"], 0)
+        self.assertEqual(self.client.get("/api/admin/ai/reviews", {"status": "done"}).data["data"]["total"], 1)
+
+    def test_acm_order_ties_and_ignored_failures(self):
+        users = [self.create_user(name, name, login=False) for name in ("ann", "bob", "cat")]
+        base = self.contest.start_time
+        def job(user, status, minutes):
+            item = AIJob.objects.create(user=user, problem=self.problem, contest=self.contest, kind="evaluation", official=True,
+                                        category="quiz", problem_version=1, source_sha256="a" * 64, status=status)
+            AIJob.objects.filter(pk=item.pk).update(created_at=base + timedelta(minutes=minutes))
+        job(users[0], "SYSTEM_ERROR", 1); job(users[0], "ACCEPTED", 10)  # 10 min, system errors are free
+        job(users[1], "PARTIAL", 2); job(users[1], "ACCEPTED", 5); job(users[1], "WRONG_ANSWER", 6)  # 5 + 20 min
+        job(users[2], "WRONG_ANSWER", 3)
+        self.client.force_login(self.teacher)
+        rows = self.client.get("/api/ai/leaderboard", self.scope).data["data"]["results"]
+        self.assertEqual([(r["username"], r["rank"], r["solved"], r["penalty"] // 60) for r in rows],
+                         [("ann", 1, 1, 10), ("bob", 2, 1, 25), ("cat", 3, 0, 0)])
+        detail = self.client.get("/api/ai/contest", self.scope).data["data"]
+        self.assertEqual(detail["ranking"], "acm")
+
+    def test_contest_ranking_setting_is_frozen_after_start(self):
+        payload = {"contest_id": self.contest.id, "selection": "latest", "ranking": "score", "private_published": False,
+                   "practice_enabled": True, "problems": [{"id": self.problem.code, "points": 10}]}
+        self.assertEqual(self.client.get("/api/admin/ai/contest", {"contest_id": self.contest.id}).data["data"]["ranking"], "acm")
+        self.assertFailed(self.client.put("/api/admin/ai/contest", payload, format="json"))
+        Contest.objects.filter(pk=self.contest.pk).update(start_time=now() + timedelta(minutes=5), end_time=now() + timedelta(hours=1))
+        self.assertSuccess(self.client.put("/api/admin/ai/contest", payload, format="json"))
+        self.assertEqual(AIContestConfig.objects.get(contest=self.contest).ranking, "score")

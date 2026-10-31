@@ -7,13 +7,17 @@
     <div class="studio-notebook-scroll">
       <article v-for="(question, index) in questions" :key="question.id" :class="['studio-quiz-question', { answered: isAnswered(question) }]">
         <header class="studio-quiz-heading"><span class="studio-cell-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ kindLabels[question.kind] }}</strong><span class="studio-quiz-points">{{ question.points }} 分</span></header>
-        <p class="studio-quiz-prompt"><StatementText :text="question.prompt" /></p>
+        <StatementBlock class="studio-quiz-prompt" :text="question.prompt" />
         <p v-if="question.materials.length" class="studio-quiz-refs">参考材料：<span v-for="id in question.materials" :key="id">{{ materialTitle(id) }}</span></p>
         <div v-if="question.kind === 'single' || question.kind === 'multiple'" class="studio-quiz-options" :role="question.kind === 'single' ? 'radiogroup' : 'group'" :aria-label="'第 ' + (index + 1) + ' 题选项'">
           <label v-for="(option, optionIndex) in question.options" :key="optionIndex" :class="{ selected: isSelected(question, optionIndex) }">
             <input :type="question.kind === 'single' ? 'radio' : 'checkbox'" :name="question.id" :checked="isSelected(question, optionIndex)" :disabled="!authenticated" @change="choose(question, optionIndex, $event.target.checked)" />
             <span class="studio-quiz-letter">{{ letters[optionIndex] }}</span><StatementText :text="option" />
           </label>
+        </div>
+        <div v-else-if="question.kind === 'text'" class="studio-quiz-text">
+          <textarea :value="answers[question.id] ?? ''" :maxlength="2000" rows="8" :disabled="!authenticated" :aria-label="'第 ' + (index + 1) + ' 题作答'" placeholder="在这里写出你的答案" @input="setAnswer(question.id, $event.target.value || null)" />
+          <small>{{ (answers[question.id] || '').length }} / 2000 · 由老师评阅</small>
         </div>
         <div v-else-if="question.kind === 'number'" class="studio-quiz-number">
           <input type="text" inputmode="decimal" autocomplete="off" :value="numbers[question.id] ?? ''" :disabled="!authenticated" :aria-label="'第 ' + (index + 1) + ' 题数值'" placeholder="填写数值" @input="setNumber(question, $event.target.value)" />
@@ -35,9 +39,9 @@
     <div v-if="dialog" class="studio-dialog-overlay" @click.self="dialog = ''" @keydown.esc="dialog = ''">
       <section class="studio-dialog" role="dialog" aria-modal="true" :aria-label="dialogTitle">
         <h2>{{ dialogTitle }}</h2>
-        <template v-if="dialog === 'submit'"><p>已作答 {{ answeredCount }} / {{ questions.length }} 题，未作答的小题记 0 分。提交后按本次作答计分，只显示总分。</p><p v-if="attemptText">{{ attemptText }}。</p></template>
+        <template v-if="dialog === 'submit'"><p>已作答 {{ answeredCount }} / {{ questions.length }} 题，未作答的小题记 0 分。</p><p v-if="attemptText">{{ attemptText }}。</p></template>
         <p v-else-if="dialog === 'reset'">当前作答将全部清空。</p>
-        <template v-else-if="latest"><p>本次得分 {{ latest.publicScore ?? '—' }} / 100。</p><p class="studio-footnote">{{ latest.problemId }} · {{ latest.id.slice(0, 8) }} · {{ formatDate(latest.createdAt) }}（北京时间）</p></template>
+        <template v-else-if="latest"><p>{{ latest.status === 'REVIEWING' ? '客观题已判分，主观题等待老师评阅，评阅后计入成绩。' : '本次得分 ' + (latest.publicScore ?? '—') + ' / 100。' }}</p><p class="studio-footnote">{{ latest.problemId }} · {{ latest.id.slice(0, 8) }} · {{ formatDate(latest.createdAt) }}（北京时间）</p></template>
         <div class="studio-dialog-actions">
           <button class="studio-button" @click="dialog = ''">{{ dialog === 'result' ? '关闭' : '取消' }}</button>
           <button v-if="dialog === 'submit'" class="studio-button primary" @click="submit">确认提交</button>
@@ -58,13 +62,14 @@ import { formatDate } from './studio'
 import { studioApi } from './api'
 import EvaluationStatus from './EvaluationStatus.vue'
 import StatementText from './StatementText.vue'
+import StatementBlock from './StatementBlock.vue'
 
 const props = defineProps({
   problem: { type: Object, required: true },
   contestId: { type: String, default: '' },
   authenticated: { type: Boolean, default: false }
 })
-const kindLabels = { single: '单选题', multiple: '多选题', number: '数值题', order: '排序题' }
+const kindLabels = { single: '单选题', multiple: '多选题', number: '数值题', order: '排序题', text: '主观题' }
 const letters = 'ABCDEFGHIJKL'
 const NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/
 const answers = ref({}); const numbers = ref({}); const invalid = ref({})

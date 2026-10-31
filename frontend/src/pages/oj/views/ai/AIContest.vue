@@ -29,7 +29,8 @@
           <div><dt><CalendarDays aria-hidden="true" />开始时间</dt><dd>{{ formatDate(contest.start_time) }} <small>北京时间</small></dd></div>
           <div><dt><Clock3 aria-hidden="true" />比赛时长</dt><dd>{{ Math.round((Date.parse(contest.end_time) - Date.parse(contest.start_time)) / 60000) }} 分钟</dd></div>
           <div><dt><MapPin aria-hidden="true" />创建者</dt><dd>{{ contest.created_by?.username }}</dd></div>
-          <div><dt><Award aria-hidden="true" />总分</dt><dd>{{ totalPoints }} 分</dd></div>
+          <div v-if="acm"><dt><Award aria-hidden="true" />排名</dt><dd>ACM</dd></div>
+          <div v-else><dt><Award aria-hidden="true" />总分</dt><dd>{{ totalPoints }} 分</dd></div>
         </dl>
       </section>
 
@@ -68,7 +69,7 @@
             <dl>
               <div><dt>赛制</dt><dd class="contest-rule rule-ai">AI</dd></div>
               <div><dt>说明</dt><dd>{{ $t('m.AI_Evaluation') }}</dd></div>
-              <div><dt>计分</dt><dd>{{ contest.scorePolicy === 'best' ? '最高得分' : '最后一次提交' }}</dd></div>
+              <div><dt>{{ acm ? '排名' : '计分' }}</dt><dd>{{ acm ? '通过题数多者在前；同题数比罚时，罚时 = 各题首次通过用时 + 之前每次错误 20 分钟' : contest.scorePolicy === 'best' ? '最高得分' : '最后一次提交' }}</dd></div>
               <div><dt>作答方式</dt><dd>Notebook</dd></div>
               <div><dt>赛后练习</dt><dd>与正式成绩分开</dd></div>
             </dl>
@@ -116,6 +117,7 @@
             <p>{{ scoreError || '正式比赛提交评测完成后，将在这里显示成绩。' }}</p>
             <router-link class="ai-preview-link" :to="{ name: 'ai-submissions' }">查看我的提交<ChevronRight :size="14" aria-hidden="true" /></router-link>
           </div>
+          <div v-else-if="acm" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th>通过</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td>{{ row.solved }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="acmClass(row.scores[item.id])">{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></td></tr></tbody></table><p class="ai-contest-note">ACM 排名 · 罚时单位为分钟 · 「?」表示评测中</p></div>
           <div v-else class="problem-table-wrap"><table class="contest-problem-table"><thead><tr><th>排名</th><th>选手</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th><th>总分</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-for="item in contestProblems" :key="item.id">{{ row.scores[item.id]?.score ?? '—' }}</td><td>{{ row.total }}</td></tr></tbody></table><p class="ai-contest-note">{{ contest.privatePublished ? '私榜已公布' : '当前为公榜成绩' }} · {{ contest.scorePolicy === 'best' ? '最高得分' : '最后一次提交' }}</p></div>
         </section>
       </main>
@@ -140,6 +142,9 @@ const error = ref(''); const scoreError = ref(''); const password = ref(''); con
 const authenticated = computed(() => store.getters.isAuthenticated)
 const contestProblems = computed(() => contest.value?.problems || [])
 const totalPoints = computed(() => contest.value?.totalPoints || 0)
+const acm = computed(() => contest.value?.ranking === 'acm')
+const acmClass = cell => !cell ? '' : cell.accepted ? 'acm-accepted' : cell.pending ? 'acm-pending' : cell.tries ? 'acm-failed' : ''
+const acmMark = cell => !cell ? '' : cell.accepted ? '+' + (cell.tries || '') : cell.pending ? '?' : cell.tries ? '−' + cell.tries : ''
 const description = computed(() => DOMPurify.sanitize(contest.value?.description || ''))
 const statusLabel = computed(() => ({ '0': '进行中', '1': '未开始', '-1': '已结束' })[contest.value?.status] || '')
 const statusClass = computed(() => ({ '0': 'status-underway', '1': 'status-not-started', '-1': 'status-ended' })[contest.value?.status] || '')
@@ -210,6 +215,10 @@ onBeforeUnmount(() => { generation++; clearTimeout(timer) })
 .ai-preview-link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-top: 16px; color: var(--color-link); font-size: 12px; }
 .contest-guide > .ai-preview-link { display: flex; }
 .ai-contest-note { margin: 14px 0 0; color: var(--color-text-faint); font-size: 11px; line-height: 1.8; }
+.ai-acm-board td small { display: block; color: var(--color-text-faint); font-size: 10px; }
+.ai-acm-board .acm-accepted { color: var(--oj-success); font-weight: 600; }
+.ai-acm-board .acm-failed { color: var(--oj-danger); }
+.ai-acm-board .acm-pending { color: var(--oj-info); }
 .problem-table-wrap { position: relative; }
 .contest-problem-table { min-width: 760px; }
 .contest-problem-table .problem-status { width: auto; white-space: nowrap; }

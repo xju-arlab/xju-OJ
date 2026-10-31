@@ -13,14 +13,10 @@
           <nav class="studio-tabs small" aria-label="题目资料"><button v-for="tab in infoTabs" :key="tab.id" :class="{ active: infoTab === tab.id }" @click="infoTab = tab.id">{{ tab.name }}</button></nav>
           <div v-if="infoTab === 'description'" class="studio-prose">
             <h2>任务目标</h2>
-            <p><StatementText :text="problem.objective" /></p>
-            <template v-if="problem.requirements.length">
-              <h2>{{ problem.type === 'quiz' ? '作答说明' : '实现要求' }}</h2>
-              <ol><li v-for="item in problem.requirements" :key="item"><StatementText :text="item" /></li></ol>
-            </template>
+            <StatementBlock :text="problem.objective" />
             <template v-if="problem.signature">
               <h2>接口约定</h2>
-              <pre class="studio-signature"><code>{{ problem.signature }}</code></pre>
+              <StatementBlock class="studio-signature-list" :text="problem.signature" list />
             </template>
             <template v-if="problem.type === 'quiz' && problem.quiz.materials.length">
               <h2>场景材料</h2>
@@ -33,21 +29,25 @@
             </template>
             <template v-if="problem.inputSpec">
               <h2>输入</h2>
-              <div class="studio-io-description"><p v-for="(line, index) in statementLines(problem.inputSpec)" :key="index"><StatementText :text="line" /></p></div>
+              <StatementBlock class="studio-io-description" :text="problem.inputSpec" />
             </template>
             <template v-if="problem.outputSpec">
               <h2>输出</h2>
-              <div class="studio-io-description"><p v-for="(line, index) in statementLines(problem.outputSpec)" :key="index"><StatementText :text="line" /></p></div>
+              <StatementBlock class="studio-io-description" :text="problem.outputSpec" />
+            </template>
+            <template v-if="problem.requirements.length">
+              <h2>{{ problem.type === 'quiz' ? '作答说明' : '实现要求' }}</h2>
+              <ul class="studio-requirements"><li v-for="item in problem.requirements" :key="item"><StatementText :text="item" /></li></ul>
             </template>
           </div>
           <div v-else-if="infoTab === 'data'" class="studio-prose">
-            <h2>数据说明</h2><p><StatementText :text="problem.data" /></p>
+            <h2>数据说明</h2><StatementBlock :text="problem.data" />
             <div class="studio-files">
               <div v-for="name in problem.files" :key="name" class="studio-file-row"><FileCode :size="18" /><strong>{{ name }}</strong><a class="studio-text-button" :href="dataUrl(name)"><Download :size="14" />下载</a></div>
               <div v-if="problem.type !== 'quiz'" class="studio-file-row"><NotebookPen :size="18" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook"><Download :size="14" />下载</button></div>
             </div>
           </div>
-          <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><p><StatementText :text="problem.evaluation" /></p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
+          <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><StatementBlock :text="problem.evaluation" /><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
           <ProblemRanking v-else :problem-id="problem.id" :contest-id="contestId" :authenticated="authenticated" />
           <div class="studio-problem-pagination"><router-link v-if="previous" :to="problemRoute(previous.id)"><ArrowLeft :size="14" />上一题</router-link><span v-else></span><router-link v-if="next" :to="problemRoute(next.id)">下一题<ArrowRight :size="14" /></router-link></div>
         </section>
@@ -59,7 +59,7 @@
           </div>
           <div class="studio-notebook-scroll">
             <article v-for="(code, index) in cells" :key="activeKey + index" :class="['studio-cell', 'cell-' + cellStatus(index).toLowerCase()]" :data-cell-state="cellStatus(index)" @keydown.shift.enter.capture.prevent.stop="runCell(index, true)">
-              <div class="studio-cell-heading"><span class="studio-cell-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ cellTitles[index] || '代码单元格' }}</strong><span v-if="cellStatus(index) !== 'IDLE'" class="studio-cell-state"><Check v-if="cellStatus(index) === 'SUCCEEDED'" :size="12" /><X v-else-if="cellStatus(index) === 'ERROR'" :size="12" />{{ cellLabels[cellStatus(index)] }}</span><span class="studio-cell-language">Python</span><button class="studio-icon-button studio-cell-run" :disabled="running || !authenticated" :aria-label="'运行第 ' + (index + 1) + ' 个单元格'" title="运行当前单元格 · Shift+Enter 运行并前进" @click="runCell(index)"><LoaderCircle v-if="cellStatus(index) === 'RUNNING'" class="studio-spin" :size="14" /><Play v-else :size="14" /></button></div>
+              <div class="studio-cell-heading"><span class="studio-cell-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ cellTitle(code) }}</strong><span v-if="cellStatus(index) !== 'IDLE'" class="studio-cell-state"><Check v-if="cellStatus(index) === 'SUCCEEDED'" :size="12" /><X v-else-if="cellStatus(index) === 'ERROR'" :size="12" />{{ cellLabels[cellStatus(index)] }}</span><span class="studio-cell-language">Python</span><button class="studio-icon-button studio-cell-run" :disabled="running || !authenticated" :aria-label="'运行第 ' + (index + 1) + ' 个单元格'" title="运行当前单元格 · Shift+Enter 运行并前进" @click="runCell(index)"><LoaderCircle v-if="cellStatus(index) === 'RUNNING'" class="studio-spin" :size="14" /><Play v-else :size="14" /></button></div>
               <div class="studio-cell-input"><span class="studio-cell-prompt">[{{ cellStatus(index) === 'RUNNING' ? '*' : outputs[index]?.execution_count ?? ' ' }}]</span><CodeMirror :ref="editor => { cellEditors[index] = editor }" :model-value="code" mode="text/x-python" @update:model-value="value => updateCell(index, value)" /></div>
               <div v-if="hasOutput(index)" class="studio-cell-output"><pre>{{ outputs[index].text }}</pre><img v-for="(png, imageIndex) in outputs[index].png" :key="imageIndex" :src="'data:image/png;base64,' + png" alt="单元格输出图表" /></div>
             </article>
@@ -94,6 +94,7 @@ import EvaluationStatus from './EvaluationStatus.vue'
 import ProblemRanking from './ProblemRanking.vue'
 import QuizCard from './QuizCard.vue'
 import StatementText from './StatementText.vue'
+import StatementBlock from './StatementBlock.vue'
 import './studio.less'
 
 const route = useRoute()
@@ -120,8 +121,8 @@ const predictionName = ref(''); const predictions = ref('')
 const oldBackup = ref(null)
 const infoTab = ref('description'); const showReset = ref(false); const snapshot = ref(null)
 const infoTabs = [{ id: 'description', name: '题目' }, { id: 'data', name: '数据与框架' }, { id: 'evaluation', name: '评测' }, { id: 'ranking', name: '排行' }]
-const cellTitles = ['准备环境', '完成你的实现', '公开样例']
-const statementLines = value => value.split(/\n+/).filter(line => line.trim())
+// Name each cell after the functions or classes it defines.
+const cellTitle = code => [...code.matchAll(/^(?:def|class)\s+(\w+)/gm)].map(match => match[1]).slice(0, 3).join(' · ') || '代码单元格'
 const previous = ref(null); const next = ref(null)
 const dataUrl = name => '/api/ai/file?' + new URLSearchParams({ problem_id: problem.value.id, contest_id: contestId.value, name })
 const problemRoute = id => ({ name: 'ai-problem', params: { problemID: id }, query: contestId.value ? { contest: contestId.value } : {} })
@@ -287,7 +288,7 @@ async function poll (id, kind, current) {
     if (current !== generation) return
     if (kind === 'evaluation' && latestEvaluation.value?.id === id) latestEvaluation.value = result
     if (kind === 'notebook') applyNotebookResult(result)
-    if (activeStatuses.has(result.status)) { polls.set(id, setTimeout(() => poll(id, kind, current), kind === 'notebook' ? 1000 : 2000)); return }
+    if (activeStatuses.has(result.status)) { polls.set(id, setTimeout(() => poll(id, kind, current), kind === 'notebook' ? 400 : 2000)); return }
   } catch (failure) {
     if (current === generation) { error.value = failure.message; polls.set(id, setTimeout(() => poll(id, kind, current), 10000)) }
   }

@@ -25,6 +25,7 @@
     <el-sub-menu v-if="hasProblemPermission" index="ai-problem">
       <template #title><Icon type="ios-analytics" />AI 题库</template>
       <el-menu-item index="/ai/problems">题目管理</el-menu-item>
+      <el-menu-item index="/ai/reviews">主观题评阅</el-menu-item>
       <el-menu-item index="/ai/problem/batch_ops">导入 / 导出</el-menu-item>
     </el-sub-menu>
   </el-menu>

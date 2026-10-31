@@ -53,6 +53,26 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(recovered["output"]["kernel_reset"])
         self.assertTrue(all(cell["execution_count"] is None for cell in recovered["output"]["cells"]))
 
+    def test_spare_kernel_is_adopted_within_the_pool_budget(self):
+        executor = NotebookExecutor(os.environ.get("AI_NOTEBOOK_IMAGE", "xju-ai-notebook:dev"), max_kernels=2)
+        self.addCleanup(executor.close)
+        executor.ensure_spare()
+        spare = executor.spare["name"]
+        key = uuid.uuid4().hex
+        job = {"id": str(uuid.uuid4()), "lease": uuid.uuid4().hex, "judge": {"run_seconds": 15},
+               "payload": {"kernel_id": key, "cells": ["value = 5", "print(value * 2)"]}}
+        result = executor.run(job, lambda **data: None)
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertIn("10", result["output"]["cells"][1]["text"])
+        self.assertEqual((executor.sessions[key]["name"], executor.spare), (spare, None))
+        executor.ensure_spare()
+        second = executor.spare["name"]
+        job["id"], job["payload"]["kernel_id"] = str(uuid.uuid4()), uuid.uuid4().hex
+        self.assertEqual(executor.run(job, lambda **data: None)["status"], "SUCCEEDED")
+        self.assertEqual(executor.sessions[job["payload"]["kernel_id"]]["name"], second)
+        executor.ensure_spare()  # Two sessions fill max_kernels=2, so no spare is booted.
+        self.assertIsNone(executor.spare)
+
     def test_run_all_stops_at_error_and_keeps_prior_variables(self):
         executor = NotebookExecutor(os.environ.get("AI_NOTEBOOK_IMAGE", "xju-ai-notebook:dev"))
         self.addCleanup(executor.close)

@@ -15,7 +15,7 @@ from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem
 from .packages import IMPORT_ACTIVE, managed_problems, service_lock
 from .worker_auth import authenticate_worker
 from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access, problem_leaderboard,
-                       public_job, public_problem, quiz_attempts, save_draft)
+                       public_job, public_problem, quiz_attempts, review_item, review_job, reviewable_jobs, save_draft)
 
 
 def page(request, queryset, serialize):
@@ -232,12 +232,34 @@ class ProblemAdminAPI(APIView):
         return self.success({"id": problem.code, "version": problem.version, "revision": problem.revision})
 
 
+class ReviewAdminAPI(APIView):
+    """Teachers score free-text quiz answers; scoring finalizes the submission and its ranking."""
+    @admin_role_required
+    def get(self, request):
+        jobs = reviewable_jobs(request.user)
+        if request.GET.get("status", "pending") == "pending":
+            jobs = jobs.filter(status="REVIEWING").order_by("created_at", "id")
+        else:
+            jobs = jobs.filter(output__has_key="review").order_by("-finished_at", "-id")
+        if request.GET.get("contest_id"):
+            require(request.GET["contest_id"].isdigit(), "Invalid contest")
+            jobs = jobs.filter(contest_id=request.GET["contest_id"])
+        if request.GET.get("problem_id"):
+            jobs = jobs.filter(problem__code=request.GET["problem_id"])
+        return self.success(page(request, jobs, review_item))
+
+    @admin_role_required
+    def post(self, request):
+        return self.success(review_item(review_job(request.user, request.data)))
+
+
 class ContestAdminAPI(APIView):
     @admin_role_required
     def get(self, request):
         contest = self.contest(request, request.GET)
         config = AIContestConfig.objects.filter(contest=contest).first()
         return self.success({"selection": config.selection if config else "latest",
+                             "ranking": config.ranking if config else "score",
                              "private_published": bool(config and config.private_published),
                              "practice_enabled": config.practice_enabled if config else True,
                              "problems": [{"id": link.problem.code, "points": link.points} for link in
@@ -258,6 +280,8 @@ class ContestAdminAPI(APIView):
         contest = Contest.objects.select_for_update().get(pk=contest.pk)
         config, _ = AIContestConfig.objects.get_or_create(contest=contest)
         require(data.get("selection") in ("latest", "best"), "Invalid selection policy")
+        ranking = data.get("ranking", config.ranking)
+        require(ranking in ("score", "acm"), "Invalid ranking rule")
         require(type(data.get("private_published")) is bool and type(data.get("practice_enabled")) is bool, "Invalid publication settings")
         require(not data["private_published"] or contest.end_time < now(), "Private scores cannot be published before the contest ends")
         links = data.get("problems")
@@ -272,13 +296,14 @@ class ContestAdminAPI(APIView):
         require(len({item[0] for item in normalized}) == len(normalized), "Duplicate problem")
         current = list(AIContestProblem.objects.filter(contest=contest).values_list("problem_id", "points"))
         frozen = contest.start_time <= now() or AIJob.objects.filter(contest=contest, official=True).exists()
-        require(not frozen or (normalized == current and config.selection == data["selection"]),
+        require(not frozen or (normalized == current and config.selection == data["selection"] and config.ranking == ranking),
                 "Problems, weights and score policy are frozen after the contest starts")
         if normalized != current:
             AIContestProblem.objects.filter(contest=contest).delete()
             AIContestProblem.objects.bulk_create([AIContestProblem(contest=contest, problem_id=pk, points=points, position=index)
                                                  for index, (pk, points) in enumerate(normalized)])
         config.selection = data["selection"]
+        config.ranking = ranking
         config.private_published = data["private_published"]
         config.practice_enabled = data["practice_enabled"]
         config.save()

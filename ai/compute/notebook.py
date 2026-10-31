@@ -17,6 +17,10 @@ class NotebookExecutor:
         if not (1 <= self.max_kernels <= 32 and 256 <= self.memory_mb <= 4096 and 30 <= self.idle_seconds <= 3600):
             raise ValueError("Invalid Notebook pool limits")
         self.sessions = {}
+        # One kernel booted ahead of demand, inside the max_kernels budget, so a new
+        # Notebook session does not wait for container and Jupyter startup.
+        self.spare = None
+        self.spare_retry_at = 0.0
 
     def preflight(self):
         subprocess.run([self.engine, "info", "--format", "{{.ServerVersion}}"], check=True,
@@ -35,13 +39,19 @@ class NotebookExecutor:
 
     def drop(self, key):
         session = self.sessions.get(key)
-        if not session:
-            return
+        if session:
+            self.remove(session, lambda: self.sessions.pop(key))
+
+    def drop_spare(self):
+        if self.spare:
+            self.remove(self.spare, lambda: setattr(self, "spare", None))
+
+    def remove(self, session, forget):
         process = session["process"]
         try:
             subprocess.run([self.engine, "rm", "-f", session["name"]], timeout=15,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            del self.sessions[key]
+            forget()
         finally:
             if process.poll() is None:
                 process.kill()
@@ -51,6 +61,7 @@ class NotebookExecutor:
             session["errors"].close()
 
     def close(self):
+        self.drop_spare()
         for key in list(self.sessions):
             self.drop(key)
 
@@ -58,11 +69,31 @@ class NotebookExecutor:
         for key, session in list(self.sessions.items()):
             if time.monotonic() - session["last_used"] > self.idle_seconds or session["process"].poll() is not None:
                 self.drop(key)
+        if self.spare and self.spare["process"].poll() is not None:
+            self.drop_spare()
+            self.spare_retry_at = time.monotonic() + 30  # Do not spin on a failing image or engine.
+
+    def ensure_spare(self):
+        """Boot one kernel ahead of demand when the pool has room; called by an idle worker."""
+        self.reap_idle()
+        if not self.spare and len(self.sessions) < self.max_kernels and time.monotonic() >= self.spare_retry_at:
+            self.spare = self.launch()
 
     def start(self, key):
+        if self.spare and self.spare["process"].poll() is None:
+            session, self.spare = self.spare, None
+            session["last_used"] = time.monotonic()
+            self.sessions[key] = session
+            return session
+        self.drop_spare()
         while len(self.sessions) >= self.max_kernels:
             self.drop(min(self.sessions, key=lambda item: self.sessions[item]["last_used"]))
-        name = "xju-notebook-" + hashlib.sha256(self.owner.encode()).hexdigest()[:8] + "-" + key
+        self.sessions[key] = self.launch()
+        return self.sessions[key]
+
+    def launch(self):
+        # Containers are found by owner label; the name only needs to be unique.
+        name = "xju-notebook-" + hashlib.sha256(self.owner.encode()).hexdigest()[:8] + "-" + uuid.uuid4().hex
         command = [self.engine, "run", "--name", name, "--label", "org.xju.ai=notebook", "-i",
                    "--label", "org.xju.ai.notebook-owner=" + self.owner,
                    "--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
@@ -80,10 +111,8 @@ class NotebookExecutor:
         except Exception:
             errors.close()
             raise
-        session = {"name": name, "process": process, "errors": errors, "generation": uuid.uuid4().hex,
-                   "last_used": time.monotonic(), "paused": False}
-        self.sessions[key] = session
-        return session
+        return {"name": name, "process": process, "errors": errors, "generation": uuid.uuid4().hex,
+                "last_used": time.monotonic(), "paused": False}
 
     def run(self, job, heartbeat):
         self.reap_idle()

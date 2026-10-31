@@ -20,7 +20,8 @@ STATEMENT_FIELDS = ("objective", "signature", "inputSpec", "outputSpec", "data",
 EVALUATION_FIELDS = {"public_column", "private_column", "accuracy_column", "pass_score", "run_seconds", "max_attempts"}
 ASSET_FOLDERS = {"scoring_program": "scoring", "ingestion_program": "ingestion", "input_data": "input", "reference_data": "reference"}
 TYPES = ("logic", "model", "challenge", "quiz")
-QUIZ_KINDS = ("single", "multiple", "number", "order")
+QUIZ_KINDS = ("single", "multiple", "number", "order", "text")
+MAX_TEXT_ANSWER = 2000
 QUIZ_ID = r"[A-Za-z0-9_-]{1,32}"
 # Quiz images are inlined as data URIs, so keep them small. SVG is never accepted.
 MEDIA_TYPES = {"png": ("image/png", (b"\x89PNG\r\n\x1a\n",)), "jpg": ("image/jpeg", (b"\xff\xd8\xff",)),
@@ -135,9 +136,9 @@ def quiz_input(value):
     raw = value.get("questions")
     require(isinstance(raw, list) and 1 <= len(raw) <= 50, "作答卡需要 1–50 道小题")
     for item in raw:
-        require(isinstance(item, dict) and item.get("kind") in QUIZ_KINDS, "小题类型必须是 single、multiple、number 或 order")
+        require(isinstance(item, dict) and item.get("kind") in QUIZ_KINDS, "小题类型必须是 single、multiple、number、order 或 text")
         kind = item["kind"]
-        allowed = {"id", "kind", "prompt", "points", "materials"} | ({"unit"} if kind == "number" else {"options"})
+        allowed = {"id", "kind", "prompt", "points", "materials"} | {"number": {"unit"}, "text": set()}.get(kind, {"options"})
         require(not set(item) - allowed, "小题字段无效")
         require(isinstance(item.get("id"), str) and re.fullmatch(QUIZ_ID, item["id"]) and item["id"] not in seen, "小题编号无效或与其他编号重复")
         seen.add(item["id"])
@@ -148,6 +149,8 @@ def quiz_input(value):
                   "points": item["points"], "materials": refs}
         if kind == "number":
             result["unit"] = _text(item.get("unit", ""), 32, "数值单位无效", empty=True)
+        elif kind == "text":
+            pass  # Free-text answers are graded by a teacher.
         else:
             options = item.get("options")
             require(isinstance(options, list) and 2 <= len(options) <= 12, "选择和排序题需要 2–12 个选项")
@@ -168,6 +171,11 @@ def quiz_key_input(quiz, value):
     for qid, entry in value.items():
         question = questions[qid]
         kind, count = question["kind"], len(question.get("options", []))
+        if kind == "text":
+            # The rubric is shown to reviewers only.
+            require(isinstance(entry, dict) and set(entry) == {"rubric"}, "主观题需提供 rubric 评分要点：" + qid)
+            result[qid] = {"rubric": _text(entry["rubric"], 4000, "评分要点无效：" + qid)}
+            continue
         require(isinstance(entry, dict) and "answer" in entry, "答案格式无效：" + qid)
         answer = entry["answer"]
         if kind == "single":

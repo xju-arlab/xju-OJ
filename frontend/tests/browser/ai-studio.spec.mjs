@@ -218,7 +218,7 @@ test('anonymous visitors cannot run or submit', async ({ page }) => {
 
 test('problem input/output follows the interface and ranking uses the current problem and contest', async ({ page }) => {
   await page.goto('/ai-studio/problem/AI004?contest=23')
-  await expect(page.locator('.studio-prose h2')).toHaveText(['任务目标', '实现要求', '接口约定', '输入', '输出'])
+  await expect(page.locator('.studio-prose h2')).toHaveText(['任务目标', '接口约定', '输入', '输出', '实现要求'])
   await expect(page.locator('.studio-io-description').first()).toContainText('600 行')
   await expect(page.locator('.studio-io-description').last()).toContainText('完全同序')
   await expect(page.getByRole('navigation', { name: '题目资料' }).locator('button')).toHaveText(['题目', '数据与框架', '评测', '排行'])

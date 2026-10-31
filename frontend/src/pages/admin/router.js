@@ -28,6 +28,7 @@ const router = createRouter({
       component: Home,
       children: [
         { path: '/ai/problems', name: 'ai-problems', component: () => import('./views/ai/Problems.vue') },
+        { path: '/ai/reviews', name: 'ai-reviews', component: () => import('./views/ai/Reviews.vue') },
         { path: '/ai/problem/batch_ops', name: 'ai-problem-batch-ops', component: ProblemImportOrExport },
         {
           path: '',

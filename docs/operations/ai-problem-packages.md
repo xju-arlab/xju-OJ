@@ -78,7 +78,7 @@ evaluation/
 | `type` | `logic` 逻辑实现、`model` 模型定义、`challenge` 数据挑战、`quiz` 模型理解 |
 | `title` / `metric` | 非空纯文本，分别最多 128 / 64 字符 |
 | `points` | 1–10000，默认 100；比赛仍可独立配置题目权重 |
-| `statement` | 普通文本，不执行 HTML；各文本最多 32000 字符，实现要求最多 50 项 |
+| `statement` | 普通文本，不执行 HTML；各文本最多 32000 字符，实现要求最多 50 项。`$...$` 渲染为 KaTeX 公式；每行一段，`- ` 开头为列表（缩进两格嵌套），`1. ` 为编号列表；`signature` 每行显示为一条接口；页面顺序为任务目标、接口约定、输入、输出，实现要求在最后 |
 | `public_column` | 必须与 `scores.json` 中公榜评分字段一致，默认 `score` |
 | `private_column` | 数据挑战必填，其他类型可选；只有比赛结束并公布后才返回私榜成绩 |
 | `accuracy_column` | 可选，模型准确率字段，值须在 0–1 之间 |
@@ -115,7 +115,8 @@ evaluation/reference/answers.json
     {"id": "q1", "kind": "single", "prompt": "题干", "options": ["选项 A", "选项 B"], "points": 10, "materials": ["fields"]},
     {"id": "q2", "kind": "multiple", "prompt": "题干", "options": ["…", "…", "…"], "points": 10},
     {"id": "q3", "kind": "number", "prompt": "题干", "unit": "kWh", "points": 10},
-    {"id": "q4", "kind": "order", "prompt": "题干", "options": ["第一步", "第二步", "第三步"], "points": 10}
+    {"id": "q4", "kind": "order", "prompt": "题干", "options": ["第一步", "第二步", "第三步"], "points": 10},
+    {"id": "q5", "kind": "text", "prompt": "主观题题干", "points": 40}
   ]
 }
 ```
@@ -124,11 +125,18 @@ evaluation/reference/answers.json
   图片最多 8 张、单张 400 KiB、合计 1 MiB，按真实文件头校验，不接受 SVG；导入后以 data URI 存入题面。
 - 小题 1–50 道，编号在材料与小题之间唯一；`points` 1–100；题干与选项是纯文本，反引号显示为代码。
 - `answers.json` 恰好覆盖每道小题，选项用 0 起的下标：
-  `{"q1": {"answer": 0}, "q2": {"answer": [0, 2], "scoring": "partial"}, "q3": {"answer": 1.5, "tolerance": 0.01, "relative": 0}, "q4": {"answer": [2, 0, 1]}}`。
+  `{"q1": {"answer": 0}, "q2": {"answer": [0, 2], "scoring": "partial"}, "q3": {"answer": 1.5, "tolerance": 0.01, "relative": 0}, "q4": {"answer": [2, 0, 1]}, "q5": {"rubric": "评分要点"}}`。
+- 主观题 `text` 作答最多 2000 字，`rubric` 只给评阅老师看。客观题即时判分；作答了主观题、且主观题满分时总分能达到
+  `pass_score` 的提交进入「待评阅」，老师在后台「AI 题库 → 主观题评阅」逐题给分后定分。同一学生同题新的待评阅提交会替代旧的，
+  旧的记为「已被替代」，不计罚时。总分达不到 `pass_score` 的作答立即定分，主观题记 0 分。
   多选默认 `all` 全对才得分；`partial` 按（选对数 − 选错数）/ 正确数计分，最低 0。
   数值题在 `max(tolerance, relative × |answer|)` 内算对。排序题须完全一致。
 - 总分为得分小题分值之和占全部分值的百分比；达到 `pass_score` 为通过，其余非零为部分通过。
   学生只看到总分，看不到逐题对错与答案；答案只在后台题目管理中可见。
+
+AI 比赛的「排名规则」可选按总分（含部分分，取最后一次或最高分）或 ACM：通过数多者在前，同数比罚时，
+罚时为各题首次通过距开赛的时间加上之前每次失败 20 分钟；系统错误、取消和被替代的提交不计，评测中与待评阅显示为「?」。
+logic 和 quiz 题达到 `pass_score` 才算通过，model 题达到准确率达标线才算通过。
 
 ## Notebook 与数据
 
