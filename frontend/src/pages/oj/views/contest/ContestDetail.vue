@@ -4,9 +4,14 @@
     <template v-if="!isProblemRoute">
       <section class="contest-hero" aria-labelledby="contest-title">
         <div class="contest-breadcrumb">
-          <router-link :to="{ name: 'contest-list' }">{{$t('m.Contests')}}</router-link>
+          <span v-if="myTeam">{{$t('m.Contests')}}</span>
+          <router-link v-else :to="{ name: 'contest-list' }">{{$t('m.Contests')}}</router-link>
           <span aria-hidden="true">/</span>
           <span>{{contestID}}</span>
+          <span v-if="myTeam" class="contest-team" :title="myTeam.members.length ? '队员：' + myTeam.members.join('、') : ''">
+            <Icon type="users" /><strong>{{ myTeam.name }}</strong>
+            <button type="button" @click="teamLogout">退出</button>
+          </span>
         </div>
 
         <div class="contest-hero-main">
@@ -207,6 +212,9 @@
         <el-form-item :label="$t('m.Contest_Name')">
           <el-input v-model="publishForm.title" maxlength="128" :placeholder="$t('m.Contest_Name')"></el-input>
         </el-form-item>
+        <el-form-item label="参赛账号">
+          <el-switch v-model="publishForm.team_mode" inactive-text="原账号" active-text="批量队伍账号"></el-switch>
+        </el-form-item>
         <div class="prep-publish-grid">
           <el-form-item :label="$t('m.Contest_Start_Time')">
             <el-date-picker v-model="publishForm.start_time" type="datetime"></el-date-picker>
@@ -214,17 +222,42 @@
           <el-form-item :label="$t('m.Contest_End_Time')">
             <el-date-picker v-model="publishForm.end_time" type="datetime"></el-date-picker>
           </el-form-item>
-          <el-form-item :label="$t('m.Contest_Password')">
+          <el-form-item v-if="!publishForm.team_mode" :label="$t('m.Contest_Password')">
             <el-input v-model="publishForm.password" maxlength="32"></el-input>
           </el-form-item>
           <el-form-item :label="$t('m.Real_Time_Rank')">
             <el-switch v-model="publishForm.real_time_rank"></el-switch>
           </el-form-item>
+          <el-form-item v-if="contest.rule_type === 'ACM'" label="封榜">
+            <el-switch v-model="publishForm.freeze" @change="suggestFreeze"></el-switch>
+          </el-form-item>
+          <el-form-item v-if="contest.rule_type === 'ACM' && publishForm.freeze" label="封榜时间（赛后由管理员开榜）">
+            <el-date-picker v-model="publishForm.rank_freeze_time" type="datetime"></el-date-picker>
+          </el-form-item>
         </div>
+        <el-form-item v-if="publishForm.team_mode" label="队伍信息" class="prep-publish-teams">
+          <TeamRosterImport @update:teams="publishForm.teams = $event" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="publishVisible = false">{{ $t('m.Cancel') }}</el-button>
-        <el-button type="primary" :loading="publishing" :disabled="publishBlocked" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
+        <el-button type="primary" :loading="publishing" :disabled="publishBlocked || (publishForm.team_mode && !publishForm.teams.length)" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
+      </template>
+    </LegacyDialog>
+
+    <LegacyDialog v-if="canManagePrep" title="已发布" width="520px"
+                  :visible="Boolean(publishResult)" @update:visible="publishResult = $event ? publishResult : null">
+      <template v-if="publishResult">
+        <p class="prep-published-copy">比赛链接（队伍用账号密码登录；比赛结束后无需登录即可查看）：</p>
+        <div class="prep-published-link">
+          <a :href="publishResult.link" target="_blank" rel="noopener">{{ publishResult.link }}</a>
+          <el-button size="small" @click="copyText(publishResult.link)">复制</el-button>
+        </div>
+        <p class="prep-published-copy is-warning">{{ publishResult.teams.length }} 个队伍账号的密码只在这里给出一次，已自动下载 CSV。</p>
+      </template>
+      <template #footer>
+        <el-button @click="downloadPublishedTeams">再次下载账号密码</el-button>
+        <el-button type="primary" @click="publishResult = null">完成</el-button>
       </template>
     </LegacyDialog>
 
@@ -240,6 +273,8 @@
   import api from '@oj/api'
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
+  import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
+  import { downloadTeamAccounts } from '@/utils/teamRoster'
   import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
@@ -250,7 +285,7 @@
 
   export default {
     name: 'ContestDetail',
-    components: { ContestAnnouncementBanner, PrepStatementExportDialog },
+    components: { ContestAnnouncementBanner, PrepStatementExportDialog, TeamRosterImport },
     data () {
       return {
         routeName: '',
@@ -269,6 +304,8 @@
         publishVisible: false,
         publishing: false,
         publishForm: {},
+        // The team-account publish: its link and the one-time passwords.
+        publishResult: null,
         exportVisible: false
       }
     },
@@ -502,10 +539,35 @@
           end_time: end.toDate(),
           // The published contest's password is chosen here; the review password is not carried over.
           password: '',
-          real_time_rank: this.contest.real_time_rank !== false
+          real_time_rank: this.contest.real_time_rank !== false,
+          team_mode: false,
+          teams: [],
+          freeze: false,
+          rank_freeze_time: null
         }
         this.publishVisible = true
         this.loadSelection()
+      },
+      suggestFreeze (on) {
+        // The usual board freezes four hours in, or an hour before a shorter contest ends.
+        if (!on || this.publishForm.rank_freeze_time) return
+        const start = moment(this.publishForm.start_time)
+        const end = moment(this.publishForm.end_time)
+        let freeze = start.clone().add(4, 'hours')
+        if (!freeze.isBefore(end)) freeze = moment.max(start.clone().add(1, 'minute'), end.clone().subtract(1, 'hour'))
+        this.publishForm.rank_freeze_time = freeze.toDate()
+      },
+      async teamLogout () {
+        try { await api.logout() } catch (_) {}
+        this.$store.dispatch('clearProfile')
+        this.$router.replace({ name: 'contest-arena', params: { contestID: this.contestID } })
+      },
+      copyText (text) {
+        navigator.clipboard.writeText(text).then(() => this.$success('已复制'), () => this.$error('复制失败，请手动选择链接'))
+      },
+      downloadPublishedTeams () {
+        const result = this.publishResult
+        if (result) downloadTeamAccounts(`contest-${result.id}-teams.csv`, result.teams)
       },
       async publish () {
         const form = this.publishForm
@@ -513,7 +575,13 @@
           this.$error(this.$t('m.Prep_Time_Invalid'))
           return
         }
-        const tab = this.blankTab()
+        const freeze = this.contest.rule_type === 'ACM' && form.freeze && form.rank_freeze_time
+        if (freeze && !(new Date(form.start_time) < new Date(form.rank_freeze_time) && new Date(form.rank_freeze_time) < new Date(form.end_time))) {
+          this.$error('封榜时间须在比赛开始和结束之间')
+          return
+        }
+        // A team publish stays here to hand over the link and the passwords.
+        const tab = form.team_mode ? null : this.blankTab()
         this.publishing = true
         try {
           const res = await api.publishPrepContest({
@@ -521,14 +589,23 @@
             title: form.title,
             start_time: new Date(form.start_time).toISOString(),
             end_time: new Date(form.end_time).toISOString(),
-            password: form.password,
-            real_time_rank: form.real_time_rank
+            password: form.team_mode ? '' : form.password,
+            real_time_rank: form.real_time_rank,
+            rank_freeze_time: freeze ? new Date(form.rank_freeze_time).toISOString() : null,
+            ...(form.team_mode ? { teams: form.teams } : {})
           })
           this.publishVisible = false
           this.$success(this.$t('m.Prep_Published'))
-          const href = this.$router.resolve({ name: 'contest-details', params: { contestID: res.data.data.id } }).href
-          if (tab) tab.location.href = href
-          else window.open(href, '_blank', 'noopener')
+          const published = res.data.data
+          if (form.team_mode) {
+            const link = new URL(this.$router.resolve({ name: 'contest-arena', params: { contestID: published.id } }).href, window.location.origin).href
+            this.publishResult = { id: published.id, link, teams: published.teams }
+            this.downloadPublishedTeams()
+          } else {
+            const href = this.$router.resolve({ name: 'contest-details', params: { contestID: published.id } }).href
+            if (tab) tab.location.href = href
+            else window.open(href, '_blank', 'noopener')
+          }
           // Show the new "published as" link on this page.
           this.$store.dispatch('getContest').catch(() => {})
           this.notifyPrepChange()
@@ -553,6 +630,10 @@
       ]),
       publishedContests () {
         return this.contest.published_contests || []
+      },
+      myTeam () {
+        const team = this.$store.state.user.profile.team
+        return team && String(team.contest_id) === String(this.contestID) ? team : null
       },
       isPrepSettingView () {
         return this.isPrepContest && PREP_SETTING_ROUTES.includes(this.routeName)
@@ -908,6 +989,15 @@
   .prep-live::after { animation: none; }
 }
 .prep-publish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.prep-publish-teams :deep(.el-form-item__content) { display: block; }
+.contest-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--color-text); font-size: 13px; cursor: default; }
+.contest-team strong { font-weight: 650; }
+.contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.contest-team button:hover { color: var(--color-text); }
+.prep-published-copy { margin: 0 0 8px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.prep-published-copy.is-warning { margin-top: 12px; color: var(--color-text); font-weight: 600; }
+.prep-published-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-subtle); }
+.prep-published-link a { min-width: 0; flex: 1; font: 13px var(--font-mono); overflow-wrap: anywhere; }
 .prep-publish-grid :deep(.el-date-editor.el-input) { width: 100%; }
 @media (max-width: 560px) {
   .prep-publish-grid { grid-template-columns: 1fr; }

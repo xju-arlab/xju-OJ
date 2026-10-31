@@ -398,7 +398,7 @@ class ContestPrepPublishAPI(APIView):
         overrides = dict(request.serializer.validated_data)
         prep = load_prep_contest(request, overrides.pop("contest_id"), MANAGE)
         contest = publish_prep_contest(prep, overrides)
-        return self.success({"id": contest.id, "title": contest.title})
+        return self.success({"id": contest.id, "title": contest.title, "teams": contest.generated_teams})
 
 
 class ContestPrepFeedbackAPI(APIView):

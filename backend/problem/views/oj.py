@@ -8,6 +8,7 @@ from ..contest_authoring import order_contest_problems
 from ..models import ProblemFavorite, ProblemTag, Problem, ProblemRuleType
 from ..serializers import (ProblemFavoriteSerializer, ProblemSerializer, ProfileProblemSerializer,
                            TagSerializer, ProblemSafeSerializer)
+from contest.freeze import mask_problem_stats
 from contest.models import ContestRuleType, ContestStatus
 from ..publication import publish_due_contest_problems
 
@@ -129,7 +130,8 @@ class ContestProblemAPI(APIView):
         problem_id = request.GET.get("problem_id")
         if problem_id:
             # Preparation members already passed check_contest_permission.
-            if not request.user.is_contest_admin(self.contest) and not self.contest.is_preparation:
+            is_admin = request.user.is_authenticated and request.user.is_contest_admin(self.contest)
+            if not is_admin and not self.contest.is_preparation:
                 if self.contest.status == ContestStatus.CONTEST_NOT_START:
                     return self.error("Contest has not started yet.")
                 # Before the deadline a non-registered user cannot open the
@@ -149,6 +151,8 @@ class ContestProblemAPI(APIView):
             if self.contest.problem_details_permission(request.user):
                 problem_data = ProblemSerializer(problem).data
                 self._add_problem_status(request, [problem_data, ])
+                if self.contest.rank_frozen(request.user):
+                    mask_problem_stats(self.contest, [problem_data])
             else:
                 problem_data = ProblemSafeSerializer(problem).data
             if self.contest.is_preparation:
@@ -160,6 +164,9 @@ class ContestProblemAPI(APIView):
         if self.contest.problem_details_permission(request.user):
             data = ProblemSerializer(contest_problems, many=True).data
             self._add_problem_status(request, data)
+            # The counters would reveal results the frozen board hides.
+            if self.contest.rank_frozen(request.user):
+                mask_problem_stats(self.contest, data)
         else:
             data = ProblemSafeSerializer(contest_problems, many=True).data
         if self.contest.is_preparation:

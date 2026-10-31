@@ -11,9 +11,10 @@ const ContestPrepAssign = () => import('./children/ContestPrepAssign.vue')
 // The review overview is drawn by ContestDetail itself; the route only needs a placeholder.
 const ContestPrepReview = { name: 'ContestPrepReview', render: () => null }
 const PrepInvite = () => import('./PrepInvite.vue')
+const ContestArena = () => import('./ContestArena.vue')
 
 export {
   ContestDetails, ContestList, ContestProblemList, ContestRank, ACMContestHelper,
   ContestPrepProblems, ContestPrepProblemEdit, ContestPrepUpload, ContestPrepRoles, ContestPrepAssign,
-  ContestPrepReview, PrepInvite
+  ContestPrepReview, PrepInvite, ContestArena
 }

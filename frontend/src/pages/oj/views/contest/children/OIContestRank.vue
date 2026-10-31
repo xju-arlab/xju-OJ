@@ -51,6 +51,14 @@
             title: this.$t('m.User_User'),
             align: 'center',
             render: (h, params) => {
+              // A team account shows its team name, with the members on hover.
+              const team = params.row.team
+              if (team) {
+                return h('span', {
+                  class: 'rank-team',
+                  title: team.members.length ? '队员：' + team.members.join('、') : team.name
+                }, team.name)
+              }
               return h('a', {
                 style: {
                   display: 'inline-block',
@@ -167,7 +175,7 @@
       applyToChart (rankData) {
         let [usernames, scores] = [[], []]
         rankData.forEach(ele => {
-          usernames.push(ele.user.username)
+          usernames.push(ele.team ? ele.team.name : ele.user.username)
           scores.push(ele.total_score)
         })
         this.options.xAxis[0].data = usernames
@@ -222,6 +230,7 @@
   }
 </script>
 <style scoped lang="less">
+  :deep(.rank-team) { color: var(--color-text); font-weight: 600; cursor: default; }
   .echarts {
     height: 320px;
     width: 100%;

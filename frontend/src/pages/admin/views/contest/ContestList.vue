@@ -75,13 +75,15 @@
         </el-table-column>
         <el-table-column
           fixed="right"
-          width="184"
+          width="216"
           label="操作">
           <template #default="scope"><div class="contest-operation-actions">
             <icon-btn name="编辑" icon="edit" @click="goEdit(scope.row.id)"></icon-btn>
             <icon-btn name="题目" icon="list-ol" @click="scope.row.rule_type === 'AI' ? goEdit(scope.row.id) : goContestProblemList(scope.row.id)"></icon-btn>
             <icon-btn name="公告" icon="info-circle"
                       @click="goContestAnnouncement(scope.row.id)"></icon-btn>
+            <icon-btn v-if="!scope.row.prep_state" name="队伍账号" icon="users"
+                      @click="$router.push({name: 'contest-teams', params: {contestId: scope.row.id}})"></icon-btn>
             <icon-btn v-if="scope.row.rule_type !== 'AI'" icon="download" name="下载通过的提交"
                       @click="openDownloadOptions(scope.row.id)"></icon-btn>
             <icon-btn danger icon="trash" name="删除比赛"

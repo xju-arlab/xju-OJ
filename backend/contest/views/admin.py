@@ -6,25 +6,45 @@ from ipaddress import ip_network
 
 import dateutil.parser
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.http import FileResponse
 from django.utils.timezone import now
 
 from account.decorators import check_contest_permission, ensure_created_by
 from account.models import User
 from submission.models import Submission, JudgeStatus
-from utils.api import APIView, validate_serializer
+from utils.api import APIError, APIView, validate_serializer
 from utils.cache import cache
 from utils.constants import CacheKey, ContestPrepState, ContestRuleType, PREP_PLACEHOLDER_DAYS
 from utils.shortcuts import rand_str
 from utils.tasks import delete_files
-from ..models import Contest, ContestAnnouncement, ACMContestRank
+from ..models import Contest, ContestAnnouncement, ACMContestRank, ContestTeam
+from ..teams import create_teams, hash_team_password, team_data, team_password
 from problem.models import Problem
 from problem.publication import publish_due_contest_problems
 from problem.tasks import schedule_contest_problem_publication
 from ..serializers import (ContestAnnouncementSerializer, ContestAdminSerializer,
                            CreateConetestSeriaizer, CreateContestAnnouncementSerializer,
                            EditConetestSeriaizer, EditContestAnnouncementSerializer,
-                           ACMContesHelperSerializer, )
+                           ACMContesHelperSerializer, ContestRankFreezeSerializer,
+                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer, )
+
+
+def freeze_time_error(data, rule_type, preparation):
+    """Parse rank_freeze_time in place; it only applies to ACM and must fall inside the window."""
+    value = data.get("rank_freeze_time")
+    if not value or rule_type != ContestRuleType.ACM or preparation:
+        data["rank_freeze_time"] = None
+        return None
+    value = dateutil.parser.parse(value)
+    if not data["start_time"] < value < data["end_time"]:
+        return "Freeze time must fall between start time and end time"
+    data["rank_freeze_time"] = value
+    return None
+
+
+def forget_frozen_board(contest):
+    cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}:frozen")
 
 
 class ContestAPI(APIView):
@@ -49,6 +69,9 @@ class ContestAPI(APIView):
             data["end_time"] = dateutil.parser.parse(data["end_time"])
         if data["end_time"] <= data["start_time"]:
             return self.error("Start time must occur earlier than end time")
+        error = freeze_time_error(data, data["rule_type"], bool(data.get("prep_state")))
+        if error:
+            return self.error(error)
         if data.get("password") and data["password"] == "":
             data["password"] = None
         for ip_range in data["allowed_ip_ranges"]:
@@ -71,6 +94,9 @@ class ContestAPI(APIView):
         data["end_time"] = dateutil.parser.parse(data["end_time"])
         if data["end_time"] <= data["start_time"]:
             return self.error("Start time must occur earlier than end time")
+        error = freeze_time_error(data, contest.rule_type, contest.is_preparation)
+        if error:
+            return self.error(error)
         if not data["password"]:
             data["password"] = None
         for ip_range in data["allowed_ip_ranges"]:
@@ -85,6 +111,7 @@ class ContestAPI(APIView):
         for k, v in data.items():
             setattr(contest, k, v)
         contest.save()
+        forget_frozen_board(contest)
         publish_due_contest_problems([contest.id])
         if Problem.objects.filter(contest=contest, publish_after_contest=True).exists():
             transaction.on_commit(lambda: schedule_contest_problem_publication(
@@ -282,3 +309,76 @@ class DownloadContestSubmissions(APIView):
         resp["Content-Type"] = "application/zip"
         resp["Content-Disposition"] = f"attachment;filename={os.path.basename(zip_path)}"
         return resp
+
+
+class ContestRankFreezeAPI(APIView):
+    @validate_serializer(ContestRankFreezeSerializer)
+    def post(self, request):
+        """Unfreeze the ACM board, or freeze it again."""
+        try:
+            contest = Contest.objects.get(id=request.data["contest_id"], rule_type=ContestRuleType.ACM,
+                                          rank_freeze_time__isnull=False)
+            ensure_created_by(contest, request.user)
+        except Contest.DoesNotExist:
+            return self.error("Contest has no frozen board")
+        contest.rank_unfrozen = request.data["unfrozen"]
+        contest.save(update_fields=["rank_unfrozen"])
+        forget_frozen_board(contest)
+        return self.success({"rank_unfrozen": contest.rank_unfrozen})
+
+
+class ContestTeamAPI(APIView):
+    """Team accounts of one contest: generated from a roster, one login per team."""
+
+    def load_contest(self, request, contest_id):
+        try:
+            contest = Contest.objects.get(id=contest_id, prep_state__isnull=True)
+        except (Contest.DoesNotExist, ValueError, TypeError):
+            raise APIError("Contest does not exist")
+        ensure_created_by(contest, request.user)
+        return contest
+
+    def get(self, request):
+        contest = self.load_contest(request, request.GET.get("contest_id"))
+        teams = ContestTeam.objects.filter(contest=contest).select_related("user")
+        return self.success([team_data(team) for team in teams])
+
+    @validate_serializer(CreateContestTeamsSerializer)
+    def post(self, request):
+        """Create one account per roster row and register it; plaintext passwords are returned only here."""
+        contest = self.load_contest(request, request.data["contest_id"])
+        with transaction.atomic():
+            created = create_teams(contest, request.data["teams"])
+        cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
+        forget_frozen_board(contest)
+        return self.success(created)
+
+    @validate_serializer(ContestTeamPasswordSerializer)
+    def put(self, request):
+        """Issue a new password for one team account."""
+        contest = self.load_contest(request, request.data["contest_id"])
+        try:
+            team = ContestTeam.objects.select_related("user").get(id=request.data["id"], contest=contest)
+        except ContestTeam.DoesNotExist:
+            return self.error("Team does not exist")
+        password = team_password()
+        team.user.password = hash_team_password(password)
+        team.user.save(update_fields=["password"])
+        return self.success(dict(team_data(team), password=password))
+
+    def delete(self, request):
+        """Remove a team account that has not submitted yet."""
+        contest = self.load_contest(request, request.GET.get("contest_id"))
+        try:
+            team = ContestTeam.objects.get(id=request.GET.get("id"), contest=contest)
+        except (ContestTeam.DoesNotExist, ValueError):
+            return self.error("Team does not exist")
+        if Submission.objects.filter(user_id=team.user_id).exists():
+            return self.error("This team has submissions and cannot be deleted")
+        try:
+            team.user.delete()
+        except ProtectedError:
+            return self.error("This team has submissions and cannot be deleted")
+        cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
+        forget_frozen_board(contest)
+        return self.success()

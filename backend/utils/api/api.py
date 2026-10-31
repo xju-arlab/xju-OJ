@@ -130,11 +130,9 @@ class APIView(View):
         if offset < 0:
             offset = 0
         results = query_set[offset:offset + limit]
+        count = len(query_set) if isinstance(query_set, list) else query_set.count()
         if object_serializer:
-            count = query_set.count()
             results = object_serializer(results, many=True).data
-        else:
-            count = query_set.count()
         data = {"results": results,
                 "total": count}
         return data

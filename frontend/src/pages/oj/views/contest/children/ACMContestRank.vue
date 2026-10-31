@@ -1,5 +1,13 @@
 <template>
   <Panel shadow>
+    <div v-if="freezeNotice" :class="['rank-freeze-banner', { 'is-live': isContestAdmin && !previewFrozen }]">
+      <Icon type="ios-locked-outline" />
+      <span>{{ freezeNotice }}</span>
+      <template v-if="isContestAdmin">
+        <label class="rank-setting"><span>选手视角</span><i-switch v-model="previewFrozen" @on-change="getContestRankData(1)"></i-switch></label>
+        <button v-if="contestEnded" type="button" class="rank-unfreeze" :disabled="unfreezing" @click="unfreeze">开榜</button>
+      </template>
+    </div>
     <div class="rank-settings-row" aria-label="Ranking settings">
       <label class="rank-setting"><span>{{$t('m.Chart')}}</span><i-switch v-model="showChart"></i-switch></label>
       <label class="rank-setting"><span>{{$t('m.Auto_Refresh')}} (10s)</span><i-switch v-model="autoRefresh" :disabled="refreshDisabled" @on-change="handleAutoRefresh"></i-switch></label>
@@ -26,6 +34,7 @@
 </template>
 <script>
   import moment from 'moment'
+  import api from '@oj/api'
   import { mapActions } from '@/store/compat'
 
   import Pagination from '@oj/components/Pagination'
@@ -43,6 +52,7 @@
         total: 0,
         page: 1,
         contestID: '',
+        unfreezing: false,
         columns: [
           {
             className: 'rank-hover-cell',
@@ -60,6 +70,14 @@
             fixed: 'left',
             width: 150,
             render: (h, params) => {
+              // A team account shows its team name, with the members on hover.
+              const team = params.row.team
+              if (team) {
+                return h('span', {
+                  class: 'rank-team',
+                  title: team.members.length ? '队员：' + team.members.join('、') : team.name
+                }, team.name)
+              }
               return h('a', {
                 style: {
                   display: 'inline-block',
@@ -191,7 +209,7 @@
       applyToChart (rankData) {
         let [users, seriesData] = [[], []]
         rankData.forEach(rank => {
-          users.push(rank.user.username)
+          users.push(this.rankName(rank))
           let info = rank.submission_info
           // 提取出已AC题目的时间
           let timeData = []
@@ -212,7 +230,7 @@
             data.push([realTime, index + 1])
           }
           seriesData.push({
-            name: rank.user.username,
+            name: this.rankName(rank),
             type: 'line',
             data
           })
@@ -236,6 +254,9 @@
               cellClass[problemID] = 'first-ac'
             } else if (status.is_ac) {
               cellClass[problemID] = 'ac'
+            } else if (status.frozen_number) {
+              // Attempted after the freeze; the result stays hidden.
+              cellClass[problemID] = 'frozen'
             } else {
               cellClass[problemID] = 'wa'
             }
@@ -282,11 +303,25 @@
                 if (status.error_number !== 0) {
                   errorNumber = h('span', {class: 'rank-problem-errors'}, '(-' + status.error_number + ')')
                 }
-                return h('div', {class: 'rank-problem-result'}, [acTime, errorNumber])
+                const pending = status.frozen_number ? h('span', {class: 'rank-problem-pending'}, '?+' + status.frozen_number) : null
+                return h('div', {class: 'rank-problem-result'}, [acTime, pending, errorNumber])
               }
             }
           })
         })
+      },
+      rankName (rank) {
+        return rank.team ? rank.team.name : rank.user.username
+      },
+      unfreeze () {
+        this.$confirm('开榜后所有人都能看到最终排名，确定开榜吗？', '开榜', { confirmButtonText: '开榜', cancelButtonText: '取消', type: 'warning' }).then(() => {
+          this.unfreezing = true
+          return api.setContestRankFreeze(this.contestID, true).then(() => {
+            this.$success('已开榜')
+            this.previewFrozen = false
+            return this.$store.dispatch('getContest')
+          }).then(() => this.getContestRankData(1)).finally(() => { this.unfreezing = false })
+        }).catch(() => {})
       },
       parseTotalTime (totalTime) {
         return this.formatRankTime(totalTime)
@@ -326,6 +361,14 @@
   :deep(.el-table__body tr:hover > td.el-table__cell.first-ac),
   :deep(.el-table__body tr:hover > td.el-table__cell.ac) { background-color: var(--tag-tools-bg) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.wa) { background-color: var(--tag-research-bg) !important; }
+  :deep(.el-table__body td.el-table__cell.frozen), :deep(.el-table__body tr:hover > td.el-table__cell.frozen) { background-color: #e3eefa !important; }
+  :deep(.rank-problem-pending) { display: block; color: #2873be; font-weight: 700; }
+  :deep(.rank-team) { display: inline-block; max-width: 150px; overflow: hidden; color: var(--color-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; cursor: default; vertical-align: middle; }
+  .rank-freeze-banner { display: flex; min-height: 44px; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--color-border); background: #eef4fb; color: #2873be; font-size: 13px; }
+  .rank-freeze-banner.is-live { background: var(--color-bg-subtle); color: var(--color-text-muted); }
+  .rank-freeze-banner .rank-setting { margin-left: auto; }
+  .rank-unfreeze { min-height: 28px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: #2873be; color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .rank-unfreeze:disabled { opacity: .6; cursor: default; }
 
   @media (max-width: 760px) {
     .rank-settings-row { gap: 10px 14px; padding: 10px 12px; }

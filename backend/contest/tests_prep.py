@@ -22,8 +22,8 @@ from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 from utils.constants import (CacheKey, ContestPrepRole, ContestPrepState, PREP_PLACEHOLDER_DAYS,
                              PUBLISH_DEFAULT_HOURS)
-from .models import (ACMContestRank, Contest, ContestAnnouncement, ContestPrepInvite, ContestPrepMember,
-                     ContestPrepPlanItem)
+from .models import (ACMContestRank, Contest, ContestAnnouncement, ContestParticipation, ContestPrepInvite,
+                     ContestPrepMember, ContestPrepPlanItem)
 
 PREP_CONTEST_DATA = {"title": "Regional prep", "description": "<p>prep</p>", "rule_type": "ACM",
                      "password": "secret", "real_time_rank": True, "allowed_ip_ranges": ["10.0.0.0/8"]}
@@ -880,3 +880,36 @@ class ContestPrepImageUploadTest(ContestPrepTestBase):
         self.login(self.stranger)
         self.assertFailed(self.upload(self.image_file("a.png", "PNG")), "Contest does not exist")
         self.assertEqual(os.listdir(self.upload_root.name), [])
+
+
+class ContestPrepTeamPublishTest(ContestPrepTestBase):
+    def setUp(self):
+        super().setUp()
+        self.add_problem(self.contest, title="only")
+        self.url = self.reverse("contest_prep_publish_api")
+
+    def test_team_publish_creates_registered_accounts_and_drops_the_password(self):
+        self.login(self.creator)
+        start = timezone.now() + timedelta(days=1)
+        response = self.client.post(self.url, data={
+            "contest_id": self.contest.id, "password": "ignored", "start_time": start.isoformat(),
+            "end_time": (start + timedelta(hours=5)).isoformat(),
+            "rank_freeze_time": (start + timedelta(hours=4)).isoformat(),
+            "teams": [{"name": "Alpha", "members": ["A1", "A2"]}, {"name": "Beta", "members": []}]}, format="json")
+        self.assertSuccess(response)
+        published = Contest.objects.get(id=response.data["data"]["id"])
+        self.assertIsNone(published.password)
+        self.assertEqual(published.rank_freeze_time, start + timedelta(hours=4))
+        teams = response.data["data"]["teams"]
+        self.assertEqual([team["name"] for team in teams], ["Alpha", "Beta"])
+        self.assertTrue(all(team["password"] for team in teams))
+        self.assertEqual(ContestParticipation.objects.filter(contest=published).count(), 2)
+
+    def test_a_bad_roster_publishes_nothing(self):
+        self.login(self.creator)
+        before = Contest.objects.count()
+        response = self.client.post(self.url, data={
+            "contest_id": self.contest.id,
+            "teams": [{"name": "Alpha", "members": []}, {"name": "Alpha", "members": []}]}, format="json")
+        self.assertFailed(response)
+        self.assertEqual(Contest.objects.count(), before)

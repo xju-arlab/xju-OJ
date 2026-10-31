@@ -45,6 +45,10 @@ class Contest(models.Model):
     # most this many items and publishing needs exactly this many problems.
     # Null means not decided yet.
     prep_problem_count = models.PositiveIntegerField(null=True, blank=True)
+    # ACM only. From this moment everyone but contest admins sees the board as
+    # it stood, with later attempts pending, until an admin unfreezes it.
+    rank_freeze_time = models.DateTimeField(null=True, blank=True)
+    rank_unfrozen = models.BooleanField(default=False)
 
     objects = ContestQuerySet.as_manager()
 
@@ -98,6 +102,21 @@ class Contest(models.Model):
     def review_running(self):
         window = self.review_window()
         return window is not None and window[1] is None
+
+    @property
+    def is_team_contest(self):
+        """Contested by generated team accounts only; open to all once it ends."""
+        if "_is_team_contest" not in self.__dict__:
+            self.__dict__["_is_team_contest"] = self.teams.exists()
+        return self.__dict__["_is_team_contest"]
+
+    def rank_frozen(self, user=None):
+        """Whether this viewer gets the frozen ACM board; contest admins always see it live."""
+        if self.rule_type != ContestRuleType.ACM or not self.rank_freeze_time or self.rank_unfrozen:
+            return False
+        if now() < self.rank_freeze_time:
+            return False
+        return not (user and user.is_authenticated and user.is_contest_admin(self))
 
     def prep_can_manage(self, user):
         return self.prep_role(user) == ContestPrepRole.CREATOR
@@ -192,6 +211,23 @@ class ContestPrepInvite(models.Model):
     class Meta:
         db_table = "contest_prep_invite"
         ordering = ("-create_time", "-id")
+
+
+class ContestTeam(models.Model):
+    """A team account generated for one contest from a roster.
+
+    The account logs in with its password even where only SSO login is
+    otherwise allowed, and the board shows the team name.
+    """
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="teams")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="contest_team")
+    name = models.TextField()
+    members = JSONField(default=list)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "contest_team"
+        ordering = ("id",)
 
 
 class ContestParticipation(models.Model):

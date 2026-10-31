@@ -246,7 +246,7 @@ class DashboardInfoAPI(APIView):
         recent_contest_count = Contest.objects.public().exclude(end_time__lt=timezone.now()).count()
         judge_server_count = len(list(filter(lambda x: x.status == "normal", JudgeServer.objects.all())))
         return self.success({
-            "user_count": User.objects.count(),
+            "user_count": User.objects.filter(contest_team__isnull=True).count(),
             "recent_contest_count": recent_contest_count,
             "today_submission_count": today_submission_count,
             "judge_server_count": judge_server_count,

@@ -15,8 +15,9 @@ from problem.contest_authoring import alphabetic_display_id, order_contest_probl
 from problem.models import Problem
 from problem.tasks import schedule_contest_problem_publication
 from utils.api import APIError
-from utils.constants import PUBLISH_DEFAULT_HOURS
+from utils.constants import ContestRuleType, PUBLISH_DEFAULT_HOURS
 from .models import Contest, ContestAnnouncement
+from .teams import create_teams
 
 
 @transaction.atomic
@@ -36,8 +37,13 @@ def publish_prep_contest(prep_contest, overrides):
     end_time = overrides.get("end_time") or start_time + timedelta(hours=PUBLISH_DEFAULT_HOURS)
     if end_time <= start_time:
         raise APIError("Start time must occur earlier than end time")
+    freeze_time = overrides.get("rank_freeze_time") if prep.rule_type == ContestRuleType.ACM else None
+    if freeze_time and not start_time < freeze_time < end_time:
+        raise APIError("Freeze time must fall between start time and end time")
+    teams = overrides.get("teams")
     # The review password stays with the review; the real contest gets its own.
-    password = overrides.get("password") or None
+    # Team accounts arrive registered, so their contest needs none.
+    password = None if teams else overrides.get("password") or None
 
     contest = Contest.objects.create(
         title=overrides.get("title", prep.title),
@@ -51,7 +57,10 @@ def publish_prep_contest(prep_contest, overrides):
         visible=True,
         allowed_ip_ranges=list(prep.allowed_ip_ranges),
         published_from=prep,
+        rank_freeze_time=freeze_time,
     )
+    # Plaintext passwords of the new team accounts, handed back once.
+    contest.generated_teams = create_teams(contest, teams) if teams else []
 
     queued = False
     for index, problem in enumerate(problems):

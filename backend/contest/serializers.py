@@ -20,6 +20,7 @@ class CreateConetestSeriaizer(serializers.Serializer):
     allowed_ip_ranges = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=True)
     # Create a private preparation workspace instead of a normal contest.
     preparation = serializers.BooleanField(required=False, default=False)
+    rank_freeze_time = serializers.DateTimeField(required=False, allow_null=True)
 
 
 class EditConetestSeriaizer(serializers.Serializer):
@@ -32,12 +33,34 @@ class EditConetestSeriaizer(serializers.Serializer):
     visible = serializers.BooleanField()
     real_time_rank = serializers.BooleanField()
     allowed_ip_ranges = serializers.ListField(child=serializers.CharField(max_length=32))
+    rank_freeze_time = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class ContestRankFreezeSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    unfrozen = serializers.BooleanField()
+
+
+class ContestTeamInputSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=64)
+    members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
+
+
+class CreateContestTeamsSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    teams = serializers.ListField(child=ContestTeamInputSerializer(), min_length=1, max_length=500)
+
+
+class ContestTeamPasswordSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    id = serializers.IntegerField()
 
 
 class ContestAdminSerializer(serializers.ModelSerializer):
     created_by = UsernameSerializer()
     status = serializers.CharField()
     contest_type = serializers.CharField()
+    team_contest = serializers.BooleanField(source="is_team_contest", read_only=True)
 
     class Meta:
         model = Contest
@@ -194,6 +217,9 @@ class ContestPrepPublishSerializer(serializers.Serializer):
     end_time = serializers.DateTimeField(required=False)
     password = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
     real_time_rank = serializers.BooleanField(required=False)
+    rank_freeze_time = serializers.DateTimeField(required=False, allow_null=True)
+    # Publish for generated team accounts instead of the contestants' own accounts.
+    teams = serializers.ListField(child=ContestTeamInputSerializer(), required=False, min_length=1, max_length=500)
 
 
 class ContestProblemFeedbackSerializer(serializers.ModelSerializer):

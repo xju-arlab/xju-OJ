@@ -117,7 +117,8 @@ class UserAdminAPI(APIView):
                 return self.error("User does not exist")
             return self.success(UserAdminSerializer(user).data)
 
-        user = User.objects.all().order_by("-create_time")
+        # Contest team accounts are managed with their contest, not as site accounts.
+        user = User.objects.filter(contest_team__isnull=True).order_by("-create_time")
 
         keyword = request.GET.get("keyword", None)
         if keyword:

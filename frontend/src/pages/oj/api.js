@@ -420,6 +420,11 @@ export default {
   exportPrepStatements (data) {
     return axios.post('contest/prep/statement_pdf', data, { responseType: 'blob', timeout: 180000 })
   },
+  setContestRankFreeze (contestID, unfrozen) {
+    return ajax('admin/contest/rank_freeze', 'post', {
+      data: { contest_id: contestID, unfrozen }
+    })
+  },
   publishPrepContest (data) {
     return ajax('contest/prep/publish', 'post', {
       data

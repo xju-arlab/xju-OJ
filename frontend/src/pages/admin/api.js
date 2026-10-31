@@ -189,6 +189,26 @@ export default {
       params: params
     })
   },
+  getContestTeams (contestID) {
+    return ajax('admin/contest/teams', 'get', {
+      params: { contest_id: contestID }
+    })
+  },
+  createContestTeams (contestID, teams) {
+    return ajax('admin/contest/teams', 'post', {
+      data: { contest_id: contestID, teams }
+    })
+  },
+  resetContestTeamPassword (contestID, id) {
+    return ajax('admin/contest/teams', 'put', {
+      data: { contest_id: contestID, id }
+    })
+  },
+  deleteContestTeam (contestID, id) {
+    return ajax('admin/contest/teams', 'delete', {
+      params: { contest_id: contestID, id }
+    })
+  },
   getContestAnnouncementList (contestID) {
     return ajax('admin/contest/announcement', 'get', {
       params: {

@@ -1,3 +1,4 @@
+import moment from 'moment'
 import api from '@oj/api'
 import { mapGetters, mapState } from '@/store/compat'
 import { types } from '@/store'
@@ -11,7 +12,10 @@ export default {
     return {
       autoRefresh: rankPreferences.autoRefresh,
       rankPreferences,
-      rankRequestSerial: 0
+      rankRequestSerial: 0,
+      // Contest admins see the live board; this shows them the contestants' frozen one.
+      previewFrozen: false,
+      boardFrozen: false
     }
   },
   methods: {
@@ -27,6 +31,7 @@ export default {
         contest_id: this.$route.params.contestID,
         force_refresh: this.forceUpdate ? '1' : '0'
       }
+      if (this.previewFrozen) params.frozen = '1'
       api.getContestRank(params).then(res => {
         if (requestSerial !== this.rankRequestSerial) return
         const payload = res.data.data || {}
@@ -42,6 +47,7 @@ export default {
     },
     applyRankPayload (payload, page) {
       const results = Array.isArray(payload.results) ? payload.results : []
+      this.boardFrozen = payload.frozen === true
       this.total = Number(payload.total) || results.length
       if (page === 1) this.applyToChart(results.slice(0, 10))
       this.applyToTable(results)
@@ -133,6 +139,21 @@ export default {
     },
     refreshDisabled () {
       return this.contest.status === CONTEST_STATUS.ENDED
+    },
+    contestEnded () {
+      return this.contest.status === CONTEST_STATUS.ENDED
+    },
+    freezeNotice () {
+      const contest = this.contest
+      const freeze = contest.rank_freeze_time && moment(contest.rank_freeze_time)
+      const active = contest.rule_type === 'ACM' && freeze && !contest.rank_unfrozen &&
+        !freeze.isAfter(moment(this.$store.state.contest.now))
+      if (this.isContestAdmin ? !active : !this.boardFrozen) return ''
+      const since = `已于 ${freeze.format('HH:mm')} 封榜`
+      if (this.isContestAdmin && !this.previewFrozen) {
+        return `${since}，你看到的是实时榜，选手看到的是封榜榜${this.contestEnded ? '' : '，比赛结束后可开榜'}`
+      }
+      return `${since}，此后的提交显示为 ?，比赛结束后由管理员开榜`
     }
   },
   mounted () {

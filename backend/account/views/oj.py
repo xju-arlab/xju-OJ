@@ -12,6 +12,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from otpauth import OtpAuth
 
+from contest.models import ContestTeam
 from problem.models import Problem
 from utils.constants import ContestRuleType
 from options.options import SysOptions
@@ -49,7 +50,12 @@ class UserProfileAPI(APIView):
                 show_real_name = True
         except User.DoesNotExist:
             return self.error("User does not exist")
-        return self.success(UserProfileSerializer(user.userprofile, show_real_name=show_real_name).data)
+        data = UserProfileSerializer(user.userprofile, show_real_name=show_real_name).data
+        if not username:
+            # A team account only lives inside its contest; the site uses this to stay there.
+            team = ContestTeam.objects.filter(user=user).first()
+            data["team"] = team and {"contest_id": team.contest_id, "name": team.name, "members": team.members}
+        return self.success(data)
 
     @validate_serializer(EditUserProfileSerializer)
     @login_required
@@ -178,9 +184,12 @@ class UserLoginAPI(APIView):
         """
         User login api
         """
-        if settings.AUTHENTIK_OIDC_ENABLED and not settings.AUTHENTIK_LOCAL_LOGIN_ENABLED:
-            return self.error("Please login with Authentik")
         data = request.data
+        # Generated contest team accounts have no SSO identity and keep their
+        # password login when local login is otherwise switched off.
+        if settings.AUTHENTIK_OIDC_ENABLED and not settings.AUTHENTIK_LOCAL_LOGIN_ENABLED and \
+                not ContestTeam.objects.filter(user__username__iexact=data["username"]).exists():
+            return self.error("Please login with Authentik")
         user = auth.authenticate(username=data["username"], password=data["password"])
         # None is returned if username or password is wrong
         if user:
@@ -416,8 +425,8 @@ class UserRankAPI(APIView):
         rule_type = request.GET.get("rule")
         if rule_type not in ContestRuleType.choices():
             rule_type = ContestRuleType.ACM
-        profiles = UserProfile.objects.filter(user__admin_type=AdminType.REGULAR_USER, user__is_disabled=False) \
-            .select_related("user")
+        profiles = UserProfile.objects.filter(user__admin_type=AdminType.REGULAR_USER, user__is_disabled=False,
+                                              user__contest_team__isnull=True).select_related("user")
         if rule_type == ContestRuleType.ACM:
             profiles = profiles.filter(submission_number__gt=0).order_by("-accepted_number", "submission_number")
         else:

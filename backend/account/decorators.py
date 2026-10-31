@@ -117,8 +117,11 @@ def check_contest_permission(check_type="details"):
                     return self.error("Contest %s doesn't exist" % contest_id)
                 return func(*args, **kwargs)
 
-            # Anonymous
+            # Anonymous. A team contest opens to everyone once it ends; it
+            # stays read only, since submitting needs a login.
             if not user.is_authenticated:
+                if self.contest.status == ContestStatus.CONTEST_ENDED and self.contest.is_team_contest:
+                    return func(*args, **kwargs)
                 return self.error("Please login first.")
 
             # creator or owner

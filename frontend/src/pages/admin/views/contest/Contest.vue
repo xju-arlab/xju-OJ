@@ -93,6 +93,18 @@
               </span>
               <el-switch v-model="contest.visible"></el-switch>
             </div>
+            <div v-if="contest.rule_type === 'ACM' && !isPrepWorkspace" class="setting-card">
+              <span class="setting-copy">
+                <strong>封榜</strong>
+                <small>{{ contest.rank_unfrozen ? '已开榜' : '封榜后的提交显示为 ?，赛后由管理员开榜' }}</small>
+              </span>
+              <el-switch v-model="freezeEnabled"></el-switch>
+            </div>
+          </div>
+          <div v-if="contest.rule_type === 'ACM' && !isPrepWorkspace && freezeEnabled" class="field-grid time-grid freeze-grid">
+            <el-form-item label="封榜时间">
+              <el-date-picker v-model="contest.rank_freeze_time" class="full-control" type="datetime"></el-date-picker>
+            </el-form-item>
           </div>
         </section>
 
@@ -151,13 +163,27 @@
           password: '',
           real_time_rank: true,
           visible: true,
-          allowed_ip_ranges: []
+          allowed_ip_ranges: [],
+          rank_freeze_time: null
         }
       }
     },
     computed: {
       isCreate () {
         return this.$route.name !== 'edit-contest'
+      },
+      freezeEnabled: {
+        get () { return Boolean(this.contest.rank_freeze_time) },
+        set (on) {
+          if (!on) { this.contest.rank_freeze_time = null; return }
+          // The usual board freezes four hours in, or an hour before a shorter contest ends.
+          const start = new Date(this.contest.start_time).getTime()
+          const end = new Date(this.contest.end_time).getTime()
+          if (!start || !end) { this.$error('请先设置比赛开始和结束时间'); return }
+          let freeze = start + 4 * 3600e3
+          if (freeze >= end) freeze = Math.max(start + 60e3, end - 3600e3)
+          this.contest.rank_freeze_time = new Date(freeze)
+        }
       },
       isPrepWorkspace () {
         return this.isCreate ? this.preparation && this.contest.rule_type !== 'AI' : Boolean(this.contest.prep_state)
@@ -243,6 +269,7 @@
   .setting-copy strong { color: var(--color-text); font-size: 13px; }
   .setting-copy small { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
   .form-actions { display: flex; justify-content: flex-end; padding: 2px 0 6px; }
+  .freeze-grid { margin-top: 14px; }
 
   :deep(.el-form-item) { min-width: 0; }
   :deep(.el-form-item__label) { color: var(--color-text-muted); font-size: 12px; font-weight: 620; }

@@ -2,8 +2,9 @@ import ipaddress
 import logging
 
 from account.decorators import login_required, check_contest_permission
-from contest.models import ContestStatus, ContestRuleType
+from contest.models import ContestStatus, ContestRuleType, ContestTeam
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from judge.tasks import judge_task
 from options.options import SysOptions
@@ -70,6 +71,13 @@ class SubmissionAPI(APIView):
             contest = self.contest
             if not contest.problem_details_permission(request.user):
                 hide_id = True
+        team_contest = ContestTeam.objects.filter(user_id=request.user.id).values_list("contest_id", flat=True).first()
+        if team_contest is not None and team_contest != (contest and contest.id):
+            return self.error("A team account only submits in its own contest")
+        # A finished team contest is for reading only.
+        if contest and contest.is_team_contest and contest.status == ContestStatus.CONTEST_ENDED and \
+                not request.user.is_contest_admin(contest):
+            return self.error("Contest has ended")
 
         if data.get("captcha"):
             if not Captcha(request).check(data["captcha"]):
@@ -230,8 +238,12 @@ class ContestSubmissionListAPI(APIView):
 
         # 封榜的时候只能看到自己的提交
         if contest.rule_type == ContestRuleType.ACM and not contest.is_preparation:
-            if not contest.real_time_rank and not request.user.is_contest_admin(contest):
+            is_admin = request.user.is_authenticated and request.user.is_contest_admin(contest)
+            if not contest.real_time_rank and not is_admin:
                 submissions = submissions.filter(user_id=request.user.id)
+            elif contest.rank_frozen(request.user):
+                submissions = submissions.filter(Q(user_id=request.user.id) |
+                                                 Q(create_time__lt=contest.rank_freeze_time))
 
         data = self.paginate_data(request, submissions)
         data["results"] = SubmissionListSerializer(data["results"], many=True, user=request.user).data

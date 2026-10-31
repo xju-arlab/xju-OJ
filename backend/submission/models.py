@@ -77,7 +77,10 @@ class Submission(models.Model):
 
         if check_share:
             if self.contest:
-                # Once a contest has ended, all of its code is open to read.
+                # Once a contest has ended, all of its code is open to read,
+                # except attempts a still frozen board hides.
+                if self.contest.rank_frozen(user) and self.create_time >= self.contest.rank_freeze_time:
+                    return False
                 return self.contest.status == ContestStatus.CONTEST_ENDED
             if self.problem.share_submission or self.shared:
                 return True

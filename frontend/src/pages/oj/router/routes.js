@@ -97,6 +97,14 @@ export default [
     meta: {title: 'Contest List'},
     component: Contest.ContestList
   },
+  // The link handed out with a team-account contest: a navbar-free sign-in,
+  // and once the contest is over a read-only view for everyone.
+  {
+    name: 'contest-arena',
+    path: '/arena/:contestID',
+    meta: {title: 'Contest', arena: true},
+    component: Contest.ContestArena
+  },
   // One-time preparation invite; the token travels in the URL fragment.
   {
     name: 'prep-invite',

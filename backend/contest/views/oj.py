@@ -15,8 +15,9 @@ from utils.shortcuts import datetime2str, check_is_id
 from account.decorators import login_required, check_contest_permission, check_contest_password
 
 from utils.constants import ContestPrepRole, ContestRuleType, ContestStatus
+from ..freeze import freeze_rows
 from ..models import (ACMContestRank, Contest, ContestAnnouncement,
-                      ContestParticipation, OIContestRank)
+                      ContestParticipation, ContestTeam, OIContestRank)
 from ..serializers import ContestAnnouncementSerializer
 from ..serializers import (ContestPasswordVerifySerializer,
                            ContestRegistrationSerializer, ContestSerializer)
@@ -84,6 +85,10 @@ class ContestListAPI(APIView):
                                               Q(pk__in=member_prep_contests(user).values("pk")))
         else:
             contests = Contest.objects.public()
+        # A team contest is reached by its link and joins the list once it ends.
+        if not (user.is_authenticated and user.is_super_admin()):
+            running = Contest.objects.filter(teams__isnull=False, end_time__gte=now()).values("pk")
+            contests = contests.exclude(Q(pk__in=running) & ~Q(created_by_id=user.id))
         contests = contests.select_related("created_by")
         keyword = request.GET.get("keyword")
         rule_type = request.GET.get("rule_type")
@@ -143,7 +148,11 @@ class ContestAccessAPI(APIView):
         if contest.is_preparation and contest.prep_role(request.user) is None:
             return self.error("Contest does not exist")
         session_pass = request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(contest.id)
-        return self.success({"access": check_contest_password(session_pass, contest.password)})
+        # Registration already proved the password; generated team accounts
+        # arrive registered and never type it.
+        registered = not contest.is_preparation and \
+            ContestParticipation.objects.filter(contest=contest, user=request.user).exists()
+        return self.success({"access": registered or check_contest_password(session_pass, contest.password)})
 
 
 class ContestRegistrationAPI(APIView):
@@ -157,6 +166,8 @@ class ContestRegistrationAPI(APIView):
             return self.error("Contest does not exist")
         if contest.status == ContestStatus.CONTEST_ENDED:
             return self.error("Contest has ended")
+        if contest.is_team_contest:
+            return self.error("Only the team accounts of this contest take part")
 
         password = data.get("password") or request.session.get(
             CONTEST_PASSWORD_SESSION_KEY, {}
@@ -216,7 +227,19 @@ class ContestRankAPI(APIView):
         else:
             serializer = ACMContestRankSerializer
 
-        if force_refresh == "1" and is_contest_admin:
+        # Contest admins watch the live board and may preview the frozen one.
+        frozen = self.contest.rank_frozen(request.user) or \
+            (is_contest_admin and request.GET.get("frozen") == "1" and self.contest.rank_frozen())
+        rows = None
+        if frozen:
+            frozen_key = f"{CacheKey.contest_rank_cache}:{self.contest.id}:frozen"
+            rows = None if is_contest_admin else cache.get(frozen_key)
+            if rows is None:
+                rows = freeze_rows(self.contest, list(serializer(
+                    self.get_rank(), many=True, is_contest_admin=is_contest_admin).data))
+                if not is_contest_admin:
+                    cache.set(frozen_key, rows, 10)
+        elif force_refresh == "1" and is_contest_admin:
             qs = self.get_rank()
         else:
             cache_key = f"{CacheKey.contest_rank_cache}:{self.contest.id}"
@@ -224,9 +247,12 @@ class ContestRankAPI(APIView):
             if not qs:
                 qs = self.get_rank()
                 cache.set(cache_key, qs)
+        # Team accounts show as their team name, with members on hover.
+        teams = {user_id: {"name": name, "members": members} for user_id, name, members in
+                 ContestTeam.objects.filter(contest=self.contest).values_list("user_id", "name", "members")}
 
         if download_csv:
-            data = serializer(qs, many=True, is_contest_admin=is_contest_admin).data
+            data = rows if frozen else serializer(qs, many=True, is_contest_admin=is_contest_admin).data
             contest_problems = order_contest_problems(Problem.objects.filter(contest=self.contest, visible=True))
             problem_columns = {str(item.id): index for index, item in enumerate(contest_problems)}
 
@@ -258,7 +284,7 @@ class ContestRankAPI(APIView):
                 for index, item in enumerate(data):
                     worksheet.write_string(index + 1, 0, str(item["user"]["id"]))
                     worksheet.write_string(index + 1, 1, item["user"]["username"])
-                    worksheet.write_string(index + 1, 2, item["user"]["real_name"] or "")
+                    worksheet.write_string(index + 1, 2, teams.get(item["user"]["id"], {}).get("name") or item["user"]["real_name"] or "")
                     worksheet.write_string(index + 1, 3, str(item["accepted_number"]))
                     worksheet.write_string(index + 1, 4, str(item["submission_number"]))
                     worksheet.write_string(index + 1, 5, str(item["total_time"]))
@@ -273,6 +299,12 @@ class ContestRankAPI(APIView):
             response["Content-Type"] = "application/xlsx"
             return response
 
-        page_qs = self.paginate_data(request, qs)
-        page_qs["results"] = serializer(page_qs["results"], many=True, is_contest_admin=is_contest_admin).data
+        if frozen:
+            page_qs = self.paginate_data(request, rows)
+        else:
+            page_qs = self.paginate_data(request, qs)
+            page_qs["results"] = serializer(page_qs["results"], many=True, is_contest_admin=is_contest_admin).data
+        for row in page_qs["results"]:
+            row["team"] = teams.get(row["user"]["id"])
+        page_qs["frozen"] = frozen
         return self.success(page_qs)

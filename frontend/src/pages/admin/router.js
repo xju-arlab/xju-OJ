@@ -13,6 +13,7 @@ const ProblemList = () => import('./views/problem/ProblemList.vue')
 const ProblemImportOrExport = () => import('./views/problem/ImportAndExport.vue')
 const Contest = () => import('./views/contest/Contest.vue')
 const ContestList = () => import('./views/contest/ContestList.vue')
+const ContestTeams = () => import('./views/contest/ContestTeams.vue')
 
 const router = createRouter({
   history: createWebHistory('/admin/'),
@@ -89,6 +90,11 @@ const router = createRouter({
           path: '/contest/:contestId/edit',
           name: 'edit-contest',
           component: Contest
+        },
+        {
+          path: '/contest/:contestId/teams',
+          name: 'contest-teams',
+          component: ContestTeams
         },
         {
           path: '/contest/:contestId/announcement',
