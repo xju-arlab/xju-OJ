@@ -71,6 +71,12 @@ services:
     mem_limit: 384m
   codabench:
     <<: *site
+    # gunicorn leaks file descriptors per request; the image's soft limit of 1024 is
+    # exhausted after a few hundred evaluations, after which every submission fails
+    # with "Too many open files". The higher limit only buys time: restarting the
+    # container is still what reclaims the leaked descriptors.
+    ulimits:
+      nofile: {soft: 65535, hard: 65535}
     depends_on:
       db: {condition: service_healthy}
       rabbit: {condition: service_healthy}
