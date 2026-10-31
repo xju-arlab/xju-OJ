@@ -5,10 +5,15 @@
         <input type="file" accept=".csv,text/csv" @change="pick" />
         <span>{{ fileName ? '重新选择' : '选择 CSV' }}</span>
       </label>
-      <span class="team-roster-file">{{ fileName || '每行一支队伍：队伍名,队员1,队员2,队员3' }}</span>
+      <span class="team-roster-file">{{ fileName || '未选择文件' }}</span>
       <el-checkbox v-if="cells" v-model="skipHeader" @change="parse">首行是表头</el-checkbox>
     </div>
-    <p class="team-roster-hint">队员不足三人时后面留空，逗号照写，例如 <code>xx队,tom,,</code> 或 <code>xx队,tom,jerry,</code>；队伍名留空时按队员姓氏取名，例如 <code>,赵一,孙二,</code> 记为赵孙队。每支队伍生成一个 team-xxxx 账号和 8 位密码。</p>
+    <ul class="team-roster-hint">
+      <li>每行一支队伍：<code>队伍名,队员1,队员2,队员3</code></li>
+      <li>队员不足三人时后面留空，逗号照写：<code>xx队,tom,,</code> 或 <code>xx队,tom,jerry,</code></li>
+      <li>队伍名留空时按队员姓氏取名：<code>,赵一,孙二,</code> 记为赵孙队</li>
+      <li>每支队伍生成一个 team-xxxx 账号和 8 位密码</li>
+    </ul>
     <ul v-if="errors.length" class="team-roster-errors" role="alert">
       <li v-for="error in errors.slice(0, 6)" :key="error">{{ error }}</li>
       <li v-if="errors.length > 6">另有 {{ errors.length - 6 }} 处问题</li>
@@ -69,7 +74,7 @@
   .team-roster-pick:hover { background: var(--color-bg-subtle); }
   .team-roster-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .team-roster-file { min-width: 0; color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
-  .team-roster-hint { margin: 0; color: var(--color-text-faint); font-size: 12px; line-height: 1.5; }
+  .team-roster-hint { margin: 0; padding-left: 18px; color: var(--color-text-faint); font-size: 12px; line-height: 1.7; }
   .team-roster-hint code { padding: 0 4px; border-radius: 3px; background: var(--color-bg-subtle); color: var(--color-text); font-family: var(--font-mono); }
   .team-roster-errors { margin: 0; padding: 8px 10px 8px 26px; border-radius: var(--radius-sm); background: var(--tag-research-bg); color: var(--oj-danger, #c4554d); font-size: 12px; line-height: 1.6; }
   .team-roster-preview p { margin: 0 0 6px; color: var(--color-text-muted); font-size: 12px; }

@@ -148,12 +148,11 @@ class ContestTeamSheetTest(APITestCase):
         self.url = self.reverse("contest_team_sheet_api")
         self.teams = [{"name": "A&B_%队", "members": ["赵一"], "username": "team-abcd", "password": "Ab3dEf7g"}]
 
-    def test_every_field_is_escaped_and_thirty_lines_fill_a_page(self):
+    def test_every_field_is_escaped_and_each_team_gets_a_row(self):
         source = render_team_sheet("Team & contest", self.teams * 31)
         self.assertIn(r"\xjurow{A\&B\_\%队}{赵一}{team-abcd}{Ab3dEf7g}", source)
         self.assertIn(r"Team \& contest", source)
-        # Thirty lines to a page.
-        self.assertEqual(source.count(r"\newpage"), 1)
+        self.assertEqual(source.count(r"\xjurow{"), 31)
 
     def test_contest_admins_download_the_sheet(self):
         with mock.patch("contest.views.admin.compile_team_sheet", return_value=b"%PDF-1.7") as compile_sheet:

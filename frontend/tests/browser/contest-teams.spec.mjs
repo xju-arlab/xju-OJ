@@ -50,7 +50,8 @@ test.beforeEach(async ({ page }) => {
     if (path === '/api/logout') state.profile = {}
     if (path === '/api/contest') {
       data = url.searchParams.get('id') === '31' ? prep
-        : state.ended ? { ...contest, status: '-1', start_time: iso(-6), end_time: iso(-1), now: iso(0) } : contest
+        : state.ended ? { ...contest, status: '-1', start_time: iso(-6), end_time: iso(-1), now: iso(0) }
+          : state.upcoming ? { ...contest, status: '1', start_time: iso(2), end_time: iso(7), rank_freeze_time: iso(6) } : contest
     }
     if (path === '/api/contest/problem') {
       data = url.searchParams.get('problem_id') ? problem : [{ id: 5, _id: 'A', title: 'A+B', submission_number: 3, accepted_number: 1, my_status: null }]
@@ -146,4 +147,17 @@ test('after the contest the link is read only while the normal site keeps practi
   await page.goto('/contest/22/problem/A/')
   await expect(page.locator('#header')).toBeVisible()
   await expect(page.locator('.oj-submit-button')).toBeEnabled()
+})
+
+test('before the start the link says so instead of loading forever', async ({ page }) => {
+  state.upcoming = true
+  await page.goto('/arena/22')
+  await expect(page.locator('.contest-arena-notice')).toContainText('未到开赛时间')
+  await expect(page.getByPlaceholder('team-xxxx')).toBeVisible()
+  // A signed-in site account is told the contest is for team accounts.
+  state.profile = { language: 'zh-CN', user: { id: 7, username: 'student', admin_type: 'Regular User' } }
+  await page.reload()
+  await expect(page.locator('.contest-arena-notice')).toContainText('未到开赛时间')
+  await expect(page.getByText('本场比赛只对队伍账号开放，当前登录的是 student')).toBeVisible()
+  await expect(page.getByText('Loading')).toHaveCount(0)
 })

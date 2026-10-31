@@ -8,26 +8,32 @@ import tempfile
 
 from .statement_pdf import StatementPDFError, escape, run_xelatex
 
-# One team per line, 30 to a page, dashed cut lines between them.
-ROWS_PER_PAGE = 30
+# One team per boxed row in plain black sans. The row height and the 2.6mm
+# gap make exactly 30 one-line rows fit a page (31 do not), with room to cut.
 TEMPLATE = r"""\documentclass[a4paper,10pt]{article}
 \usepackage[fontset=fandol,scheme=plain]{ctex}
 \usepackage[a4paper,top=16mm,bottom=10mm,left=12mm,right=12mm,headheight=12pt,headsep=4mm]{geometry}
-\usepackage{tikz}
+\usepackage{array}
 \usepackage{fancyhdr}
+\setsansfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold,
+  ItalicFont=*-italic, BoldItalicFont=*-bolditalic]
+% Latin and CJK text alike in sans (CJK sans is FandolHei).
+\renewcommand{\familydefault}{\sfdefault}
 \pagestyle{fancy}
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
-\fancyhead[L]{\footnotesize\color{gray}%%HEADER%%}
-\fancyhead[R]{\footnotesize\color{gray}第 \thepage 页}
+\fancyhead[L]{\small %%HEADER%%}
+\fancyhead[R]{\small 第 \thepage 页}
 \setlength{\parindent}{0pt}
-% No interline glue around the cut lines, so thirty rows always fit a page.
-\newcommand{\xjucut}{\par\nointerlineskip\noindent\tikz\draw[dashed,gray!70] (0,0) -- (\linewidth-0.4pt,0);\par\nointerlineskip}
-\newcommand{\xjurow}[4]{\noindent%
-  \parbox[c][8mm][c]{0.27\linewidth}{\raggedright\small\bfseries #1}\hfill%
-  \parbox[c][8mm][c]{0.30\linewidth}{\raggedright\small #2}\hfill%
-  \parbox[c][8mm][c]{0.19\linewidth}{\small{\color{gray}账号}\enspace\ttfamily #3}\hfill%
-  \parbox[c][8mm][c]{0.19\linewidth}{\small{\color{gray}密码}\enspace\ttfamily #4}\par}
+\setlength{\tabcolsep}{5pt}
+\setlength{\arrayrulewidth}{0.6pt}
+\renewcommand{\arraystretch}{1.4}
+% Column widths add up to the line: three inner rules and the outer two.
+\newcolumntype{C}[1]{>{\raggedright\arraybackslash}p{\dimexpr#1\linewidth-2\tabcolsep-0.6pt\relax}}
+\newcommand{\xjurow}[4]{\noindent
+  \begin{tabular}{|C{0.27}|C{0.31}|C{0.21}|>{\raggedright\arraybackslash}p{\dimexpr0.21\linewidth-2\tabcolsep-1.2pt\relax}|}
+    \hline #1 & #2 & 账号\enspace #3 & 密码\enspace #4 \\ \hline
+  \end{tabular}\par\nointerlineskip\vspace{2.6mm}}
 \begin{document}
 %%ROWS%%
 \end{document}
@@ -35,15 +41,12 @@ TEMPLATE = r"""\documentclass[a4paper,10pt]{article}
 
 
 def render_team_sheet(header, teams):
-    """LaTeX source with one line per team; every field is user text and is escaped."""
+    """LaTeX source with one boxed row per team; every field is user text and is escaped."""
     rows = []
-    for index, team in enumerate(teams):
-        if index and index % ROWS_PER_PAGE == 0:
-            rows.append(r"\xjucut\newpage")
+    for team in teams:
         fields = [escape(team["name"]), escape("、".join(team["members"][:3])),
                   escape(team["username"]), escape(team["password"])]
-        rows.append(r"\xjucut\xjurow" + "".join("{" + field + "}" for field in fields))
-    rows.append(r"\xjucut")
+        rows.append(r"\xjurow" + "".join("{" + field + "}" for field in fields))
     return TEMPLATE.replace("%%HEADER%%", escape(header)).replace("%%ROWS%%", "\n".join(rows))
 
 

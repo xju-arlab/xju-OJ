@@ -4,6 +4,7 @@
       <p class="contest-arena-eyebrow">{{ $t('m.Contests') }} / {{ contestID }}</p>
       <h1>{{ contest ? contest.title : '比赛' }}</h1>
       <p v-if="contest" class="contest-arena-time">{{ formatTime(contest.start_time) }} — {{ formatTime(contest.end_time) }}</p>
+      <p v-if="contest && contest.status === '1'" class="contest-arena-notice">未到开赛时间，{{ formatTime(contest.start_time) }} 开赛</p>
       <p v-if="error" role="alert" class="contest-arena-error">{{ error }}</p>
       <form v-else-if="mode === 'login'" class="contest-arena-form" @submit.prevent="login">
         <label>队伍账号<el-input v-model="username" placeholder="team-xxxx" autocomplete="username" /></label>
@@ -12,7 +13,7 @@
         <p class="contest-arena-hint">使用发放的队伍账号和密码登录，无需统一身份认证。</p>
       </form>
       <div v-else-if="mode === 'other'" class="contest-arena-form">
-        <p class="contest-arena-hint">本场比赛只对队伍账号开放，当前登录的是 {{ currentUser.username }}。</p>
+        <p class="contest-arena-hint">本场比赛只对队伍账号开放，当前登录的是 {{ user.username }}。</p>
         <el-button @click="logout">退出后用队伍账号登录</el-button>
       </div>
       <p v-else class="contest-arena-hint">{{ $t('m.Loading') }}</p>
@@ -30,7 +31,7 @@
       return { contest: null, mode: '', error: '', username: '', password: '', loading: false }
     },
     computed: {
-      ...mapGetters(['profile', 'currentUser', 'isAuthenticated']),
+      ...mapGetters(['profile', 'user', 'isAuthenticated']),
       contestID () { return String(this.$route.params.contestID) }
     },
     async mounted () {
@@ -53,7 +54,7 @@
         if (team && String(team.contest_id) === this.contestID) return this.enter()
         if (team) return
         if (!this.isAuthenticated) { this.mode = 'login'; return }
-        const admin = this.contest.created_by.id === this.currentUser.id || this.currentUser.admin_type === 'Super Admin'
+        const admin = this.contest.created_by.id === this.user.id || this.user.admin_type === 'Super Admin'
         if (admin) return this.enter()
         this.mode = 'other'
       },
@@ -83,6 +84,7 @@
   .contest-arena-eyebrow { margin: 0; color: var(--color-text-faint); font-size: 12px; }
   .contest-arena-card h1 { margin: 6px 0 4px; color: var(--color-text); font-size: 22px; font-weight: 680; }
   .contest-arena-time { margin: 0 0 20px; color: var(--color-text-muted); font: 12px var(--font-mono); }
+  .contest-arena-notice { margin: -8px 0 18px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--color-bg-subtle); color: var(--color-text); font-size: 13px; }
   .contest-arena-form { display: grid; gap: 14px; }
   .contest-arena-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
   .contest-arena-hint { margin: 0; color: var(--color-text-faint); font-size: 12px; line-height: 1.6; }
