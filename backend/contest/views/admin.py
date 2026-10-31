@@ -7,7 +7,7 @@ from ipaddress import ip_network
 import dateutil.parser
 from django.db import transaction
 from django.db.models import ProtectedError
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.utils.timezone import now
 
 from account.decorators import check_contest_permission, ensure_created_by
@@ -19,6 +19,8 @@ from utils.constants import CacheKey, ContestPrepState, ContestRuleType, PREP_PL
 from utils.shortcuts import rand_str
 from utils.tasks import delete_files
 from ..models import Contest, ContestAnnouncement, ACMContestRank, ContestTeam
+from ..statement_pdf import PDF_TIMEOUT_SECONDS, StatementPDFError
+from ..team_sheet import compile_team_sheet
 from ..teams import create_teams, hash_team_password, team_data, team_password
 from problem.models import Problem
 from problem.publication import publish_due_contest_problems
@@ -27,7 +29,8 @@ from ..serializers import (ContestAnnouncementSerializer, ContestAdminSerializer
                            CreateConetestSeriaizer, CreateContestAnnouncementSerializer,
                            EditConetestSeriaizer, EditContestAnnouncementSerializer,
                            ACMContesHelperSerializer, ContestRankFreezeSerializer,
-                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer, )
+                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer,
+                           ContestTeamSheetSerializer, )
 
 
 def freeze_time_error(data, rule_type, preparation):
@@ -382,3 +385,29 @@ class ContestTeamAPI(APIView):
         cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
         forget_frozen_board(contest)
         return self.success()
+
+
+class ContestTeamSheetAPI(APIView):
+    @validate_serializer(ContestTeamSheetSerializer)
+    def post(self, request):
+        """Typeset the given team accounts as A4 slips to cut apart."""
+        data = request.data
+        try:
+            contest = Contest.objects.get(id=data["contest_id"], prep_state__isnull=True)
+        except Contest.DoesNotExist:
+            return self.error("Contest does not exist")
+        ensure_created_by(contest, request.user)
+        header = contest.title + (f" · 登录 {data['link']}" if data.get("link") else "")
+        # One typesetting run per contest at a time.
+        lock = f"contest_team_sheet:{contest.id}"
+        if not cache.add(lock, 1, timeout=PDF_TIMEOUT_SECONDS * 3):
+            return self.error("The team sheet is being typeset; try again shortly")
+        try:
+            pdf = compile_team_sheet(header, data["teams"])
+        except StatementPDFError as error:
+            return self.error(str(error))
+        finally:
+            cache.delete(lock)
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="contest-{contest.id}-teams.pdf"'
+        return response

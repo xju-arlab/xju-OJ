@@ -74,10 +74,6 @@ class SubmissionAPI(APIView):
         team_contest = ContestTeam.objects.filter(user_id=request.user.id).values_list("contest_id", flat=True).first()
         if team_contest is not None and team_contest != (contest and contest.id):
             return self.error("A team account only submits in its own contest")
-        # A finished team contest is for reading only.
-        if contest and contest.is_team_contest and contest.status == ContestStatus.CONTEST_ENDED and \
-                not request.user.is_contest_admin(contest):
-            return self.error("Contest has ended")
 
         if data.get("captcha"):
             if not Captcha(request).check(data["captcha"]):

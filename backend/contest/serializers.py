@@ -51,6 +51,20 @@ class CreateContestTeamsSerializer(serializers.Serializer):
     teams = serializers.ListField(child=ContestTeamInputSerializer(), min_length=1, max_length=500)
 
 
+class ContestTeamAccountSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=64)
+    members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
+    username = serializers.CharField(max_length=32)
+    password = serializers.CharField(max_length=32)
+
+
+class ContestTeamSheetSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    # Where the teams sign in, printed on every slip.
+    link = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    teams = serializers.ListField(child=ContestTeamAccountSerializer(), min_length=1, max_length=500)
+
+
 class ContestTeamPasswordSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     id = serializers.IntegerField()

@@ -16,18 +16,14 @@
 import { mapActions, mapGetters, mapState } from '@/store/compat'
 import { parseAuthError } from '@oj/authError'
 import NavBar from '@oj/components/NavBar.vue'
+import { arenaContest, enterArena, leaveArena } from '@/utils/arena'
 
-// The contest a visitor entered through its team link; its pages then stay
-// navbar-free for the rest of the browser session.
-const ARENA_KEY = 'xju-oj-arena-contest'
-function readArena () { try { return sessionStorage.getItem(ARENA_KEY) || '' } catch (_) { return '' } }
-function keepArena (id) { try { sessionStorage.setItem(ARENA_KEY, id) } catch (_) {} }
 // Team accounts may open their contest, their submissions and the sign-out page only.
 const TEAM_ROUTES = ['submission-details', 'logout', 'contest-arena']
 
 export default {
   name: 'app', components: { NavBar },
-  data () { return { authErrorHandled: false, notebookOnly: false, arenaContest: readArena() } },
+  data () { return { authErrorHandled: false, notebookOnly: false, arenaContest: arenaContest() } },
   created () { try { document.body.removeChild(document.getElementById('app-loader')) } catch (e) {} },
   mounted () {
     this.getWebsiteConfig(); this.getAuthProviders(); this.surfaceAuthError()
@@ -70,7 +66,14 @@ export default {
     website () { this.changeDomTitle() },
     '$route' (to) {
       this.changeDomTitle(); this.surfaceAuthError()
-      if (to.meta.arena) { this.arenaContest = String(to.params.contestID); keepArena(this.arenaContest) }
+      if (to.meta.arena) {
+        this.arenaContest = String(to.params.contestID)
+        enterArena(this.arenaContest)
+      } else if (this.arenaContest && !this.inContest(this.arenaContest) && to.name !== 'submission-details') {
+        // Leaving the contest returns to the normal site, practice included.
+        this.arenaContest = ''
+        leaveArena()
+      }
       this.keepTeamInContest()
     },
     'profile.team' () { this.keepTeamInContest() },

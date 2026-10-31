@@ -217,7 +217,7 @@
         </el-form-item>
         <div class="prep-publish-grid">
           <el-form-item :label="$t('m.Contest_Start_Time')">
-            <el-date-picker v-model="publishForm.start_time" type="datetime"></el-date-picker>
+            <el-date-picker v-model="publishForm.start_time" type="datetime" @change="syncPublishEnd"></el-date-picker>
           </el-form-item>
           <el-form-item :label="$t('m.Contest_End_Time')">
             <el-date-picker v-model="publishForm.end_time" type="datetime"></el-date-picker>
@@ -225,16 +225,8 @@
           <el-form-item v-if="!publishForm.team_mode" :label="$t('m.Contest_Password')">
             <el-input v-model="publishForm.password" maxlength="32"></el-input>
           </el-form-item>
-          <el-form-item :label="$t('m.Real_Time_Rank')">
-            <el-switch v-model="publishForm.real_time_rank"></el-switch>
-          </el-form-item>
-          <el-form-item v-if="contest.rule_type === 'ACM'" label="封榜">
-            <el-switch v-model="publishForm.freeze" @change="suggestFreeze"></el-switch>
-          </el-form-item>
-          <el-form-item v-if="contest.rule_type === 'ACM' && publishForm.freeze" label="封榜时间（赛后由管理员开榜）">
-            <el-date-picker v-model="publishForm.rank_freeze_time" type="datetime"></el-date-picker>
-          </el-form-item>
         </div>
+        <p class="prep-publish-note">实时排名{{ contest.rule_type === 'ACM' ? '，最后一小时封榜，赛后由管理员开榜' : '' }}</p>
         <el-form-item v-if="publishForm.team_mode" label="队伍信息" class="prep-publish-teams">
           <TeamRosterImport @update:teams="publishForm.teams = $event" />
         </el-form-item>
@@ -253,10 +245,11 @@
           <a :href="publishResult.link" target="_blank" rel="noopener">{{ publishResult.link }}</a>
           <el-button size="small" @click="copyText(publishResult.link)">复制</el-button>
         </div>
-        <p class="prep-published-copy is-warning">{{ publishResult.teams.length }} 个队伍账号的密码只在这里给出一次，已自动下载 CSV。</p>
+        <p class="prep-published-copy is-warning">{{ publishResult.teams.length }} 个队伍账号的密码只在这里给出一次，已自动下载 CSV；可导出 A4 账号条 PDF，按虚线裁开发给各队。</p>
       </template>
       <template #footer>
         <el-button @click="downloadPublishedTeams">再次下载账号密码</el-button>
+        <el-button :loading="sheetLoading" @click="downloadPublishedSheet">导出 PDF</el-button>
         <el-button type="primary" @click="publishResult = null">完成</el-button>
       </template>
     </LegacyDialog>
@@ -274,7 +267,7 @@
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
-  import { downloadTeamAccounts } from '@/utils/teamRoster'
+  import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
   import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
@@ -306,6 +299,7 @@
         publishForm: {},
         // The team-account publish: its link and the one-time passwords.
         publishResult: null,
+        sheetLoading: false,
         exportVisible: false
       }
     },
@@ -539,23 +533,15 @@
           end_time: end.toDate(),
           // The published contest's password is chosen here; the review password is not carried over.
           password: '',
-          real_time_rank: this.contest.real_time_rank !== false,
           team_mode: false,
-          teams: [],
-          freeze: false,
-          rank_freeze_time: null
+          teams: []
         }
         this.publishVisible = true
         this.loadSelection()
       },
-      suggestFreeze (on) {
-        // The usual board freezes four hours in, or an hour before a shorter contest ends.
-        if (!on || this.publishForm.rank_freeze_time) return
-        const start = moment(this.publishForm.start_time)
-        const end = moment(this.publishForm.end_time)
-        let freeze = start.clone().add(4, 'hours')
-        if (!freeze.isBefore(end)) freeze = moment.max(start.clone().add(1, 'minute'), end.clone().subtract(1, 'hour'))
-        this.publishForm.rank_freeze_time = freeze.toDate()
+      syncPublishEnd (start) {
+        // A new start time brings the usual five hour window with it.
+        if (start) this.publishForm.end_time = moment(start).add(PUBLISH_DEFAULT_HOURS, 'hours').toDate()
       },
       async teamLogout () {
         try { await api.logout() } catch (_) {}
@@ -564,6 +550,12 @@
       },
       copyText (text) {
         navigator.clipboard.writeText(text).then(() => this.$success('已复制'), () => this.$error('复制失败，请手动选择链接'))
+      },
+      async downloadPublishedSheet () {
+        const result = this.publishResult
+        if (!result || this.sheetLoading) return
+        this.sheetLoading = true
+        try { await downloadTeamSheet(result.id, result.link, result.teams) } catch (error) { this.$error(error.message || '导出 PDF 失败') } finally { this.sheetLoading = false }
       },
       downloadPublishedTeams () {
         const result = this.publishResult
@@ -575,11 +567,9 @@
           this.$error(this.$t('m.Prep_Time_Invalid'))
           return
         }
-        const freeze = this.contest.rule_type === 'ACM' && form.freeze && form.rank_freeze_time
-        if (freeze && !(new Date(form.start_time) < new Date(form.rank_freeze_time) && new Date(form.rank_freeze_time) < new Date(form.end_time))) {
-          this.$error('封榜时间须在比赛开始和结束之间')
-          return
-        }
+        // Ranks are always live; an ACM board freezes for the last hour, unless the contest is shorter.
+        const freeze = moment(form.end_time).subtract(1, 'hour')
+        const freezes = this.contest.rule_type === 'ACM' && freeze.isAfter(moment(form.start_time))
         // A team publish stays here to hand over the link and the passwords.
         const tab = form.team_mode ? null : this.blankTab()
         this.publishing = true
@@ -590,8 +580,8 @@
             start_time: new Date(form.start_time).toISOString(),
             end_time: new Date(form.end_time).toISOString(),
             password: form.team_mode ? '' : form.password,
-            real_time_rank: form.real_time_rank,
-            rank_freeze_time: freeze ? new Date(form.rank_freeze_time).toISOString() : null,
+            real_time_rank: true,
+            rank_freeze_time: freezes ? freeze.toISOString() : null,
             ...(form.team_mode ? { teams: form.teams } : {})
           })
           this.publishVisible = false
@@ -990,6 +980,7 @@
 }
 .prep-publish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 .prep-publish-teams :deep(.el-form-item__content) { display: block; }
+.prep-publish-note { margin: -6px 0 14px; color: var(--color-text-muted); font-size: 12px; }
 .contest-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--color-text); font-size: 13px; cursor: default; }
 .contest-team strong { font-weight: 650; }
 .contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }

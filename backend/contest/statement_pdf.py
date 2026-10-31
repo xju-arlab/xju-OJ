@@ -596,49 +596,59 @@ def latex_errors(log):
     return errors
 
 
+def run_xelatex(workdir, name):
+    """Typeset workdir/<name>.tex twice in isolation; return (pdf_bytes or None, log)."""
+    xelatex = shutil.which("xelatex")
+    if xelatex is None:
+        raise StatementPDFError("PDF export is unavailable: XeLaTeX is not installed on the server")
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": workdir,
+        "TEXMFOUTPUT": workdir,
+        "TEXMFVAR": os.path.join(workdir, ".texmf-var"),
+        # No shell escape and no file access outside the build directory.
+        "shell_escape": "f",
+        "openin_any": "p",
+        "openout_any": "p",
+        "max_print_line": "1000",
+        "LANG": "C.UTF-8",
+    }
+    command = [xelatex, "-interaction=nonstopmode", "-no-shell-escape", f"{name}.tex"]
+    for _ in range(2):
+        try:
+            subprocess.run(command, cwd=workdir, env=env, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=PDF_TIMEOUT_SECONDS, check=False)
+        except subprocess.TimeoutExpired:
+            raise StatementPDFError("Typesetting took too long; check the statements for runaway formulas")
+    log = ""
+    log_path = os.path.join(workdir, f"{name}.log")
+    if os.path.exists(log_path):
+        with open(log_path, encoding="utf-8", errors="replace") as log_file:
+            log = log_file.read()
+    pdf_path = os.path.join(workdir, f"{name}.pdf")
+    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+        return None, log
+    with open(pdf_path, "rb") as pdf_file:
+        return pdf_file.read(), log
+
+
 def compile_statement_pdf(contest_title, contest_date, problems, subtitle="", cover="plain"):
     """Return (pdf_bytes, errors); errors are recoverable TeX errors worth showing to the setter."""
     if not isinstance(contest_date, date_type):
         raise StatementPDFError("Invalid contest date")
     if not problems:
         raise StatementPDFError("The contest has no problems yet")
-    xelatex = shutil.which("xelatex")
-    if xelatex is None:
+    if shutil.which("xelatex") is None:
         raise StatementPDFError("PDF export is unavailable: XeLaTeX is not installed on the server")
     with tempfile.TemporaryDirectory(prefix="xjuoj-statements-") as workdir:
         source = render_document(contest_title, contest_date, problem_dicts(problems), workdir, subtitle, cover)
         with open(os.path.join(workdir, "statements.tex"), "w", encoding="utf-8") as tex_file:
             tex_file.write(source)
-        env = {
-            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-            "HOME": workdir,
-            "TEXMFOUTPUT": workdir,
-            "TEXMFVAR": os.path.join(workdir, ".texmf-var"),
-            # No shell escape and no file access outside the build directory.
-            "shell_escape": "f",
-            "openin_any": "p",
-            "openout_any": "p",
-            "max_print_line": "1000",
-            "LANG": "C.UTF-8",
-        }
-        command = [xelatex, "-interaction=nonstopmode", "-no-shell-escape", "statements.tex"]
-        for _ in range(2):
-            try:
-                subprocess.run(command, cwd=workdir, env=env, stdin=subprocess.DEVNULL,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                               timeout=PDF_TIMEOUT_SECONDS, check=False)
-            except subprocess.TimeoutExpired:
-                raise StatementPDFError("Typesetting took too long; check the statements for runaway formulas")
-        log_path = os.path.join(workdir, "statements.log")
-        log = ""
-        if os.path.exists(log_path):
-            with open(log_path, encoding="utf-8", errors="replace") as log_file:
-                log = log_file.read()
+        pdf, log = run_xelatex(workdir, "statements")
         errors = latex_errors(log)
-        pdf_path = os.path.join(workdir, "statements.pdf")
-        if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+        if pdf is None:
             first = errors[0] if errors else {"problem": None, "message": "no output"}
             where = f"Problem {first['problem']}: " if first.get("problem") else ""
             raise StatementPDFError(f"Typesetting failed. {where}{first['message']}", details=log[-2000:])
-        with open(pdf_path, "rb") as pdf_file:
-            return pdf_file.read(), errors
+        return pdf, errors

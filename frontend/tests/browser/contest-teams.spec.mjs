@@ -22,6 +22,13 @@ const rank = {
       submission_number: 2, submission_info: { 5: { is_ac: false, ac_time: 0, error_number: 0, is_first_ac: false, frozen_number: 2 } } }
   ]
 }
+const problem = {
+  id: 5, _id: 'A', title: 'A+B', description: '<p>求和</p>', input_description: '<p>两个数</p>', output_description: '<p>和</p>',
+  data_range: '', samples: [{ input: '1 2', output: '3' }], hint: '', languages: ['C++'], template: {}, time_limit: 1000,
+  memory_limit: 256, io_mode: { io_mode: 'Standard IO', input: 'input.txt', output: 'output.txt' }, rule_type: 'ACM',
+  difficulty: 'Low', tags: [], source: '', created_by: { username: 'root' }, submission_number: 3, accepted_number: 1,
+  statistic_info: {}, my_status: null, total_score: 0, judge_mode: 'LOCAL', favorited: false
+}
 let state
 
 test.beforeEach(async ({ page }) => {
@@ -41,13 +48,20 @@ test.beforeEach(async ({ page }) => {
       } else { error = 'error'; data = 'Invalid username or password' }
     }
     if (path === '/api/logout') state.profile = {}
-    if (path === '/api/contest') data = url.searchParams.get('id') === '31' ? prep : contest
-    if (path === '/api/contest/problem') data = [{ id: 5, _id: 'A', title: 'A+B', submission_number: 3, accepted_number: 1, my_status: null }]
+    if (path === '/api/contest') {
+      data = url.searchParams.get('id') === '31' ? prep
+        : state.ended ? { ...contest, status: '-1', start_time: iso(-6), end_time: iso(-1), now: iso(0) } : contest
+    }
+    if (path === '/api/contest/problem') {
+      data = url.searchParams.get('problem_id') ? problem : [{ id: 5, _id: 'A', title: 'A+B', submission_number: 3, accepted_number: 1, my_status: null }]
+    }
+    if (path === '/api/languages') data = { languages: [{ name: 'C++', description: 'G++', content_type: 'text/x-c++src', config: { template: '' } }], spj_languages: [] }
     if (path === '/api/contest_rank') data = state.admin ? { ...rank, frozen: false } : rank
     if (path.startsWith('/api/contest/prep/problem')) data = [{ id: 9, _id: 'A', title: 'A+B', visible: true }]
     if (path === '/api/contest/prep/plan') data = { items: [], progress: [] }
     if (path === '/api/contest/prep/publish') data = { id: 40, title: body.title, teams: body.teams.map((item, index) => ({ ...item, id: index + 1, username: `team-aaa${index}`, password: 'Pass2345' })) }
     if (path === '/api/contest/announcement') data = []
+    if (path === '/api/admin/contest/teams/sheet') return route.fulfill({ body: '%PDF-1.7', contentType: 'application/pdf' })
     await route.fulfill({ json: { error, data } })
   })
 })
@@ -84,17 +98,52 @@ test('publishing for team accounts takes a roster instead of a password and hand
   await page.getByRole('button', { name: /发布|Publish/ }).first().click()
   const dialog = page.locator('.el-dialog').filter({ hasText: '参赛账号' })
   await expect(dialog.getByText('密码', { exact: true })).toBeVisible()
+  await expect(dialog.locator('.prep-publish-note')).toHaveText('实时排名，最后一小时封榜，赛后由管理员开榜')
+  await expect(dialog.locator('.el-switch')).toHaveCount(1)
+  // A new start time brings a five hour window.
+  const [start, end] = await dialog.locator('.el-date-editor input').all()
+  await start.fill('2026-11-08 09:00:00')
+  await start.press('Enter')
+  await expect(end).toHaveValue('2026-11-08 14:00:00')
   await dialog.locator('.el-switch').first().click()
   await expect(dialog.getByText('密码', { exact: true })).toHaveCount(0)
   await dialog.locator('input[type=file]').setInputFiles({
-    name: 'teams.csv', mimeType: 'text/csv', buffer: Buffer.from('队伍名,队员1,队员2,队员3\nTeam Alpha,A1,A2,\nTeam Beta,B1,,\n')
+    name: 'teams.csv', mimeType: 'text/csv', buffer: Buffer.from('队伍名,队员1,队员2,队员3\nTeam Alpha,A1,A2,\nTeam Beta,B1,,,\n,赵一,孙二,\n')
   })
-  await expect(dialog.locator('.team-roster-preview')).toContainText('共 2 支队伍')
+  await expect(dialog.locator('.team-roster-preview')).toContainText('共 3 支队伍')
+  await expect(dialog.locator('.team-roster-preview')).toContainText('赵孙队')
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '发布比赛' }).click()
   expect((await download).suggestedFilename()).toBe('contest-40-teams.csv')
   const publish = state.writes.find(item => item.path === '/api/contest/prep/publish')
-  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'] }, { name: 'Team Beta', members: ['B1'] }])
+  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'] }, { name: 'Team Beta', members: ['B1'] },
+    { name: '赵孙队', members: ['赵一', '孙二'] }])
   expect(publish.body.password).toBe('')
+  // Ranks are live and an ACM board freezes for the last hour.
+  expect(publish.body.real_time_rank).toBe(true)
+  expect(Date.parse(publish.body.end_time) - Date.parse(publish.body.start_time)).toBe(5 * 3600e3)
+  expect(Date.parse(publish.body.end_time) - Date.parse(publish.body.rank_freeze_time)).toBe(3600e3)
   await expect(page.locator('.prep-published-link a')).toHaveText(/\/arena\/40$/)
+  const sheet = page.waitForEvent('download')
+  await page.locator('.el-dialog').filter({ hasText: '比赛链接' }).getByRole('button', { name: '导出 PDF' }).click()
+  expect((await sheet).suggestedFilename()).toBe('contest-40-teams.pdf')
+  const sheetRequest = state.writes.find(item => item.path === '/api/admin/contest/teams/sheet')
+  expect(sheetRequest.body.teams[2]).toEqual({ name: '赵孙队', members: ['赵一', '孙二'], username: 'team-aaa2', password: 'Pass2345' })
+})
+
+test('after the contest the link is read only while the normal site keeps practice', async ({ page }) => {
+  state.ended = true
+  state.profile = { language: 'zh-CN', user: { id: 7, username: 'student', admin_type: 'Regular User' } }
+  await page.goto('/arena/22')
+  await expect(page).toHaveURL(/\/contest\/22\/$/)
+  await expect(page.locator('#header')).toHaveCount(0)
+  await page.goto('/contest/22/problem/A/')
+  await expect(page.getByText('比赛已结束，此链接只供查看')).toBeVisible()
+  await expect(page.locator('.oj-submit-button')).toBeDisabled()
+  // Leaving through the contest list ends the link view.
+  await page.goto('/contest')
+  await expect(page.locator('#header')).toBeVisible()
+  await page.goto('/contest/22/problem/A/')
+  await expect(page.locator('#header')).toBeVisible()
+  await expect(page.locator('.oj-submit-button')).toBeEnabled()
 })

@@ -1,5 +1,6 @@
 // Team rosters for contest team accounts: a CSV of team name and up to three
 // members, and the account sheet handed back once with the passwords.
+import axios from 'axios'
 import papa from 'papaparse'
 
 export const TEAM_NAME_MAX = 64
@@ -20,14 +21,30 @@ export function looksLikeHeader (cells) {
   return /^(队伍名称?|队名|队伍|team( name)?|name)$/i.test(name) || /^(队员|成员|member)\s*1?$/i.test(first)
 }
 
-export function parseRoster (text, skipHeader) {
+// A team without a name is called after its members' surnames: 赵某、孙某 → 赵孙队.
+export function surnameTeamName (members, taken) {
+  const base = members.map(member => Array.from(member)[0]).join('') + '队'
+  let name = base
+  for (let index = 2; taken.has(name); index++) name = base + index
+  return name
+}
+
+export function parseRoster (text, skipHeader, existingNames = []) {
   const rows = papa.parse(text, { skipEmptyLines: 'greedy' }).data
     .map(cells => cells.map(cell => String(cell ?? '').trim()))
-  return (skipHeader ? rows.slice(1) : rows).map((cells, index) => ({
+  const teams = (skipHeader ? rows.slice(1) : rows).map((cells, index) => ({
     line: index + (skipHeader ? 2 : 1),
     name: cells[0] || '',
     members: cells.slice(1, 4).filter(Boolean)
-  }))
+  })).filter(team => team.name || team.members.length)
+  const taken = new Set([...existingNames, ...teams.map(team => team.name).filter(Boolean)])
+  for (const team of teams) {
+    if (team.name) continue
+    team.name = surnameTeamName(team.members, taken)
+    team.derived = true
+    taken.add(team.name)
+  }
+  return teams
 }
 
 // Problems the server would also reject, reported per CSV line.
@@ -52,15 +69,19 @@ function csvCell (value) {
   return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text
 }
 
-export function downloadTeamAccounts (filename, teams) {
-  const lines = [['队伍名', '队员1', '队员2', '队员3', '用户名', '密码']]
-  for (const team of teams) {
-    const members = [...team.members, '', '', ''].slice(0, 3)
-    lines.push([team.name, ...members, team.username, team.password])
+// The A4 slips to cut apart; the server typesets what it is sent and keeps nothing.
+export async function downloadTeamSheet (contestId, link, teams) {
+  const res = await axios.post('admin/contest/teams/sheet', {
+    contest_id: contestId, link, teams: teams.map(({ name, members, username, password }) => ({ name, members, username, password }))
+  }, { responseType: 'blob' })
+  if (res.data.type !== 'application/pdf') {
+    const body = JSON.parse(await res.data.text())
+    throw new Error(typeof body.data === 'string' ? body.data : '导出 PDF 失败')
   }
-  // The BOM lets Excel read the sheet as UTF-8.
-  const blob = new Blob(['﻿' + lines.map(line => line.map(csvCell).join(',')).join('\r\n')],
-    { type: 'text/csv;charset=utf-8' })
+  saveBlob(`contest-${contestId}-teams.pdf`, res.data)
+}
+
+function saveBlob (filename, blob) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -69,4 +90,15 @@ export function downloadTeamAccounts (filename, teams) {
   link.click()
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function downloadTeamAccounts (filename, teams) {
+  const lines = [['队伍名', '队员1', '队员2', '队员3', '用户名', '密码']]
+  for (const team of teams) {
+    const members = [...team.members, '', '', ''].slice(0, 3)
+    lines.push([team.name, ...members, team.username, team.password])
+  }
+  // The BOM lets Excel read the sheet as UTF-8.
+  saveBlob(filename, new Blob(['\ufeff' + lines.map(line => line.map(csvCell).join(',')).join('\r\n')],
+    { type: 'text/csv;charset=utf-8' }))
 }

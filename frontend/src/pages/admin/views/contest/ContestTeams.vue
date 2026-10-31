@@ -11,14 +11,17 @@
       </section>
 
       <section v-if="created.length" class="team-section is-created">
-        <h3>本次生成（密码只在这里给出一次，已自动下载 CSV）</h3>
+        <h3>本次生成（密码只在这里给出一次，已自动下载 CSV，可再导出 A4 账号条 PDF）</h3>
         <el-table :data="created" size="small">
           <el-table-column prop="name" label="队伍名" />
           <el-table-column label="队员"><template #default="{ row }">{{ row.members.join('、') || '—' }}</template></el-table-column>
           <el-table-column prop="username" label="用户名" width="140" />
           <el-table-column prop="password" label="密码" width="120"><template #default="{ row }"><code>{{ row.password }}</code></template></el-table-column>
         </el-table>
-        <el-button class="team-download" @click="download(created)">再次下载账号密码</el-button>
+        <div class="team-download">
+          <el-button @click="download(created)">再次下载账号密码</el-button>
+          <el-button :loading="sheetLoading" @click="downloadSheet">导出 PDF</el-button>
+        </div>
       </section>
 
       <section class="team-section">
@@ -42,13 +45,13 @@
 <script>
   import api from '../../api.js'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
-  import { downloadTeamAccounts } from '@/utils/teamRoster'
+  import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
 
   export default {
     name: 'ContestTeams',
     components: { TeamRosterImport },
     data () {
-      return { contest: {}, teams: [], roster: [], created: [], loading: false, generating: false }
+      return { contest: {}, teams: [], roster: [], created: [], loading: false, generating: false, sheetLoading: false }
     },
     computed: {
       contestId () { return this.$route.params.contestId },
@@ -62,6 +65,12 @@
       load () {
         this.loading = true
         api.getContestTeams(this.contestId).then(res => { this.teams = res.data.data }, () => {}).finally(() => { this.loading = false })
+      },
+      downloadSheet () {
+        this.sheetLoading = true
+        downloadTeamSheet(this.contestId, this.arenaLink, this.created)
+          .catch(error => this.$error(error.message || '导出 PDF 失败'))
+          .finally(() => { this.sheetLoading = false })
       },
       download (teams) {
         downloadTeamAccounts(`contest-${this.contestId}-teams.csv`, teams)

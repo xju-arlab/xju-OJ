@@ -6,6 +6,7 @@ import i18n from '@/i18n'
 import types from './types'
 import { STORAGE_KEY, USER_TYPE, PROBLEM_PERMISSION, CONTEST_STATUS, CONTEST_TYPE, compareContestDisplayId } from '@/utils/constants'
 import runtime from '@/utils/runtime'
+import { arenaContest } from '@/utils/arena'
 import { cloneFixtures, MOCK_CONTESTS, MOCK_PROBLEMS } from '@oj/mocks/fixtures'
 
 let activeRouter = null
@@ -86,6 +87,8 @@ const useApplicationStore = defineStore('application', {
       if (!this.contestLoaded || String(this.contest.contest.id) !== String(route().params.contestID)) return true
       if (this.isPrepContest) return false
       if (this.contestStatus === CONTEST_STATUS.NOT_START) return !this.isContestAdmin
+      // The team link stays read only once its contest is over.
+      if (this.contestStatus === CONTEST_STATUS.ENDED && (this.profile.team || arenaContest() === String(route().params.contestID))) return true
       return false
     },
     passwordFormVisible () { return this.contestStatus !== CONTEST_STATUS.ENDED && this.contest.contest.contest_type !== CONTEST_TYPE.PUBLIC && !this.contest.access && !this.isContestAdmin && !this.isPrepContest },

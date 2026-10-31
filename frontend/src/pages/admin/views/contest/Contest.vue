@@ -31,7 +31,8 @@
                 v-model="contest.start_time"
                 class="full-control"
                 type="datetime"
-                :placeholder="$t('m.Contest_Start_Time')">
+                :placeholder="$t('m.Contest_Start_Time')"
+                @change="syncEnd">
               </el-date-picker>
             </el-form-item>
             <el-form-item :label="$t('m.Contest_End_Time')" required>
@@ -96,7 +97,7 @@
             <div v-if="contest.rule_type === 'ACM' && !isPrepWorkspace" class="setting-card">
               <span class="setting-copy">
                 <strong>封榜</strong>
-                <small>{{ contest.rank_unfrozen ? '已开榜' : '封榜后的提交显示为 ?，赛后由管理员开榜' }}</small>
+                <small>{{ contest.rank_unfrozen ? '已开榜' : '默认最后一小时封榜，赛后由管理员开榜' }}</small>
               </span>
               <el-switch v-model="freezeEnabled"></el-switch>
             </div>
@@ -138,6 +139,7 @@
   import Simditor from '../../components/Simditor.vue'
   import ContestProblemComposer from './ContestProblemComposer.vue'
   import AIContestSettings from '../ai/ContestSettings.vue'
+  import { PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
 
   export default {
     name: 'CreateContest',
@@ -176,12 +178,11 @@
         get () { return Boolean(this.contest.rank_freeze_time) },
         set (on) {
           if (!on) { this.contest.rank_freeze_time = null; return }
-          // The usual board freezes four hours in, or an hour before a shorter contest ends.
+          // The board freezes for the last hour, or the last minute of a shorter contest.
           const start = new Date(this.contest.start_time).getTime()
           const end = new Date(this.contest.end_time).getTime()
           if (!start || !end) { this.$error('请先设置比赛开始和结束时间'); return }
-          let freeze = start + 4 * 3600e3
-          if (freeze >= end) freeze = Math.max(start + 60e3, end - 3600e3)
+          const freeze = Math.max(start + 60e3, end - 3600e3)
           this.contest.rank_freeze_time = new Date(freeze)
         }
       },
@@ -190,6 +191,10 @@
       }
     },
     methods: {
+      syncEnd (start) {
+        // A new contest gets the usual five hour window from its start.
+        if (start && this.isCreate) this.contest.end_time = new Date(new Date(start).getTime() + PUBLISH_DEFAULT_HOURS * 3600e3)
+      },
       async saveContest () {
         if (this.saving) return
         const incompatibleProblem = this.problemPlan.find(item => (

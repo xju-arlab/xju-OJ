@@ -1,5 +1,8 @@
 import re
+import shutil
+import unittest
 from datetime import timedelta
+from unittest import mock
 
 from django.test import override_settings
 from django.utils import timezone
@@ -11,6 +14,7 @@ from submission.tests import DEFAULT_PROBLEM_DATA
 from utils.api.tests import APITestCase
 
 from .models import ACMContestRank, Contest, ContestParticipation, ContestTeam
+from .team_sheet import compile_team_sheet, render_team_sheet
 
 
 class ContestTeamTest(APITestCase):
@@ -133,3 +137,34 @@ class ContestTeamTest(APITestCase):
                                            data={"contest_id": self.contest.id, "limit": 10}))
         self.assertSuccess(self.client.get(self.reverse("contest_submission_list_api"),
                                            data={"contest_id": self.contest.id, "limit": 10}))
+
+
+class ContestTeamSheetTest(APITestCase):
+    def setUp(self):
+        self.root = self.create_super_admin()
+        self.contest = Contest.objects.create(
+            title="Team contest", description="", real_time_rank=True, rule_type="ACM", created_by=self.root,
+            start_time=timezone.now(), end_time=timezone.now() + timedelta(hours=5))
+        self.url = self.reverse("contest_team_sheet_api")
+        self.teams = [{"name": "A&B_%队", "members": ["赵一"], "username": "team-abcd", "password": "Ab3dEf7g"}]
+
+    def test_every_field_is_escaped_and_thirty_lines_fill_a_page(self):
+        source = render_team_sheet("Team & contest", self.teams * 31)
+        self.assertIn(r"\xjurow{A\&B\_\%队}{赵一}{team-abcd}{Ab3dEf7g}", source)
+        self.assertIn(r"Team \& contest", source)
+        # Thirty lines to a page.
+        self.assertEqual(source.count(r"\newpage"), 1)
+
+    def test_contest_admins_download_the_sheet(self):
+        with mock.patch("contest.views.admin.compile_team_sheet", return_value=b"%PDF-1.7") as compile_sheet:
+            response = self.client.post(self.url, data={"contest_id": self.contest.id, "link": "https://oj/arena/1",
+                                                        "teams": self.teams}, format="json")
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(compile_sheet.call_args[0][0], "Team contest · 登录 https://oj/arena/1")
+        self.create_admin()
+        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id, "teams": self.teams},
+                                           format="json"))
+
+    @unittest.skipUnless(shutil.which("xelatex"), "XeLaTeX is not installed")
+    def test_the_sheet_typesets(self):
+        self.assertTrue(compile_team_sheet("Team contest", self.teams * 7).startswith(b"%PDF"))

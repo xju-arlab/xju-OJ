@@ -133,7 +133,10 @@
             <div v-else-if="this.contestID && !OIContestRealTimePermission && submissionExists">
               <Alert type="success" show-icon>{{$t('m.You_have_submitted_a_solution')}}</Alert>
             </div>
-            <div v-if="contestEnded && !statusVisible">
+            <div v-if="arenaReadOnly">
+              <Alert type="info" show-icon>比赛已结束，此链接只供查看；补题请从比赛列表进入</Alert>
+            </div>
+            <div v-else-if="contestEnded && !statusVisible">
               <Alert type="info" show-icon>{{$t('m.Contest_Practice_Notice')}}</Alert>
             </div>
           </div>
@@ -278,6 +281,7 @@
   import storage from '@/utils/storage'
   import {FormMixin} from '@oj/components/mixins'
   import {CONTEST_STATUS, buildProblemCodeKey} from '@/utils/constants'
+  import { arenaContest } from '@/utils/arena'
   import api from '@oj/api'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import { dispatchRemoteSubmission, isRemoteBridgeInstalled, subscribeRemoteBridgeEvents } from '@oj/remoteBridge'
@@ -754,6 +758,10 @@
       contestEnded () {
         // A preparation contest's placeholder window means nothing: its runs are never practice.
         return Boolean(this.contestID) && !this.isPrepContest && this.contestStatus === CONTEST_STATUS.ENDED
+      },
+      arenaReadOnly () {
+        // A finished contest seen through its team link takes no submissions.
+        return this.contestEnded && Boolean(this.$store.state.user.profile.team || arenaContest() === String(this.contestID))
       },
       publicProblemTags () {
         if (this.contestID) return []
