@@ -3,7 +3,8 @@
     <template v-for="(block, index) in blocks" :key="index">
       <component :is="block.type" v-if="block.type !== 'p'">
         <li v-for="(item, itemIndex) in block.items" :key="itemIndex">
-          <StatementText :text="item.text" />
+          <template v-if="item.term"><code class="studio-term">{{ item.term }}</code><span class="studio-term-desc"><StatementText :text="item.text" /></span></template>
+          <StatementText v-else :text="item.text" />
           <ul v-if="item.children.length"><li v-for="(child, childIndex) in item.children" :key="childIndex"><StatementText :text="child" /></li></ul>
         </li>
       </component>
@@ -31,7 +32,10 @@ const blocks = computed(() => {
     if (nested && last && last.type !== 'p') last.items[last.items.length - 1].children.push(nested[1])
     else if (bullet || numbered) {
       const type = bullet ? 'ul' : 'ol'
-      const item = { text: (bullet || numbered)[1], children: [] }
+      const text = (bullet || numbered)[1]
+      // In interface listings "`signature`：description" becomes a term and its description.
+      const term = props.list && text.match(/^`([^`]+)`\s*[：:]\s*(.*)$/)
+      const item = term ? { term: term[1], text: term[2], children: [] } : { text, children: [] }
       if (last && last.type === type) last.items.push(item)
       else result.push({ type, items: [item] })
     } else result.push({ type: 'p', text: line.trim() })
