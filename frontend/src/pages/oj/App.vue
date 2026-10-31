@@ -59,14 +59,15 @@ export default {
     ...mapGetters(['profile']),
     isAIProblem () { return this.$route.name === 'ai-problem' },
     contestOnly () {
-      return Boolean(this.$route.meta.arena || this.profile.team || (this.arenaContest && this.inContest(this.arenaContest)))
+      return Boolean(this.$route.meta.arena || this.$route.path.startsWith('/arena/') || this.profile.team ||
+        (this.arenaContest && this.inContest(this.arenaContest)))
     }
   },
   watch: {
     website () { this.changeDomTitle() },
     '$route' (to) {
       this.changeDomTitle(); this.surfaceAuthError()
-      if (to.meta.arena) {
+      if (to.meta.arena || to.path.startsWith('/arena/')) {
         this.arenaContest = String(to.params.contestID)
         enterArena(this.arenaContest)
       } else if (this.arenaContest && !this.inContest(this.arenaContest) && to.name !== 'submission-details') {

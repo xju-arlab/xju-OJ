@@ -46,7 +46,7 @@
     },
     methods: {
       formatTime (value) { return moment(value).format('YYYY-MM-DD HH:mm') },
-      enter () { this.$router.replace({ name: 'contest-details', params: { contestID: this.contestID } }) },
+      enter () { this.$router.replace(`/arena/${this.contestID}/`) },
       route () {
         const team = this.profile.team
         // Once the contest is over its pages are open to everyone, read only.

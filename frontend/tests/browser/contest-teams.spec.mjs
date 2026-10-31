@@ -76,14 +76,17 @@ test('the team link signs in with a password and stays inside the contest withou
   await expect(page.locator('#header')).toHaveCount(0)
   await page.getByPlaceholder('team-xxxx').fill('team-abcd')
   await page.locator('input[type=password]').fill('Pass2345')
+  await expect(page).toHaveURL(/\/arena\/22\/login$/)
   await page.getByRole('button', { name: '登录并进入比赛' }).click()
-  await expect(page).toHaveURL(/\/contest\/22\/$/)
+  await expect(page).toHaveURL(/\/arena\/22\/$/)
   await expect(page.locator('#header')).toHaveCount(0)
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('Team Alpha')
   await expect(page.locator('.contest-breadcrumb .contest-team')).toHaveAttribute('title', '队员：A1、A2')
-  // Anywhere outside the contest leads back into it.
+  // Moving inside the contest keeps the link's URLs; anywhere else leads back.
+  await page.locator('.contest-tabs').getByText(/题目|Problems/).first().click()
+  await expect(page).toHaveURL(/\/arena\/22\/problems$/)
   await page.goto('/problem')
-  await expect(page).toHaveURL(/\/contest\/22\/$/)
+  await expect(page).toHaveURL(/\/arena\/22\/$/)
 })
 
 test('the board shows team names, members on hover and pending cells while frozen', async ({ page }) => {
@@ -139,9 +142,11 @@ test('after the contest the link is read only while the normal site keeps practi
   state.ended = true
   state.profile = { language: 'zh-CN', user: { id: 7, username: 'student', admin_type: 'Regular User' } }
   await page.goto('/arena/22')
-  await expect(page).toHaveURL(/\/contest\/22\/$/)
+  await expect(page).toHaveURL(/\/arena\/22$/)
+  await expect(page.locator('.contest-hero')).toBeVisible()
   await expect(page.locator('#header')).toHaveCount(0)
   await page.goto('/contest/22/problem/A/')
+  await expect(page).toHaveURL(/\/arena\/22\/problem\/A\/$/)
   await expect(page.getByText('比赛已结束，此链接只供查看')).toBeVisible()
   await expect(page.locator('.oj-submit-button')).toBeDisabled()
   // Leaving through the contest list ends the link view.
@@ -187,4 +192,14 @@ test('a published preparation contest shows its copy and edits it instead of pub
   expect(saved).toMatchObject({ id: 40, title: '新生赛决赛', password: '', real_time_rank: true, visible: true, description: '<p>说明</p>' })
   expect(Date.parse(saved.end_time) - Date.parse(saved.rank_freeze_time)).toBe(3600e3)
   expect(state.writes.some(item => item.path === '/api/contest/prep/publish')).toBe(false)
+})
+
+test('contest admins open the link and stay on /arena/', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  await page.goto('/arena/22')
+  await expect(page.locator('.contest-hero')).toBeVisible()
+  await expect(page).toHaveURL(/\/arena\/22$/)
+  await expect(page.locator('#header')).toHaveCount(0)
+  await page.locator('.contest-tabs').getByText(/排名|Rankings/).first().click()
+  await expect(page).toHaveURL(/\/arena\/22\/rank$/)
 })

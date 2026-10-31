@@ -305,7 +305,7 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
-  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS } from '@/utils/constants'
+  import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS, USER_TYPE } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
   import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
@@ -378,6 +378,7 @@
           if (data.rule_type === 'AI') return this.$router.replace({ name: 'ai-contest', params: { contestID: data.id } })
           this.changeDomTitle({ title: data.title })
           this.syncClock()
+          if (this.$route.path.startsWith('/arena/') && data.team_contest && data.status !== CONTEST_STATUS.ENDED) this.guardArena(data)
           if (data.prep_state) {
             this.enterPrepWorkspace()
             this.loadMyPlan()
@@ -388,6 +389,16 @@
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
         })
+      },
+      async guardArena (data) {
+        // A running team contest's link takes its team accounts and contest
+        // admins; everyone else goes to the sign-in.
+        try { await this.$store.dispatch('getProfile') } catch (_) {}
+        const { user, team } = this.$store.state.user.profile
+        const admin = user && (data.created_by.id === user.id || user.admin_type === USER_TYPE.SUPER_ADMIN)
+        if (!admin && !(team && String(team.contest_id) === String(data.id))) {
+          this.$router.replace({ name: 'contest-arena', params: { contestID: data.id } })
+        }
       },
       openTab (tab) {
         if (!tab.disabled && !this.isTabActive(tab)) this.$router.push(tab.route)
@@ -701,7 +712,7 @@
           this.$success(this.$t('m.Prep_Published'))
           const published = res.data.data
           if (form.team_mode) {
-            const link = new URL(this.$router.resolve({ name: 'contest-arena', params: { contestID: published.id } }).href, window.location.origin).href
+            const link = `${window.location.origin}/arena/${published.id}`
             this.publishResult = { id: published.id, link, teams: published.teams }
             this.downloadPublishedTeams()
           } else {
@@ -737,8 +748,7 @@
       publishedLink () {
         const info = this.publishedInfo
         if (!info) return ''
-        const route = info.team_contest ? { name: 'contest-arena', params: { contestID: info.id } } : { name: 'contest-details', params: { contestID: info.id } }
-        return new URL(this.$router.resolve(route).href, window.location.origin).href
+        return `${window.location.origin}/${info.team_contest ? 'arena' : 'contest'}/${info.id}`
       },
       publishedRankSummary () {
         const info = this.publishedInfo
