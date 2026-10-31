@@ -16,7 +16,7 @@ from contest.models import Contest
 from utils.api.tests import APITestCase
 from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIProblemImport, AIServiceState, AIWorker
 from .package_format import FORMAT, PackageError, make_zip, parse_package
-from .quiz import answers_input, grade
+from .quiz import answers_input, grade, manual_input
 from .tests_packages import fixture as code_fixture
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -340,6 +340,11 @@ class QuizReviewAndACMTests(APITestCase):
         self.assertEqual(self.client.get("/api/admin/ai/reviews", {"id": card["id"]}).data["data"]["questions"][0]["answer"], "方案")
         graded = self.client.post("/api/admin/ai/reviews", {"id": card["id"], "scores": {"essay": 30}}, format="json")
         self.assertEqual((graded.data["data"]["status"], graded.data["data"]["publicScore"]), ("PARTIAL", 30))
+        # Scores sent for unanswered essays are ignored when blank or zero.
+        card_quiz = parse_package(quiz_fixture(card=TEXT_CARD, key=TEXT_KEY, media={}))[0]["metadata"]["quiz"]
+        self.assertEqual(manual_input(card_quiz, {"q1": 0, "essay": None}, {"essay": None}), {})
+        with self.assertRaises(Exception):
+            manual_input(card_quiz, {"q1": 0, "essay": None}, {"essay": 5})
         # A decided card can be rescored.
         rescored = self.client.post("/api/admin/ai/reviews", {"id": card["id"], "scores": {"essay": 40}}, format="json")
         self.assertEqual(rescored.data["data"]["publicScore"], 40)

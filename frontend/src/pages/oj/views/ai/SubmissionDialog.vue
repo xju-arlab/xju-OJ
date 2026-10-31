@@ -18,7 +18,8 @@
             <StatementText class="ai-submission-prompt" :text="question.prompt" />
             <p class="ai-submission-answer">{{ answerText(question) }}</p>
             <p v-if="result[question.id]" class="ai-submission-key"><strong>{{ result[question.id].earned ?? '待评' }} / {{ result[question.id].points }} 分</strong><span v-if="question.kind !== 'text'">正确答案：{{ answerText(question, result[question.id].answer) }}</span><span v-else-if="!reviewing">参考要点：{{ result[question.id].rubric }}</span></p>
-            <label v-if="reviewing && review[question.id]" class="ai-submission-score">评分（满分 {{ review[question.id].points }}）<input v-model.number="scores[question.id]" type="number" min="0" :max="review[question.id].points" step="0.5" /><small>参考要点：{{ review[question.id].rubric }}</small></label>
+            <p v-if="reviewing && review[question.id] && !review[question.id].answer" class="ai-submission-key">未作答，记 0 分</p>
+            <label v-else-if="reviewing && review[question.id]" class="ai-submission-score">评分（满分 {{ review[question.id].points }}）<input v-model.number="scores[question.id]" type="number" min="0" :max="review[question.id].points" step="0.5" /><small>参考要点：{{ review[question.id].rubric }}</small></label>
           </li>
         </ol>
         <div v-if="reviewing" class="studio-dialog-actions"><span v-if="reviewInfo?.review" class="studio-footnote">已由 {{ reviewInfo.review.reviewer }} 评阅，可重新评分</span><button class="studio-button primary" :disabled="saving" @click="grade">{{ saving ? '保存中…' : '提交评分' }}</button></div>
@@ -60,12 +61,14 @@ async function load () {
       quiz.value = detail.quiz
       if (props.canReview) {
         reviewInfo.value = await request('admin/ai/reviews', 'get', { id: props.id })
-        scores.value = Object.fromEntries(reviewInfo.value.questions.map(item => [item.id, reviewInfo.value.review?.scores?.[item.id] ?? null]))
+        // Only answered essays are scored; an unanswered one is 0 and must not be sent.
+        scores.value = Object.fromEntries(reviewInfo.value.questions.filter(item => item.answer).map(item => [item.id, reviewInfo.value.review?.scores?.[item.id] ?? null]))
       }
     }
   } catch (failure) { error.value = failure.message }
 }
 async function grade () {
+  if (Object.values(scores.value).some(value => typeof value !== 'number' || Number.isNaN(value))) { error.value = '请为每道已作答的主观题给分'; return }
   saving.value = true; error.value = ''
   try {
     await request('admin/ai/reviews', 'post', { id: props.id, scores: scores.value })

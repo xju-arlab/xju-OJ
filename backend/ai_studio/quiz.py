@@ -87,7 +87,12 @@ def review_ceiling(quiz, key, answers):
 def manual_input(quiz, answers, value):
     """Validate a teacher's points for the answered free-text questions; unanswered ones score 0."""
     expected = {question["id"]: question for question in text_questions(quiz) if answers.get(question["id"])}
-    require(isinstance(value, dict) and set(value) == set(expected), "请为每道已作答的主观题给分")
+    unanswered = {question["id"] for question in text_questions(quiz)} - set(expected)
+    require(isinstance(value, dict), "请为每道已作答的主观题给分")
+    # An unanswered essay scores 0; a blank or zero score sent for it is ignored.
+    require(all(value[qid] in (None, 0) for qid in set(value) & unanswered), "未作答的主观题只能记 0 分")
+    value = {qid: points for qid, points in value.items() if qid not in unanswered}
+    require(set(value) == set(expected), "请为每道已作答的主观题给分")
     for qid, points in value.items():
         require(type(points) in (int, float) and math.isfinite(points) and 0 <= points <= expected[qid]["points"],
                 f"主观题得分必须在 0–{expected[qid]['points']} 之间")
