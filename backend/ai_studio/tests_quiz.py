@@ -320,6 +320,7 @@ class QuizReviewAndACMTests(APITestCase):
         self.assertEqual([(r["username"], r["rank"], r["total"], r["penalty"] // 60) for r in rows],
                          [("cat", 1, 10, 30), ("bob", 2, 6, 3), ("ann", 3, 6, 4), ("dan", 4, 0, 0)])
         self.assertEqual(rows[2]["scores"][self.problem.code]["time"], 240)
+        self.assertTrue(all("realName" in row for row in rows))  # contest admins see real names
         self.assertEqual((rows[3]["scores"][self.problem.code]["pending"], rows[3]["scores"][self.problem.code]["score"]), (1, None))
 
     def test_points_boards_review_every_essay_and_admins_read_submissions(self):
@@ -329,6 +330,7 @@ class QuizReviewAndACMTests(APITestCase):
         card = self.submit({"q1": 1, "essay": "方案"})  # cannot pass, but every point counts on an OI board
         self.assertEqual(card["status"], "REVIEWING")
         self.assertEqual(self.client.get("/api/ai/jobs", {"id": card["id"]}).data["data"]["payload"]["answers"]["essay"], "方案")
+        self.assertNotIn("realName", self.client.get("/api/ai/leaderboard", self.scope).data["data"]["results"][0])
         self.create_user("other", "other")
         self.assertFailed(self.client.get("/api/ai/jobs", {"id": card["id"]}))
         self.client.force_login(self.teacher)

@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import now
 
-from account.models import User
+from account.models import UserProfile, User
 from contest.models import Contest
 from contest.serializers import ContestSerializer
 from utils.api import APIError
@@ -394,12 +394,15 @@ def leaderboard(request, contest_id):
     private = config.private_published and contest.end_time < now()
     weights = dict(AIContestProblem.objects.filter(contest=contest).values_list("problem_id", "points"))
     jobs = AIJob.objects.filter(contest=contest, official=True, kind="evaluation", user__is_disabled=False).select_related("user", "problem")
-    if config.ranking == "acm":
-        return {"privatePublished": private, "selection": config.selection, "ranking": "acm",
-                "results": acm_leaderboard(contest, jobs)}
-    if config.ranking == "oi":
-        return {"privatePublished": private, "selection": "best", "ranking": "oi",
-                "results": oi_leaderboard(contest, jobs, weights, private)}
+    if config.ranking in ("acm", "oi"):
+        results = acm_leaderboard(contest, jobs) if config.ranking == "acm" else oi_leaderboard(contest, jobs, weights, private)
+        if request.user.is_contest_admin(contest):
+            # Like the ACM rank, real names are shown to the contest's admins only.
+            names = dict(UserProfile.objects.filter(user_id__in=[row["userId"] for row in results]).values_list("user_id", "real_name"))
+            for row in results:
+                row["realName"] = names.get(row["userId"]) or ""
+        return {"privatePublished": private, "selection": "best" if config.ranking == "oi" else config.selection,
+                "ranking": config.ranking, "results": results}
     selected = select_scores(jobs, config.selection, private)
     rows = {}
     for (user_id, problem_id), (job, score) in selected.items():

@@ -250,7 +250,7 @@ export const m = {
   Change_Avatar: '更換頭像',
   Reupload_Avatar: '重新上傳',
   Profile_Setting: '個人資訊設定',
-  Profile_Onboarding_Notice: '首次進入 OJ 只需確認使用者名稱並填寫學號。使用者名稱、電子郵件與密碼由 Authentik 統一管理，其他資料可稍後在個人設定中補充。',
+  Profile_Onboarding_Notice: '首次進入 OJ 需確認使用者名稱並填寫真實姓名與學號。使用者名稱、電子郵件與密碼由 Authentik 統一管理，其他資料可稍後在個人設定中補充。',
   Onboarding_Title: '確認帳號資訊',
   Onboarding_Confirm: '確認並進入 OJ',
   Onboarding_Done: '帳號資訊已確認',

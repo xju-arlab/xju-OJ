@@ -264,7 +264,7 @@ export const m = {
   Change_Avatar: '更换头像',
   Reupload_Avatar: '重新上传',
   Profile_Setting: '个人信息设置',
-  Profile_Onboarding_Notice: '首次进入 OJ 只需确认用户名并填写学号。用户名、邮箱和密码由 Authentik 统一管理，其他资料可稍后在个人设置中补充。',
+  Profile_Onboarding_Notice: '首次进入 OJ 需确认用户名并填写真实姓名和学号。用户名、邮箱和密码由 Authentik 统一管理，其他资料可稍后在个人设置中补充。',
   Onboarding_Title: '确认账号信息',
   Onboarding_Confirm: '确认并进入 OJ',
   Onboarding_Done: '账号信息已确认',

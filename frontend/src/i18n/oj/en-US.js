@@ -264,7 +264,7 @@ export const m = {
   Change_Avatar: 'Change avatar',
   Reupload_Avatar: 'Upload again',
   Profile_Setting: 'Profile Setting',
-  Profile_Onboarding_Notice: 'To start using the OJ, confirm your username and enter your student ID. Your username, email, and password remain managed by Authentik; other profile details can be added later in your settings.',
+  Profile_Onboarding_Notice: 'To start using the OJ, confirm your username and enter your real name and student ID. Your username, email, and password remain managed by Authentik; other profile details can be added later in your settings.',
   Onboarding_Title: 'Confirm your account',
   Onboarding_Confirm: 'Confirm and continue',
   Onboarding_Done: 'Account confirmed',

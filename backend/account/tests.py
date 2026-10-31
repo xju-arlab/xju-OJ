@@ -266,15 +266,18 @@ class UserProfileAPITest(APITestCase):
         self.assertEqual(data["submission_number"], 0)
         self.assertEqual(data["language"], "en-US")
 
-    def test_profile_update_requires_only_student_id(self):
+    def test_profile_update_requires_real_name_and_student_id(self):
         self.create_user("studio-user", "test123")
         resp = self.client.put(self.url, data={"real_name": "Studio User"}, format="json")
         self.assertEqual(resp.data["error"], "invalid-student_id")
 
-        resp = self.client.put(self.url, data={"student_id": "   "}, format="json")
+        resp = self.client.put(self.url, data={"real_name": "Studio User", "student_id": "   "}, format="json")
         self.assertEqual(resp.data["error"], "invalid-student_id")
 
-        resp = self.client.put(self.url, data={"student_id": "20260001"}, format="json")
+        resp = self.client.put(self.url, data={"real_name": "   ", "student_id": "20260001"}, format="json")
+        self.assertEqual(resp.data["error"], "invalid-real_name")
+
+        resp = self.client.put(self.url, data={"real_name": "Studio User", "student_id": "20260001"}, format="json")
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"]["student_id"], "20260001")
 
@@ -294,9 +297,9 @@ class UserProfileAPITest(APITestCase):
             email_verified=True,
             claims={},
         )
-        echoed = {field: None for field in ("real_name", "blog", "mood", "github", "school", "major", "language")}
+        echoed = {field: None for field in ("blog", "mood", "github", "school", "major", "language")}
 
-        resp = self.client.put(self.url, data={**echoed, "student_id": "20260001"}, format="json")
+        resp = self.client.put(self.url, data={**echoed, "real_name": "张三", "student_id": "20260001"}, format="json")
 
         self.assertSuccess(resp)
         profile.refresh_from_db()

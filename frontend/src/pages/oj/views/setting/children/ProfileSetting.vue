@@ -7,6 +7,9 @@
         <FormItem :label="$t('m.Username')">
           <span class="onboarding-username">{{ username }}</span>
         </FormItem>
+        <FormItem :label="$t('m.Real_Name')" required>
+          <Input v-model="formProfile.real_name" autocomplete="name" @on-enter="confirmOnboarding"/>
+        </FormItem>
         <FormItem :label="$t('m.Student_ID')" required>
           <Input v-model="formProfile.student_id" autocomplete="off" @on-enter="confirmOnboarding"/>
         </FormItem>
@@ -50,7 +53,7 @@
     <Form ref="formProfile" :model="formProfile">
       <Row type="flex" :gutter="30" justify="space-around">
         <Col :span="11">
-          <FormItem :label="$t('m.Real_Name')">
+          <FormItem :label="$t('m.Real_Name')" required>
             <Input v-model="formProfile.real_name"/>
           </FormItem>
           <Form-item :label="$t('m.Student_ID')" required>
@@ -254,11 +257,13 @@
         await this.$nextTick()
         if (previewUrl) URL.revokeObjectURL(previewUrl)
       },
-      requireStudentId () {
-        if (String(this.formProfile.student_id || '').trim()) return true
+      requireIdentity () {
+        const missing = [['real_name', 'm.Real_Name'], ['student_id', 'm.Student_ID']]
+          .filter(([field]) => !String(this.formProfile[field] || '').trim()).map(([, label]) => this.$t(label))
+        if (!missing.length) return true
         this.$Notice.warning({
           title: this.$t('m.Profile_Required_Title'),
-          desc: this.$t('m.Profile_Required_Fields', {fields: this.$t('m.Student_ID')})
+          desc: this.$t('m.Profile_Required_Fields', {fields: missing.join('、')})
         })
         return false
       },
@@ -272,16 +277,16 @@
         })
       },
       async confirmOnboarding () {
-        if (this.loadingSaveBtn || !this.requireStudentId()) return
-        // Only the student ID is sent, so empty optional fields can never
+        if (this.loadingSaveBtn || !this.requireIdentity()) return
+        // Only the required fields are sent, so empty optional fields can never
         // block the first-login handoff.
-        if (await this.saveProfile({student_id: this.formProfile.student_id.trim()})) {
+        if (await this.saveProfile({real_name: this.formProfile.real_name.trim(), student_id: this.formProfile.student_id.trim()})) {
           this.$success(this.$t('m.Onboarding_Done'))
           this.$router.replace({name: 'home'})
         }
       },
       async updateProfile () {
-        if (!this.requireStudentId()) return
+        if (!this.requireIdentity()) return
         if (await this.saveProfile({...this.formProfile})) this.$success('Success')
       }
     },
