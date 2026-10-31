@@ -8,8 +8,9 @@ from django.db import models
 class AIProblem(models.Model):
     code = models.CharField(max_length=32, unique=True)
     title = models.CharField(max_length=128)
-    category = models.CharField(max_length=16, choices=[(v, v) for v in ("logic", "model", "challenge")])
-    # Public statement and starter only. Judge configuration never goes to students.
+    category = models.CharField(max_length=16, choices=[(v, v) for v in ("logic", "model", "challenge", "quiz")])
+    # Public statement and starter only (a quiz keeps its answer card and images under "quiz"/"media").
+    # Judge configuration, including a quiz's answer key, never goes to students.
     statement = models.JSONField(default=dict)
     cells = models.JSONField(default=list)
     public_files = models.JSONField(default=dict)

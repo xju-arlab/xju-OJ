@@ -1,7 +1,8 @@
 export const categories = [
   { id: 'logic', name: '逻辑实现', detail: '实现算法与数学函数', tone: 'orange' },
   { id: 'model', name: '模型定义', detail: '构建模型与训练流程', tone: 'purple' },
-  { id: 'challenge', name: '数据挑战', detail: '隐藏测试集与指标评分', tone: 'teal' }
+  { id: 'challenge', name: '数据挑战', detail: '隐藏测试集与指标评分', tone: 'teal' },
+  { id: 'quiz', name: '模型理解', detail: '场景作答卡，无需写代码', tone: 'blue' }
 ]
 export const categoryFor = type => categories.find(category => category.id === type) || categories[0]
 export const formatDate = value => {

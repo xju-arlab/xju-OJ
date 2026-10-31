@@ -32,8 +32,9 @@ evaluation/
 ```
 
 数据挑战 `challenge` 不带 `ingestion/` 和 `input/`，直接评分选手的 `predictions.csv`。
+模型理解 `quiz` 使用另一种布局，见下文「模型理解作答卡」。
 批量 ZIP 外层仅放 1–20 个单题 ZIP，按文件名自然顺序导入，例如 `2.zip` 在 `10.zip` 前。
-不支持再嵌套一层批量 ZIP。
+不支持再嵌套一层批量 ZIP；模型理解题与代码题须分别打包导入、分别导出。
 
 整包压缩后最多 16 MiB、累计展开最多 64 MiB、单文件最多 16 MiB、总计最多 1024 项。
 每类评测资产（如 reference）最多 255 个文件、32 MiB 减 1 KiB，与计算沙箱的展开限制一致。
@@ -74,7 +75,7 @@ evaluation/
 | --- | --- |
 | `format` / `version` | 固定为 `xju-ai-problem` / `1`；这是题包协议版本 |
 | `source_id` | 可选来源编号，仅记录和导出使用，不指定新题号 |
-| `type` | `logic` 逻辑实现、`model` 模型定义、`challenge` 数据挑战 |
+| `type` | `logic` 逻辑实现、`model` 模型定义、`challenge` 数据挑战、`quiz` 模型理解 |
 | `title` / `metric` | 非空纯文本，分别最多 128 / 64 字符 |
 | `points` | 1–10000，默认 100；比赛仍可独立配置题目权重 |
 | `statement` | 普通文本，不执行 HTML；各文本最多 32000 字符，实现要求最多 50 项 |
@@ -83,10 +84,51 @@ evaluation/
 | `accuracy_column` | 可选，模型准确率字段，值须在 0–1 之间 |
 | `pass_score` | 0–100，默认 100；逻辑实现和模型定义用它判断是否达标 |
 | `run_seconds` | 5–600，默认 120，用于 Notebook 与正式评测时限 |
+| `max_attempts` | 仅模型理解题，可选 1–20：比赛中每人对本题的正式提交次数上限；赛后练习不限 |
 
 评分列名必须不同，以英文字母或下划线开头，随后可用字母、数字、下划线、点、短横线，最多 64 字符。
 公私榜评分必须为有限的 0–100 数值；RMSE 等原始指标由评分程序转换为分数。
 缺少必需评分列会失败，不补零。题包不接受服务器 Phase / Task ID、镜像名、网络或宿主执行命令。
+
+## 模型理解作答卡
+
+`quiz` 题不写代码：学生阅读场景材料，在作答卡上选择、填数或排序，OJ 后端当场判分，
+不经过 Notebook 与 Codabench，也不受计算服务暂停影响。单题 ZIP 布局：
+
+```text
+problem.json                    # 含 quiz 作答卡
+media/                          # 可选，作答卡引用的 PNG / JPEG / WebP
+data/                           # 可选，公开 UTF-8 CSV，可下载
+evaluation/reference/answers.json
+```
+
+不带 `starter.ipynb`，评测目录只允许 `answers.json`。`problem.json` 的 `quiz` 字段：
+
+```json
+{
+  "materials": [
+    {"id": "fields", "title": "字段说明", "kind": "table", "columns": ["字段", "含义"], "rows": [["temp", "室外温度"]]},
+    {"id": "log", "title": "训练日志", "kind": "text", "text": "epoch 1, loss 0.91"},
+    {"id": "curve", "title": "损失曲线", "kind": "image", "file": "curve.png", "alt": "训练与验证损失"}
+  ],
+  "questions": [
+    {"id": "q1", "kind": "single", "prompt": "题干", "options": ["选项 A", "选项 B"], "points": 10, "materials": ["fields"]},
+    {"id": "q2", "kind": "multiple", "prompt": "题干", "options": ["…", "…", "…"], "points": 10},
+    {"id": "q3", "kind": "number", "prompt": "题干", "unit": "kWh", "points": 10},
+    {"id": "q4", "kind": "order", "prompt": "题干", "options": ["第一步", "第二步", "第三步"], "points": 10}
+  ]
+}
+```
+
+- 材料最多 20 项：`table`（1–12 列、1–100 行）、`text`（纯文本，等宽显示）、`image`（引用 `media/` 中的文件）。
+  图片最多 8 张、单张 400 KiB、合计 1 MiB，按真实文件头校验，不接受 SVG；导入后以 data URI 存入题面。
+- 小题 1–50 道，编号在材料与小题之间唯一；`points` 1–100；题干与选项是纯文本，反引号显示为代码。
+- `answers.json` 恰好覆盖每道小题，选项用 0 起的下标：
+  `{"q1": {"answer": 0}, "q2": {"answer": [0, 2], "scoring": "partial"}, "q3": {"answer": 1.5, "tolerance": 0.01, "relative": 0}, "q4": {"answer": [2, 0, 1]}}`。
+  多选默认 `all` 全对才得分；`partial` 按（选对数 − 选错数）/ 正确数计分，最低 0。
+  数值题在 `max(tolerance, relative × |answer|)` 内算对。排序题须完全一致。
+- 总分为得分小题分值之和占全部分值的百分比；达到 `pass_score` 为通过，其余非零为部分通过。
+  学生只看到总分，看不到逐题对错与答案；答案只在后台题目管理中可见。
 
 ## Notebook 与数据
 

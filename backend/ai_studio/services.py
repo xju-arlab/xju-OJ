@@ -15,6 +15,7 @@ from utils.api import APIError
 from utils.constants import ContestRuleType, ContestStatus
 from .contracts import ACTIVE, MAX_PREDICTION_BYTES, cells_input, require
 from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIServiceState, AIWorker
+from .quiz import answers_input, grade
 
 
 def contest_access(request, contest_id, *, content=True, write=False):
@@ -67,6 +68,10 @@ def public_problem(problem, points=None, full=False):
                        for key in ("objective", "requirements", "signature", "inputSpec", "outputSpec", "data", "evaluation")})
         result["cells"] = problem.cells
         result["files"] = list(problem.public_files)
+        if problem.category == "quiz":
+            # The card and its images are public; the answer key stays in judge.
+            result.update(quiz=problem.statement.get("quiz", {}), media=problem.statement.get("media", {}),
+                          maxAttempts=problem.judge.get("max_attempts"))
     return result
 
 
@@ -107,7 +112,9 @@ def contest_detail(request, contest_id):
 @transaction.atomic
 def save_draft(request, data):
     problem, contest, _ = problem_access(request, data, write=True)
-    cells = cells_input(data.get("cells"))
+    quiz = problem.category == "quiz"
+    # A quiz draft stores the answer object in the same JSON column instead of code cells.
+    content = answers_input(problem.statement.get("quiz", {}), data.get("answers")) if quiz else cells_input(data.get("cells"))
     require(type(data.get("revision")) is int and data["revision"] >= 0, "Draft revision is required")
     # Serializes first creation too; a unique constraint alone cannot lock a missing draft.
     User.objects.select_for_update().get(pk=request.user.pk)
@@ -115,10 +122,45 @@ def save_draft(request, data):
                                             scope=str(contest.id) if contest else "practice")
     if draft.revision != data["revision"]:
         raise APIError("Draft changed in another window. Export your work before reloading.", "draft-conflict")
-    draft.cells = cells
+    draft.cells = content
     draft.revision += 1
     draft.save()
-    return {"cells": draft.cells, "revision": draft.revision}
+    return {"answers" if quiz else "cells": draft.cells, "revision": draft.revision}
+
+
+def quiz_attempts(user, problem, contest):
+    return AIJob.objects.filter(user=user, problem=problem, contest=contest, kind="evaluation", official=True).count()
+
+
+def create_quiz_job(request, data, problem, contest, job_id):
+    """Grade an answer card synchronously; no compute worker or admission gate is involved."""
+    require(data.get("kind", "evaluation") == "evaluation", "模型理解题无需运行代码")
+    payload = {"answers": answers_input(problem.statement.get("quiz", {}), data.get("answers"))}
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    user = User.objects.select_for_update().get(pk=request.user.pk)
+    require(not user.is_disabled, "Your account is disabled")
+    existing = AIJob.objects.filter(pk=job_id).first()
+    if existing:
+        require(existing.user_id == user.id and existing.problem_id == problem.id and
+                existing.contest_id == (contest.id if contest else None) and existing.kind == "evaluation" and
+                existing.source_sha256 == digest, "Submission UUID has already been used")
+        return existing
+    require(bool(problem.judge.get("answers")), "Evaluation is not configured")
+    if contest:
+        contest = Contest.objects.select_for_update().get(pk=contest.pk)
+        problem_access(request, data, write=True)
+    stamp = now()
+    official = bool(contest and contest.start_time <= stamp <= contest.end_time and not user.is_contest_admin(contest))
+    limit = problem.judge.get("max_attempts")
+    if official and limit:
+        # The user row lock above serializes this count against concurrent submissions.
+        require(quiz_attempts(user, problem, contest) < limit, f"本题在比赛中最多提交 {limit} 次")
+    score = grade(problem.statement["quiz"], problem.judge["answers"], payload["answers"])
+    status = "ACCEPTED" if score >= problem.judge.get("pass_score", 100) else "PARTIAL" if score > 0 else "WRONG_ANSWER"
+    return AIJob.objects.create(id=job_id, user=user, problem=problem, contest=contest, kind="evaluation",
+                               official=official, category="quiz", problem_version=problem.version,
+                               payload=payload, source_sha256=digest, judge=problem.judge.copy(),
+                               status=status, public_score=score, finished_at=stamp)
 
 
 @transaction.atomic
@@ -130,6 +172,8 @@ def create_job(request, data):
         job_id = uuid.UUID(str(data.get("id", "")))
     except ValueError:
         raise APIError("A submission UUID is required")
+    if problem.category == "quiz":
+        return create_quiz_job(request, data, problem, contest, job_id)
     payload = {"cells": cells_input(data.get("cells")), "files": problem.public_files}
     if kind == "notebook" and "kernel" in data:
         try:

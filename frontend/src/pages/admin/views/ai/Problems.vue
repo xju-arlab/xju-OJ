@@ -15,8 +15,10 @@
       <el-form-item v-for="(_, index) in form.cells" :key="index" :label="['准备环境', '作答框架', '公开样例'][index] || '代码单元格'"><CodeMirror v-model="form.cells[index]" mode="text/x-python" /></el-form-item>
       <el-form-item label="公开数据（CSV，总计不超过 1 MiB）"><input type="file" accept=".csv" multiple @change="readFiles" /><div v-for="(_, name) in form.public_files" :key="name">{{ name }} <el-button link @click="delete form.public_files[name]">移除</el-button></div></el-form-item>
       <div v-if="form.packaged" class="ai-package-config">
-        <strong>题包评测配置</strong><p>公榜：{{ form.judge.public_column }}<template v-if="form.judge.private_column"> · 私榜：{{ form.judge.private_column }}</template> · 达标：{{ form.judge.pass_score }} · 时限：{{ form.judge.run_seconds }} 秒</p>
-        <p>修改题面保留已有成绩；更换评测程序或配置，请导出修改后重新导入。</p>
+        <strong>题包评测配置</strong>
+        <p v-if="form.type === 'quiz'">作答卡：{{ form.quiz.questions.length }} 道小题 · 达标：{{ form.judge.pass_score }}<template v-if="form.judge.max_attempts"> · 比赛中每人限交 {{ form.judge.max_attempts }} 次</template></p>
+        <p v-else>公榜：{{ form.judge.public_column }}<template v-if="form.judge.private_column"> · 私榜：{{ form.judge.private_column }}</template> · 达标：{{ form.judge.pass_score }} · 时限：{{ form.judge.run_seconds }} 秒</p>
+        <p>{{ form.type === 'quiz' ? '修改题面文字保留已有成绩；作答卡、图片和答案随题包绑定，修改请导出后重新导入。' : '修改题面保留已有成绩；更换评测程序或配置，请导出修改后重新导入。' }}</p>
       </div>
       <div v-else class="ai-admin-grid"><el-form-item label="Codabench Phase ID"><el-input-number v-model="form.judge.phase_id" :min="1" /></el-form-item><el-form-item label="公榜评分列"><el-input v-model="form.judge.public_column" /></el-form-item><el-form-item label="达标分数（0–100）"><el-input-number v-model="form.judge.pass_score" :min="0" :max="100" /></el-form-item><el-form-item label="私榜评分列（可选）"><el-input v-model="form.judge.private_column" /></el-form-item><el-form-item label="Accuracy 列（可选，0–1）"><el-input v-model="form.judge.accuracy_column" /></el-form-item><el-form-item label="Notebook 运行秒数"><el-input-number v-model="form.judge.run_seconds" :min="5" :max="600" /></el-form-item></div>
       <el-button type="primary" :loading="saving" @click="save">保存题目</el-button>
@@ -58,7 +60,9 @@ async function save () {
   if (saving.value) return
   saving.value = true; error.value = ''
   const target = form.value
-  try { const result = await request('admin/ai/problems', 'post', { ...target, requirements: requirements.value.split('\n').filter(Boolean) }); if (form.value === target) { target.version = result.version; target.revision = result.revision }; await load(); ElMessage.success('题目已保存') }
+  // The quiz card and its inline images are bound to the package; never send them back.
+  const { quiz, media, ...fields } = target
+  try { const result = await request('admin/ai/problems', 'post', { ...fields, requirements: requirements.value.split('\n').filter(Boolean) }); if (form.value === target) { target.version = result.version; target.revision = result.revision }; await load(); ElMessage.success('题目已保存') }
   catch (failure) { error.value = failure.message }
   finally { saving.value = false }
 }

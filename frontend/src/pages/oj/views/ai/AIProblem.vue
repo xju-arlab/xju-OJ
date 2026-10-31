@@ -14,10 +14,23 @@
           <div v-if="infoTab === 'description'" class="studio-prose">
             <h2>任务目标</h2>
             <p><StatementText :text="problem.objective" /></p>
-            <h2>实现要求</h2>
-            <ol><li v-for="item in problem.requirements" :key="item"><StatementText :text="item" /></li></ol>
-            <h2>接口约定</h2>
-            <pre class="studio-signature"><code>{{ problem.signature }}</code></pre>
+            <template v-if="problem.requirements.length">
+              <h2>{{ problem.type === 'quiz' ? '作答说明' : '实现要求' }}</h2>
+              <ol><li v-for="item in problem.requirements" :key="item"><StatementText :text="item" /></li></ol>
+            </template>
+            <template v-if="problem.signature">
+              <h2>接口约定</h2>
+              <pre class="studio-signature"><code>{{ problem.signature }}</code></pre>
+            </template>
+            <template v-if="problem.type === 'quiz' && problem.quiz.materials.length">
+              <h2>场景材料</h2>
+              <figure v-for="(material, index) in problem.quiz.materials" :key="material.id" class="studio-material">
+                <figcaption>{{ material.title || '材料 ' + (index + 1) }}</figcaption>
+                <div v-if="material.kind === 'table'" class="studio-table-wrap"><table class="studio-table"><thead><tr><th v-for="(column, columnIndex) in material.columns" :key="columnIndex">{{ column }}</th></tr></thead><tbody><tr v-for="(row, rowIndex) in material.rows" :key="rowIndex"><td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td></tr></tbody></table></div>
+                <pre v-else-if="material.kind === 'text'" class="studio-material-text">{{ material.text }}</pre>
+                <img v-else :src="problem.media[material.file]" :alt="material.alt || material.title || '材料图片'" />
+              </figure>
+            </template>
             <template v-if="problem.inputSpec">
               <h2>输入</h2>
               <div class="studio-io-description"><p v-for="(line, index) in statementLines(problem.inputSpec)" :key="index"><StatementText :text="line" /></p></div>
@@ -31,14 +44,15 @@
             <h2>数据说明</h2><p><StatementText :text="problem.data" /></p>
             <div class="studio-files">
               <div v-for="name in problem.files" :key="name" class="studio-file-row"><FileCode :size="18" /><strong>{{ name }}</strong><a class="studio-text-button" :href="dataUrl(name)"><Download :size="14" />下载</a></div>
-              <div class="studio-file-row"><NotebookPen :size="18" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook"><Download :size="14" />下载</button></div>
+              <div v-if="problem.type !== 'quiz'" class="studio-file-row"><NotebookPen :size="18" /><div><strong>{{ problem.id }}.ipynb</strong><small>题目说明、代码框架与公开样例</small></div><button class="studio-text-button" @click="exportNotebook"><Download :size="14" />下载</button></div>
             </div>
           </div>
           <div v-else-if="infoTab === 'evaluation'" class="studio-prose"><h2>评分说明</h2><p><StatementText :text="problem.evaluation" /></p><dl class="studio-facts"><div><dt>赛制</dt><dd>AI · {{ $t('m.AI_Evaluation') }}</dd></div><div><dt>本题分值</dt><dd>{{ problem.points }} 分</dd></div><div><dt>评测指标</dt><dd>{{ problem.metric }}</dd></div></dl></div>
           <ProblemRanking v-else :problem-id="problem.id" :contest-id="contestId" :authenticated="authenticated" />
           <div class="studio-problem-pagination"><router-link v-if="previous" :to="problemRoute(previous.id)"><ArrowLeft :size="14" />上一题</router-link><span v-else></span><router-link v-if="next" :to="problemRoute(next.id)">下一题<ArrowRight :size="14" /></router-link></div>
         </section>
-        <section class="studio-notebook" aria-label="Notebook 作答区">
+        <QuizCard v-if="problem.type === 'quiz'" :problem="problem" :contest-id="contestId" :authenticated="authenticated" />
+        <section v-else class="studio-notebook" aria-label="Notebook 作答区">
           <div class="studio-notebook-title">
             <span class="studio-notebook-filename"><NotebookPen :size="16" />{{ problem.id }}.ipynb</span>
             <div class="studio-notebook-toolbar"><button :class="['studio-button', 'compact', { 'is-running': running }]" :disabled="running || !authenticated" :aria-busy="running" :title="running ? runLabel : '运行全部'" aria-label="运行全部" @click="runTask('notebook')"><LoaderCircle v-if="running" class="studio-spin" :size="14" /><Play v-else :size="14" /><span class="studio-notebook-action-label">{{ running ? runLabel : '运行全部' }}</span></button><button class="studio-button compact" title="保存草稿" aria-label="保存草稿" @click="save"><Save :size="14" /><span class="studio-notebook-action-label">保存草稿</span></button><button class="studio-button compact" title="导出" aria-label="导出" @click="exportNotebook"><Download :size="14" /><span class="studio-notebook-action-label">导出</span></button><button class="studio-icon-button" :disabled="running" title="重置为题目框架" aria-label="重置题目框架" @click="showReset = true"><RotateCcw :size="15" /></button></div>
@@ -78,6 +92,7 @@ import { categoryFor, notebookFor, download, formatDate } from './studio'
 import { studioApi, activeStatuses } from './api'
 import EvaluationStatus from './EvaluationStatus.vue'
 import ProblemRanking from './ProblemRanking.vue'
+import QuizCard from './QuizCard.vue'
 import StatementText from './StatementText.vue'
 import './studio.less'
 
@@ -169,6 +184,14 @@ async function load () {
   const scope = { problem_id: route.params.problemID, contest_id: contestId.value }
   try {
     const item = await studioApi('problems', 'get', scope)
+    if (item.type === 'quiz') {
+      // The answer card loads its own draft and submissions; no Notebook kernel is involved.
+      if (current !== generation) return
+      problem.value = item
+      previous.value = item.previous ? { id: item.previous } : null
+      next.value = item.next ? { id: item.next } : null
+      return
+    }
     const draft = authenticated.value ? await studioApi('draft', 'get', scope) : { cells: item.cells, revision: 0 }
     if (current !== generation) return
     problem.value = item

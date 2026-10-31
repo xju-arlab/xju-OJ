@@ -15,7 +15,7 @@ from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem
 from .packages import IMPORT_ACTIVE, managed_problems, service_lock
 from .worker_auth import authenticate_worker
 from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access, problem_leaderboard,
-                       public_job, public_problem, save_draft)
+                       public_job, public_problem, quiz_attempts, save_draft)
 
 
 def page(request, queryset, serialize):
@@ -36,6 +36,8 @@ class ProblemsAPI(APIView):
             if contest:
                 result["points"] = AIContestProblem.objects.get(contest=contest, problem=problem).points
                 result["practice"] = contest.end_time < now()
+                if problem.category == "quiz" and request.user.is_authenticated:
+                    result["attemptsUsed"] = quiz_attempts(request.user, problem, contest)
                 siblings = list(AIContestProblem.objects.filter(contest=contest).values_list("problem__code", flat=True))
             else:
                 siblings = list(AIProblem.objects.filter(visible=True).values_list("code", flat=True))
@@ -65,6 +67,9 @@ class DraftAPI(APIView):
         problem, contest, _ = problem_access(request, request.GET)
         draft = AIDraft.objects.filter(user=request.user, problem=problem,
                                        scope=str(contest.id) if contest else "practice").first()
+        if problem.category == "quiz":
+            return self.success({"answers": draft.cells if draft and isinstance(draft.cells, dict) else {},
+                                 "revision": draft.revision if draft else 0})
         return self.success({"cells": draft.cells if draft else problem.cells, "revision": draft.revision if draft else 0})
 
     @login_required
@@ -175,12 +180,15 @@ class ProblemAdminAPI(APIView):
         data = request.data
         require(isinstance(data.get("id"), str) and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", data["id"]), "Invalid problem code")
         require(isinstance(data.get("title"), str) and 1 <= len(data["title"].strip()) <= 128, "Invalid title")
-        require(data.get("type") in ("logic", "model", "challenge"), "Invalid problem type")
+        require(data.get("type") in ("logic", "model", "challenge", "quiz"), "Invalid problem type")
         require(type(data.get("visible")) is bool, "visible is required")
         require(isinstance(data.get("metric", "Score"), str) and len(data.get("metric", "Score")) <= 64, "Invalid metric")
         require(type(data.get("points", 100)) is int and 1 <= data.get("points", 100) <= 10000, "Invalid points")
-        cells = cells_input(data.get("cells"))
-        judge = judge_input(data.get("judge"))
+        quiz = data["type"] == "quiz"
+        # A quiz has no code cells; its card and answer key are bound to the package and checked below.
+        require(not quiz or data.get("cells", []) == [], "模型理解题没有代码单元格")
+        cells = [] if quiz else cells_input(data.get("cells"))
+        judge = data.get("judge") if quiz else judge_input(data.get("judge"))
         public_files = public_files_input(data.get("public_files", {}))
         statement = {}
         for key in ("objective", "signature", "inputSpec", "outputSpec", "data", "evaluation"):
@@ -196,6 +204,8 @@ class ProblemAdminAPI(APIView):
         if problem:
             require(managed_problems(request.user).filter(pk=problem.pk).exists(), "题目不存在或无管理权限")
             require(data.get("revision") == problem.revision, "题目已被修改，请重新加载后保存")
+            require((problem.category == "quiz") == quiz and (not quiz or judge == problem.judge),
+                    "模型理解题的作答卡和答案随题包绑定，不能转换题型或单独修改")
             require(not AIContestProblem.objects.filter(problem=problem, contest__start_time__lte=now(),
                                                        contest__end_time__gte=now()).exists(), "Cannot edit a problem during its contest")
             if problem.package_import_id:
@@ -207,6 +217,8 @@ class ProblemAdminAPI(APIView):
             problem.revision += 1
         else:
             raise APIError("新题目请通过 AI 题包导入")
+        if problem.category == "quiz":
+            statement.update(quiz=problem.statement.get("quiz", {}), media=problem.statement.get("media", {}))
         problem.title = data["title"].strip()
         problem.category = data["type"]
         problem.visible = data["visible"]

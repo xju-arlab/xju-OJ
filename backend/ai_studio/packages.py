@@ -56,7 +56,12 @@ def parse(raw):
 
 
 def package_manifest(problems):
-    return [{key: value for key, value in item.items() if key != "assets"} for item in problems]
+    # Private assets, including a quiz answer key, stay only in the archived ZIP.
+    return [{key: value for key, value in item.items() if key not in ("assets", "quiz_key")} for item in problems]
+
+
+def is_quiz_batch(batch):
+    return all(item["metadata"]["type"] == "quiz" for item in batch.manifest)
 
 
 def preview_package(user, filename, raw):
@@ -94,6 +99,7 @@ def batch_summary(batch):
             "message": batch.message, "createdAt": batch.created_at.isoformat(), "result": batch.result,
             "problems": [{"title": item["metadata"]["title"], "type": item["metadata"]["type"],
                           "sourceId": item["metadata"].get("source_id", ""), "cells": len(item["cells"]),
+                          "questions": len(item["metadata"].get("quiz", {}).get("questions", [])),
                           "files": list(item["public_files"]), "metric": item["metadata"]["metric"]} for item in batch.manifest]}
 
 
@@ -110,15 +116,21 @@ def confirm_batch(batch_id, user, publish):
     if batch.status in (*IMPORT_ACTIVE, "SUCCEEDED"):
         return batch
     require(batch.status in ("PREVIEW", "FAILED"), "导入状态无效")
-    require(not service.paused, "AI 服务维护中，请稍后导入")
     require(can_manage(batch.created_by), "题包上传者已失去题目管理权限")
-    read_archive(batch)
+    raw = read_archive(batch)
     batch.publish = publish
-    batch.status = "PENDING"
     batch.message = ""
     batch.attempts = 0
     batch.lease = None
     batch.lease_until = None
+    if is_quiz_batch(batch):
+        # Nothing is registered with the evaluation service; publish in this transaction.
+        batch.result = create_problems(batch, raw=raw)
+        batch.status = "SUCCEEDED"
+        batch.save()
+        return batch
+    require(not service.paused, "AI 服务维护中，请稍后导入")
+    batch.status = "PENDING"
     batch.save()
     return batch
 
@@ -136,19 +148,40 @@ def next_codes(count):
     return result
 
 
-def create_problems(batch, results):
+def registered_judges(batch, results):
     require(isinstance(results, list) and len(results) == len(batch.manifest), "评测注册结果不完整")
-    codes = next_codes(len(results))
-    problems = []
-    for index, (item, result, code) in enumerate(zip(batch.manifest, results, codes)):
+    judges = []
+    for index, (item, result) in enumerate(zip(batch.manifest, results)):
         require(isinstance(result, dict) and result.get("index") == index and
                 result.get("asset_sha256") == item["asset_sha256"], "评测注册内容不匹配")
         judge = judge_input(result.get("judge"))
         require(type(judge.get("task_id")) is int and judge["task_id"] > 0, "缺少评测任务")
         require({key: value for key, value in judge.items() if key not in ("phase_id", "task_id")} == item["metadata"]["evaluation"],
                 "评测注册配置不匹配")
+        judges.append(judge)
+    return judges
+
+
+def quiz_judges(batch, raw):
+    parsed = parse(raw)
+    require(len(parsed) == len(batch.manifest), "题包内容不匹配")
+    judges = []
+    for item, entry in zip(batch.manifest, parsed):
+        require(item["metadata"]["type"] == "quiz" and entry["asset_sha256"] == item["asset_sha256"], "题包内容不匹配")
+        judges.append({**item["metadata"]["evaluation"], "answers": entry["quiz_key"]})
+    return judges
+
+
+def create_problems(batch, results=None, raw=None):
+    judges = quiz_judges(batch, raw) if raw is not None else registered_judges(batch, results)
+    codes = next_codes(len(judges))
+    problems = []
+    for index, (item, judge, code) in enumerate(zip(batch.manifest, judges, codes)):
         metadata = item["metadata"]
-        problems.append(AIProblem(code=code, title=metadata["title"], category=metadata["type"], statement=metadata["statement"],
+        statement = metadata["statement"]
+        if metadata["type"] == "quiz":
+            statement = {**statement, "quiz": metadata["quiz"], "media": item["media"]}
+        problems.append(AIProblem(code=code, title=metadata["title"], category=metadata["type"], statement=statement,
                                   cells=item["cells"], public_files=item["public_files"], metric=metadata["metric"],
                                   points=metadata["points"], judge=judge, visible=batch.publish,
                                   created_by=batch.created_by, package_import=batch, package_index=index))
@@ -223,11 +256,15 @@ def export_packages(problems):
         require(expanded <= MAX_EXPANDED, "批量题包超过 64 MiB，请减少选中的题目")
         expected = problem.package_import.manifest[problem.package_index]["asset_sha256"]
         require(item["asset_sha256"] == expected, "归档的评测文件不匹配")
+        statement = {key: value for key, value in problem.statement.items() if key not in ("quiz", "media")}
         metadata = {"format": FORMAT, "version": 1, "source_id": problem.code, "title": problem.title,
-                    "type": problem.category, "metric": problem.metric, "points": problem.points,
-                    "statement": problem.statement, "evaluation": {k: v for k, v in problem.judge.items() if k not in ("phase_id", "task_id")}}
+                    "type": problem.category, "metric": problem.metric, "points": problem.points, "statement": statement,
+                    "evaluation": {k: v for k, v in problem.judge.items() if k not in ("phase_id", "task_id", "answers")}}
+        if problem.category == "quiz":
+            metadata["quiz"] = problem.statement["quiz"]
         try:
-            archives[problem.code + ".zip"] = export_problem(metadata, problem.cells, problem.public_files, item["assets"])
+            archives[problem.code + ".zip"] = export_problem(metadata, problem.cells, problem.public_files, item["assets"],
+                                                             problem.statement.get("media"))
         except PackageError as exc:
             raise APIError(str(exc)) from None
         require(sum(map(len, archives.values())) <= MAX_UPLOAD, "批量 ZIP 超过 16 MiB，请减少选中的题目")

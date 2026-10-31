@@ -15,7 +15,7 @@
           <el-table-column prop="title" label="标题" min-width="200" />
           <el-table-column label="题型" width="130"><template #default="{ row }">{{ categoryFor(row.type).name }}</template></el-table-column>
           <el-table-column prop="metric" label="指标" width="110" />
-          <el-table-column prop="cells" label="代码单元格" width="110" />
+          <el-table-column label="代码格 / 小题" width="120"><template #default="{ row }">{{ row.type === 'quiz' ? row.questions + ' 道小题' : row.cells }}</template></el-table-column>
           <el-table-column label="公开数据" min-width="160"><template #default="{ row }">{{ row.files.join('、') || '—' }}</template></el-table-column>
         </el-table>
         <p class="package-hint">{{ active(current) ? '正在注册评测环境，完成后将整批创建题目。离开页面不影响导入。' : current.status === 'SUCCEEDED' ? '导入完成' : '题号由系统自动分配，已有题目不会被覆盖。' }}</p>

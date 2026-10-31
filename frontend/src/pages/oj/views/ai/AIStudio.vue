@@ -44,7 +44,7 @@
     <section v-else>
       <div class="studio-section-title"><h2>提交记录</h2><router-link :to="{ name: 'ai-studio' }">返回 AI 工作台</router-link></div>
       <div v-if="!records.length" class="studio-empty"><History :size="28" /><h3>还没有提交记录</h3><p>提交评测后，可以在这里查看状态与答卷。</p><router-link class="studio-button" :to="{ name: 'ai-studio' }">浏览题目 <ArrowRight :size="15" /></router-link></div>
-      <div v-else class="studio-table-wrap"><table class="studio-table"><thead><tr><th>题目</th><th>时间（北京时间）</th><th>范围</th><th>状态 / 分数</th><th>答卷</th></tr></thead><tbody><tr v-for="record in records" :key="record.id"><td>{{ record.problemId }} · {{ record.title }}</td><td>{{ formatDate(record.createdAt) }}</td><td>{{ record.official ? '正式比赛' : '自主练习' }}</td><td><EvaluationStatus :record="record" /></td><td><button class="studio-text-button" @click="exportRecord(record)">下载 Notebook</button></td></tr></tbody></table></div>
+      <div v-else class="studio-table-wrap"><table class="studio-table"><thead><tr><th>题目</th><th>时间（北京时间）</th><th>范围</th><th>状态 / 分数</th><th>答卷</th></tr></thead><tbody><tr v-for="record in records" :key="record.id"><td>{{ record.problemId }} · {{ record.title }}</td><td>{{ formatDate(record.createdAt) }}</td><td>{{ record.official ? '正式比赛' : '自主练习' }}</td><td><EvaluationStatus :record="record" /></td><td><button class="studio-text-button" @click="exportRecord(record)">{{ record.type === 'quiz' ? '下载答卷' : '下载 Notebook' }}</button></td></tr></tbody></table></div>
     </section>
 
     <div v-if="section === 'submissions' && recordTotal > 20" class="studio-dialog-actions"><button class="studio-button" :disabled="recordPage === 0" @click="changePage(-1)">上一页</button><span>{{ recordPage + 1 }}</span><button class="studio-button" :disabled="(recordPage + 1) * 20 >= recordTotal" @click="changePage(1)">下一页</button></div>
@@ -102,7 +102,8 @@ function changeContestPage (delta) { contestPage.value += delta; load() }
 async function exportRecord (record) {
   try {
     const detail = await studioApi('jobs', 'get', { id: record.id })
-    download(record.problemId + '-submission.ipynb', JSON.stringify(notebookFor({ title: record.title, objective: '' }, detail.payload.cells), null, 2))
+    if (detail.payload.answers) download(record.problemId + '-answers.json', JSON.stringify(detail.payload.answers, null, 2))
+    else download(record.problemId + '-submission.ipynb', JSON.stringify(notebookFor({ title: record.title, objective: '' }, detail.payload.cells), null, 2))
   } catch (failure) { error.value = failure.message }
 }
 let searchTimer
