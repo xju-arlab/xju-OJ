@@ -76,8 +76,10 @@
                       query: {username: row.username}
                     })
                   }
-                }
-              }, row.username)
+                },
+                // A team account shows as its team; its real name lists the members.
+                title: row.team ? row.username : undefined
+              }, row.team || row.username)
             }
           },
           {

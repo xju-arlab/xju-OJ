@@ -8,9 +8,15 @@
           <router-link v-else :to="{ name: 'contest-list' }">{{$t('m.Contests')}}</router-link>
           <span aria-hidden="true">/</span>
           <span>{{contestID}}</span>
-          <span v-if="myTeam" class="contest-team" :title="myTeam.members.length ? '队员：' + myTeam.members.join('、') : ''">
+          <!-- Without the navbar, the signed-in account shows here. -->
+          <span v-if="myTeam" class="contest-team">
             <Icon type="users" /><strong>{{ myTeam.name }}</strong>
+            <span v-if="myTeam.members.length" class="contest-team-members">{{ myTeam.members.join('、') }}</span>
             <button type="button" @click="teamLogout">退出</button>
+          </span>
+          <span v-else-if="arenaAccount" class="contest-team">
+            <Icon type="user-circle" /><strong>{{ arenaAccount.username }}</strong>
+            <span v-if="arenaAccount.realName" class="contest-team-members">{{ arenaAccount.realName }}</span>
           </span>
         </div>
 
@@ -756,6 +762,11 @@
         if (info.rank_unfrozen) return '实时排名，已开榜'
         return `实时排名，${moment(info.rank_freeze_time).format('MM-DD HH:mm')} 封榜，赛后由管理员开榜`
       },
+      arenaAccount () {
+        const profile = this.$store.state.user.profile
+        if (!this.$route.path.startsWith('/arena/') || !profile.user) return null
+        return { username: profile.user.username, realName: profile.real_name }
+      },
       myTeam () {
         const team = this.$store.state.user.profile.team
         return team && String(team.contest_id) === String(this.contestID) ? team : null
@@ -877,7 +888,7 @@
           if (this.reviewRunning) return this.$t('m.Prep_State_Review')
           return this.$t(this.contest.review_started_at ? 'm.Prep_Review_Ended' : 'm.Prep_Review_Not_Started')
         }
-        if (this.contestStatus === CONTEST_STATUS.NOT_START) return this.$t('m.Not_Started')
+        if (this.contestStatus === CONTEST_STATUS.NOT_START) return this.$t('m.Starts_In')
         if (this.contestStatus === CONTEST_STATUS.ENDED) return this.$t('m.Ended')
         return this.$t('m.Underway')
       },
@@ -1118,6 +1129,7 @@
 .prep-publish-note { margin: -6px 0 14px; color: var(--color-text-muted); font-size: 12px; }
 .contest-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--color-text); font-size: 13px; cursor: default; }
 .contest-team strong { font-weight: 650; }
+.contest-team-members { color: var(--color-text-muted); }
 .contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .contest-team button:hover { color: var(--color-text); }
 .prep-published-info { display: grid; gap: 10px; margin: 0; }

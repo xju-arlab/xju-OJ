@@ -81,7 +81,7 @@ test('the team link signs in with a password and stays inside the contest withou
   await expect(page).toHaveURL(/\/arena\/22\/$/)
   await expect(page.locator('#header')).toHaveCount(0)
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('Team Alpha')
-  await expect(page.locator('.contest-breadcrumb .contest-team')).toHaveAttribute('title', '队员：A1、A2')
+  await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('A1、A2')
   // Moving inside the contest keeps the link's URLs; anywhere else leads back.
   await page.locator('.contest-tabs').getByText(/题目|Problems/).first().click()
   await expect(page).toHaveURL(/\/arena\/22\/problems$/)
@@ -196,10 +196,13 @@ test('a published preparation contest shows its copy and edits it instead of pub
 
 test('contest admins open the link and stay on /arena/', async ({ page }) => {
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.profile.real_name = '管理员甲'
   await page.goto('/arena/22')
   await expect(page.locator('.contest-hero')).toBeVisible()
   await expect(page).toHaveURL(/\/arena\/22$/)
   await expect(page.locator('#header')).toHaveCount(0)
+  await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('root')
+  await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('管理员甲')
   await page.locator('.contest-tabs').getByText(/排名|Rankings/).first().click()
   await expect(page).toHaveURL(/\/arena\/22\/rank$/)
 })

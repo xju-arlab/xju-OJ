@@ -234,7 +234,9 @@ class ACMContestHelper(APIView):
     def get(self, request):
         ensure_created_by(self.contest, request.user)
         ranks = ACMContestRank.objects.filter(contest=self.contest, accepted_number__gt=0) \
-            .values("id", "user__username", "user__userprofile__real_name", "submission_info")
+            .values("id", "user_id", "user__username", "user__userprofile__real_name", "submission_info")
+        # Balloons go to teams; their accounts' real names are the members.
+        teams = dict(ContestTeam.objects.filter(contest=self.contest).values_list("user_id", "name"))
         results = []
         for rank in ranks:
             for problem_id, info in rank["submission_info"].items():
@@ -242,6 +244,7 @@ class ACMContestHelper(APIView):
                     results.append({
                         "id": rank["id"],
                         "username": rank["user__username"],
+                        "team": teams.get(rank["user_id"]),
                         "real_name": rank["user__userprofile__real_name"],
                         "problem_id": problem_id,
                         "ac_info": info,

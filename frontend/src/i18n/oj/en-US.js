@@ -155,6 +155,7 @@ export const m = {
   ACM: 'ACM',
   Underway: 'Underway',
   Not_Started: 'Not Started',
+  Starts_In: 'Starts in',
   Ended: 'Ended',
   No_contest: 'No contest',
   Please_login_first: 'Please login first!',

@@ -283,8 +283,9 @@ class ContestRankAPI(APIView):
 
                 for index, item in enumerate(data):
                     worksheet.write_string(index + 1, 0, str(item["user"]["id"]))
-                    worksheet.write_string(index + 1, 1, item["user"]["username"])
-                    worksheet.write_string(index + 1, 2, teams.get(item["user"]["id"], {}).get("name") or item["user"]["real_name"] or "")
+                    # A team shows as its name; its real name lists the members.
+                    worksheet.write_string(index + 1, 1, teams.get(item["user"]["id"], {}).get("name") or item["user"]["username"])
+                    worksheet.write_string(index + 1, 2, item["user"]["real_name"] or "")
                     worksheet.write_string(index + 1, 3, str(item["accepted_number"]))
                     worksheet.write_string(index + 1, 4, str(item["submission_number"]))
                     worksheet.write_string(index + 1, 5, str(item["total_time"]))

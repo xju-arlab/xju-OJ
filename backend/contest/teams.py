@@ -47,6 +47,11 @@ def team_usernames(count):
     return sorted(names)
 
 
+def team_real_name(name, members):
+    """A team account's real name is its member list, so 实名 views show the people."""
+    return ",".join(members) or name
+
+
 def team_data(team):
     return {"id": team.id, "name": team.name, "members": team.members, "username": team.user.username,
             "user_id": team.user_id, "create_time": datetime2str(team.create_time)}
@@ -73,7 +78,7 @@ def create_teams(contest, roster):
     for item, username in zip(roster, team_usernames(len(roster))):
         password = team_password()
         user = User.objects.create(username=username, password=hash_team_password(password))
-        UserProfile.objects.create(user=user, real_name=item["name"])
+        UserProfile.objects.create(user=user, real_name=team_real_name(item["name"], item["members"]))
         team = ContestTeam.objects.create(contest=contest, user=user, **item)
         ContestParticipation.objects.create(contest=contest, user=user)
         if contest.rule_type == ContestRuleType.ACM:
