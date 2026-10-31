@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-31T09:06:35Z",
+  "updated_at": "2026-10-31T09:25:21Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "28c07fa04b776acbff22c117c7987ae00cb4d0800226db0dc20b8c0be0d1fcb6",
-      "size": 222874,
-      "normalized_sha256": "28c07fa04b776acbff22c117c7987ae00cb4d0800226db0dc20b8c0be0d1fcb6"
+      "sha256": "fbd49af154974d89d2ce2b0c1f5a071285f4ffb91c182ba1d2137cd6b9577342",
+      "size": 223128,
+      "normalized_sha256": "fbd49af154974d89d2ce2b0c1f5a071285f4ffb91c182ba1d2137cd6b9577342"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -652,9 +652,9 @@
     },
     "backend/ai_studio/quiz.py": {
       "role": "index",
-      "sha256": "0bb54fbe6eeb66a0a6c7937e6d04996cd1e4f7b803885f43ed57381a3fe6c971",
-      "size": 4197,
-      "normalized_sha256": "0bb54fbe6eeb66a0a6c7937e6d04996cd1e4f7b803885f43ed57381a3fe6c971"
+      "sha256": "d88b07e9d21124c4a06250ec3d377bde6a495906c67c66838b820677f0ac413d",
+      "size": 4857,
+      "normalized_sha256": "d88b07e9d21124c4a06250ec3d377bde6a495906c67c66838b820677f0ac413d"
     },
     "backend/ai_studio/services.py": {
       "role": "index",
@@ -676,9 +676,9 @@
     },
     "backend/ai_studio/tests_quiz.py": {
       "role": "index",
-      "sha256": "c7c7d9d38b3d083e20f6fd3050ed1e0bf13b6d61fbd0be2acbd062f7a5c70efd",
-      "size": 25009,
-      "normalized_sha256": "c7c7d9d38b3d083e20f6fd3050ed1e0bf13b6d61fbd0be2acbd062f7a5c70efd"
+      "sha256": "a8bb15f5803fd72572c13507ce952c0a123df70bcfc1d997c4f2d688885d9034",
+      "size": 26114,
+      "normalized_sha256": "a8bb15f5803fd72572c13507ce952c0a123df70bcfc1d997c4f2d688885d9034"
     },
     "backend/ai_studio/urls.py": {
       "role": "index",
@@ -688,9 +688,9 @@
     },
     "backend/ai_studio/views.py": {
       "role": "index",
-      "sha256": "d2031c286f6f69f3e427d736efb6e7508762bc71727cb9e05b59d524872f29d1",
-      "size": 25729,
-      "normalized_sha256": "d2031c286f6f69f3e427d736efb6e7508762bc71727cb9e05b59d524872f29d1"
+      "sha256": "b2abd75f071cee18b617c325f727e9a24d627910ddccdb47ef2d169cd4a012f7",
+      "size": 26438,
+      "normalized_sha256": "b2abd75f071cee18b617c325f727e9a24d627910ddccdb47ef2d169cd4a012f7"
     },
     "backend/ai_studio/worker_auth.py": {
       "role": "index",
@@ -3204,9 +3204,9 @@
     },
     "frontend/src/pages/oj/views/ai/AIContest.vue": {
       "role": "index",
-      "sha256": "57bf29fad11c7b7cdc66fd24b79f4e5656cfdd8833f717da6a70c25c7aa98300",
-      "size": 21364,
-      "normalized_sha256": "57bf29fad11c7b7cdc66fd24b79f4e5656cfdd8833f717da6a70c25c7aa98300"
+      "sha256": "4647bb0b6323af16d1a83948ff9b4554dda1b6aa026ac461290481dffd48bd2c",
+      "size": 22725,
+      "normalized_sha256": "4647bb0b6323af16d1a83948ff9b4554dda1b6aa026ac461290481dffd48bd2c"
     },
     "frontend/src/pages/oj/views/ai/AIProblem.vue": {
       "role": "index",
@@ -3258,9 +3258,9 @@
     },
     "frontend/src/pages/oj/views/ai/SubmissionDialog.vue": {
       "role": "index",
-      "sha256": "1275acc37b0cf4a9f7addd692878bee981b74ad1de7d6f79a261b353ebdfaca8",
-      "size": 6488,
-      "normalized_sha256": "1275acc37b0cf4a9f7addd692878bee981b74ad1de7d6f79a261b353ebdfaca8"
+      "sha256": "872f44ac74f43ec66850972995ce7b627c16fa102717ca9fb18188a48f7fc896",
+      "size": 7252,
+      "normalized_sha256": "872f44ac74f43ec66850972995ce7b627c16fa102717ca9fb18188a48f7fc896"
     },
     "frontend/src/pages/oj/views/ai/api.js": {
       "role": "index",
@@ -3816,9 +3816,9 @@
     },
     "frontend/tests/browser/ai-quiz.spec.mjs": {
       "role": "observe",
-      "sha256": "408711916b203984725bec580257c0ac1ee2f454a350485eba2392a73d9ae014",
-      "size": 11288,
-      "normalized_sha256": "408711916b203984725bec580257c0ac1ee2f454a350485eba2392a73d9ae014"
+      "sha256": "d716f50e8a554691f47888a35b413d84c896d358ce587d7c97e69c2149cf6230",
+      "size": 11458,
+      "normalized_sha256": "d716f50e8a554691f47888a35b413d84c896d358ce587d7c97e69c2149cf6230"
     },
     "frontend/tests/browser/ai-studio.spec.mjs": {
       "role": "observe",
