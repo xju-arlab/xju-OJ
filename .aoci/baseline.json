@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-29T15:36:59Z",
+  "updated_at": "2026-10-31T05:29:57Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -98,9 +98,9 @@
     },
     "ai/README.md": {
       "role": "index",
-      "sha256": "455d75741fc6454d19d2e5cb42d909aad3a76e375d35908050c6070a39500612",
-      "size": 8751,
-      "normalized_sha256": "455d75741fc6454d19d2e5cb42d909aad3a76e375d35908050c6070a39500612"
+      "sha256": "48b993311b317373f46b39ad7cfe2bc6ea87438569bd80867d12adeb5c071202",
+      "size": 8972,
+      "normalized_sha256": "48b993311b317373f46b39ad7cfe2bc6ea87438569bd80867d12adeb5c071202"
     },
     "ai/build.sh": {
       "role": "index",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "2d32a9676ae17c3923558a24501360c676029cfeec707af5da84073005a29d95",
-      "size": 215227,
-      "normalized_sha256": "2d32a9676ae17c3923558a24501360c676029cfeec707af5da84073005a29d95"
+      "sha256": "7eab065df371ca60bdc1f944f266247b0d1656c1cc3ade0e6787dae051b19b39",
+      "size": 218036,
+      "normalized_sha256": "7eab065df371ca60bdc1f944f266247b0d1656c1cc3ade0e6787dae051b19b39"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -608,17 +608,23 @@
       "size": 2217,
       "normalized_sha256": "053fa00c38ac4f11ac6222372f043a6b8b1d83b26333059b89cb377925464560"
     },
+    "backend/ai_studio/migrations/0005_aiproblem_quiz_category.py": {
+      "role": "index",
+      "sha256": "c319434d0c122b41c81553c3d2e1322ac602be33d1fb2986924bd057f7c6fb97",
+      "size": 560,
+      "normalized_sha256": "c319434d0c122b41c81553c3d2e1322ac602be33d1fb2986924bd057f7c6fb97"
+    },
     "backend/ai_studio/models.py": {
       "role": "index",
-      "sha256": "682f19d79bde122327d20bc83c5f4607df62d355c4cbb6c43d7bbaad06a7d819",
-      "size": 6243,
-      "normalized_sha256": "682f19d79bde122327d20bc83c5f4607df62d355c4cbb6c43d7bbaad06a7d819"
+      "sha256": "ce5d986d4ae83358485cb54c67234a224914e6b1f15f5bab20ce92d247c1ac83",
+      "size": 6352,
+      "normalized_sha256": "ce5d986d4ae83358485cb54c67234a224914e6b1f15f5bab20ce92d247c1ac83"
     },
     "backend/ai_studio/package_format.py": {
       "role": "index",
-      "sha256": "38dce15193ad6aa0e0f8a8b6e92213fcc7d4a4d204e15ebc00ebfeb12cdbde0c",
-      "size": 13258,
-      "normalized_sha256": "38dce15193ad6aa0e0f8a8b6e92213fcc7d4a4d204e15ebc00ebfeb12cdbde0c"
+      "sha256": "be0242109a074ddabb69b6d316b43191349d6cacecee0d156be18c973736e35a",
+      "size": 23557,
+      "normalized_sha256": "be0242109a074ddabb69b6d316b43191349d6cacecee0d156be18c973736e35a"
     },
     "backend/ai_studio/package_views.py": {
       "role": "index",
@@ -628,15 +634,21 @@
     },
     "backend/ai_studio/packages.py": {
       "role": "index",
-      "sha256": "3434dcc39273bb1a5593c22fd7e96e42a2937fa814929bfbf74d7b8b82ff545b",
-      "size": 13253,
-      "normalized_sha256": "3434dcc39273bb1a5593c22fd7e96e42a2937fa814929bfbf74d7b8b82ff545b"
+      "sha256": "2df0dd2e64fd3012fae4ca0d408fb186a72bed96f1775e6afbd102834ab44761",
+      "size": 14987,
+      "normalized_sha256": "2df0dd2e64fd3012fae4ca0d408fb186a72bed96f1775e6afbd102834ab44761"
+    },
+    "backend/ai_studio/quiz.py": {
+      "role": "index",
+      "sha256": "318bdc3480fa53610fef9bd4d30127d6be8443e9e0da09158012621bf1a95ec5",
+      "size": 2453,
+      "normalized_sha256": "318bdc3480fa53610fef9bd4d30127d6be8443e9e0da09158012621bf1a95ec5"
     },
     "backend/ai_studio/services.py": {
       "role": "index",
-      "sha256": "65504e77dec29fdc94480f9b95376b7c15c669d3b8c453e1cb4a68cad0fdc53c",
-      "size": 13894,
-      "normalized_sha256": "65504e77dec29fdc94480f9b95376b7c15c669d3b8c453e1cb4a68cad0fdc53c"
+      "sha256": "5a19da9525f89a829b1e78dc77f9169cb0fd8277f5ab51938b43d62aa2f83ad4",
+      "size": 16947,
+      "normalized_sha256": "5a19da9525f89a829b1e78dc77f9169cb0fd8277f5ab51938b43d62aa2f83ad4"
     },
     "backend/ai_studio/tests.py": {
       "role": "index",
@@ -650,6 +662,12 @@
       "size": 19847,
       "normalized_sha256": "fff2367bb2ed48d07902ab41010d36d3e88b9d38bd051d02eb5ac433345015a2"
     },
+    "backend/ai_studio/tests_quiz.py": {
+      "role": "index",
+      "sha256": "9d156dd074e4e623c6090e13914c393b711b4603ae9620d90d39138b48c51204",
+      "size": 13830,
+      "normalized_sha256": "9d156dd074e4e623c6090e13914c393b711b4603ae9620d90d39138b48c51204"
+    },
     "backend/ai_studio/urls.py": {
       "role": "index",
       "sha256": "d0961f8a1bbb88dcb995e29bee2f2ded27bb0962054466fcd1328f289c6badfa",
@@ -658,9 +676,9 @@
     },
     "backend/ai_studio/views.py": {
       "role": "index",
-      "sha256": "e5632f84dc784c3462ebe0efb05ad81bc83942e9df76032b75648e0332c6cb1c",
-      "size": 22145,
-      "normalized_sha256": "e5632f84dc784c3462ebe0efb05ad81bc83942e9df76032b75648e0332c6cb1c"
+      "sha256": "f7a0e60e3cde93e38b9aa464f19ea58c86c227b92bd402051656c065849f7a0a",
+      "size": 23211,
+      "normalized_sha256": "f7a0e60e3cde93e38b9aa464f19ea58c86c227b92bd402051656c065849f7a0a"
     },
     "backend/ai_studio/worker_auth.py": {
       "role": "index",
@@ -2173,9 +2191,9 @@
     },
     "docs/operations/ai-problem-packages.md": {
       "role": "index",
-      "sha256": "4543e0db248b834f394f2f9d6177e752c41d051adbb79ec0f7e65b823437b6dd",
-      "size": 9348,
-      "normalized_sha256": "4543e0db248b834f394f2f9d6177e752c41d051adbb79ec0f7e65b823437b6dd"
+      "sha256": "0854d18a35ca95bf06559cd526d9a023427dc7ea171ee190c7ff2390f53cb0b4",
+      "size": 12178,
+      "normalized_sha256": "0854d18a35ca95bf06559cd526d9a023427dc7ea171ee190c7ff2390f53cb0b4"
     },
     "docs/operations/audit-2026-10.md": {
       "role": "index",
@@ -2898,15 +2916,15 @@
     },
     "frontend/src/pages/admin/views/ai/ImportAndExport.vue": {
       "role": "index",
-      "sha256": "d8beea611977dd4f93ad2156dc87e83690fb709843e478a3603f6d0d165ab8dc",
-      "size": 11989,
-      "normalized_sha256": "d8beea611977dd4f93ad2156dc87e83690fb709843e478a3603f6d0d165ab8dc"
+      "sha256": "09a53910e04d97d70b88e13e8c71f9296c1b220cecb307d4f5e9da91d23898a8",
+      "size": 12103,
+      "normalized_sha256": "09a53910e04d97d70b88e13e8c71f9296c1b220cecb307d4f5e9da91d23898a8"
     },
     "frontend/src/pages/admin/views/ai/Problems.vue": {
       "role": "index",
-      "sha256": "bcf6ec50fa9fd35ab8fd3be3d7d4d128c69c367d1b609ba8e19fea3871cae482",
-      "size": 7233,
-      "normalized_sha256": "bcf6ec50fa9fd35ab8fd3be3d7d4d128c69c367d1b609ba8e19fea3871cae482"
+      "sha256": "9f38819db956eaa37f289a71e8494b6b48ac1df9f7b3b10fb4aa2f5cf3b5301a",
+      "size": 7784,
+      "normalized_sha256": "9f38819db956eaa37f289a71e8494b6b48ac1df9f7b3b10fb4aa2f5cf3b5301a"
     },
     "frontend/src/pages/admin/views/contest/Contest.vue": {
       "role": "index",
@@ -3168,15 +3186,15 @@
     },
     "frontend/src/pages/oj/views/ai/AIProblem.vue": {
       "role": "index",
-      "sha256": "266c3c756c483715303a66cd1d4185577bb0c8b4122e2e67ef06f554f528bb9c",
-      "size": 22448,
-      "normalized_sha256": "266c3c756c483715303a66cd1d4185577bb0c8b4122e2e67ef06f554f528bb9c"
+      "sha256": "f317cc3dde6959f2134798dc2f3be8236b792cb84535b756e888d17f4e5e9711",
+      "size": 24201,
+      "normalized_sha256": "f317cc3dde6959f2134798dc2f3be8236b792cb84535b756e888d17f4e5e9711"
     },
     "frontend/src/pages/oj/views/ai/AIStudio.vue": {
       "role": "index",
-      "sha256": "33be3622ae9ef90fbba485553267c4968e99c85313bba2c24eff9af7551b0222",
-      "size": 11234,
-      "normalized_sha256": "33be3622ae9ef90fbba485553267c4968e99c85313bba2c24eff9af7551b0222"
+      "sha256": "7cf0a19ed8dfc0c2cf78417961a4575f3eb3c0e3c732f3a1c7310d184f7c3f83",
+      "size": 11415,
+      "normalized_sha256": "7cf0a19ed8dfc0c2cf78417961a4575f3eb3c0e3c732f3a1c7310d184f7c3f83"
     },
     "frontend/src/pages/oj/views/ai/EvaluationIcon.vue": {
       "role": "index",
@@ -3196,6 +3214,12 @@
       "size": 3657,
       "normalized_sha256": "e29c2e3f06aa96b504e706db94cf234ca254d9722ee4b4378d4587619168ae12"
     },
+    "frontend/src/pages/oj/views/ai/QuizCard.vue": {
+      "role": "index",
+      "sha256": "2d3cd48c007a5608386627f5b3e27463b453c62e78a2348ad5d158a525290f50",
+      "size": 13871,
+      "normalized_sha256": "2d3cd48c007a5608386627f5b3e27463b453c62e78a2348ad5d158a525290f50"
+    },
     "frontend/src/pages/oj/views/ai/StatementText.vue": {
       "role": "index",
       "sha256": "064aafff09f4374fcd6d2786f50886e2efb54f6a8bd2839108b63e3fd6554023",
@@ -3210,15 +3234,15 @@
     },
     "frontend/src/pages/oj/views/ai/studio.js": {
       "role": "index",
-      "sha256": "b40bcb2f4589168e3c97fdd2c2ea1b2762da486f89423533eb2e2e1a613b86c6",
-      "size": 1722,
-      "normalized_sha256": "b40bcb2f4589168e3c97fdd2c2ea1b2762da486f89423533eb2e2e1a613b86c6"
+      "sha256": "c22ef5942f4d41a2ead84dee5589e68f6286668d2401808a1b67273946279d54",
+      "size": 1821,
+      "normalized_sha256": "c22ef5942f4d41a2ead84dee5589e68f6286668d2401808a1b67273946279d54"
     },
     "frontend/src/pages/oj/views/ai/studio.less": {
       "role": "index",
-      "sha256": "a2e4ab0aea7eafef2324be59b8f22930ab5f8963f57c3129ce6a685d3928d04c",
-      "size": 23401,
-      "normalized_sha256": "a2e4ab0aea7eafef2324be59b8f22930ab5f8963f57c3129ce6a685d3928d04c"
+      "sha256": "7585e34243c93ece8544de064f675157101f8cb93f033940e8c2ca55c9f39256",
+      "size": 27059,
+      "normalized_sha256": "7585e34243c93ece8544de064f675157101f8cb93f033940e8c2ca55c9f39256"
     },
     "frontend/src/pages/oj/views/contest/ContestDetail.vue": {
       "role": "index",
@@ -3753,6 +3777,12 @@
       "sha256": "7bf471b2005ad1e2118efa375a27d7cd35e3e36243027b23169bc623bcdace42",
       "size": 7682,
       "normalized_sha256": "7bf471b2005ad1e2118efa375a27d7cd35e3e36243027b23169bc623bcdace42"
+    },
+    "frontend/tests/browser/ai-quiz.spec.mjs": {
+      "role": "observe",
+      "sha256": "3c51404ea2d1d598701bbbb12009572c2e167aefe213645a7378db2340229f9e",
+      "size": 6971,
+      "normalized_sha256": "3c51404ea2d1d598701bbbb12009572c2e167aefe213645a7378db2340229f9e"
     },
     "frontend/tests/browser/ai-studio.spec.mjs": {
       "role": "observe",
