@@ -322,6 +322,7 @@ class QuizReviewAndACMTests(APITestCase):
         self.assertEqual(rows[2]["scores"][self.problem.code]["time"], 240)
         self.assertTrue(all("realName" in row for row in rows))  # contest admins see real names
         self.assertEqual((rows[3]["scores"][self.problem.code]["pending"], rows[3]["scores"][self.problem.code]["score"]), (1, None))
+        self.assertIsNotNone(rows[3]["scores"][self.problem.code]["pendingId"])  # a "?" cell opens the pending card
 
     def test_points_boards_review_every_essay_and_admins_read_submissions(self):
         AIContestConfig.objects.filter(contest=self.contest).update(ranking="oi")

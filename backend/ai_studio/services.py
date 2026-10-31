@@ -332,11 +332,12 @@ def acm_leaderboard(contest, jobs):
         row = rows.setdefault(job.user_id, {"userId": job.user_id, "username": job.user.username,
                                             "solved": 0, "penalty": 0, "scores": {}})
         cell = row["scores"].setdefault(job.problem.code, {"accepted": False, "tries": 0, "time": None, "pending": 0,
-                                                            "status": None, "submissionId": None})
+                                                            "status": None, "submissionId": None, "pendingId": None})
         if cell["accepted"] or job.status in ACM_IGNORED:
             continue
         if job.status in ACTIVE or job.status == "REVIEWING":
             cell["pending"] += 1
+            cell["pendingId"] = str(job.id)
             continue
         cell["status"], cell["submissionId"] = job.status, str(job.id)
         if job.status == "ACCEPTED":
@@ -361,11 +362,12 @@ def oi_leaderboard(contest, jobs, weights, private):
         row = rows.setdefault(job.user_id, {"userId": job.user_id, "username": job.user.username,
                                             "total": 0, "penalty": 0, "scores": {}})
         cell = row["scores"].setdefault(job.problem.code, {"score": None, "time": None, "tries": 0, "pending": 0,
-                                                            "status": None, "submissionId": None, "penalty": 0})
+                                                            "status": None, "submissionId": None, "pendingId": None, "penalty": 0})
         if job.status in ACM_IGNORED:
             continue
         if job.status in ACTIVE or job.status == "REVIEWING":
             cell["pending"] += 1
+            cell["pendingId"] = str(job.id)
             continue
         raw = job.private_score if private and job.private_score is not None else job.public_score
         points = None if raw is None else round(raw * weights.get(job.problem_id, 0) / 100, 4)
