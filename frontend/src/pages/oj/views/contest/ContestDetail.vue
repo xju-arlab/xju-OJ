@@ -88,7 +88,7 @@
             <span v-if="reviewRunning" class="prep-live" :title="$t('m.Prep_State_Review')"></span>
           </button>
           <template v-if="canManagePrep">
-            <button type="button" class="prep-publish" @click="openPublish">{{ $t('m.Prep_Publish') }}</button>
+            <button type="button" class="prep-publish" @click="openPublish">{{ publishedContests.length ? '已发布' : $t('m.Prep_Publish') }}</button>
             <el-tooltip :content="$t('m.Prep_Edit_Settings')" placement="top">
               <a class="prep-settings" :href="`/admin/contest/${contestID}/edit`" :aria-label="$t('m.Prep_Edit_Settings')">
                 <Icon type="settings" />
@@ -254,6 +254,47 @@
       </template>
     </LegacyDialog>
 
+    <LegacyDialog v-if="canManagePrep" title="已发布的比赛" width="560px"
+                  :visible="publishedVisible" @update:visible="publishedVisible = $event">
+      <p v-if="!publishedInfo" class="prep-published-copy">{{ $t('m.Loading') }}</p>
+      <dl v-else-if="!publishedEditing" class="prep-published-info">
+        <div><dt>比赛名称</dt><dd>{{ publishedInfo.title }}</dd></div>
+        <div><dt>比赛时间</dt><dd>{{ formatTime(publishedInfo.start_time) }} — {{ formatTime(publishedInfo.end_time) }}</dd></div>
+        <div><dt>参赛账号</dt><dd>{{ publishedInfo.team_contest ? `批量队伍账号（${publishedTeams} 支）` : '原账号' }}</dd></div>
+        <div v-if="!publishedInfo.team_contest"><dt>比赛密码</dt><dd>{{ publishedAdmin.password || '无' }}</dd></div>
+        <div><dt>排名</dt><dd>{{ publishedRankSummary }}</dd></div>
+        <div><dt>比赛链接</dt><dd class="prep-published-link"><a :href="publishedLink" target="_blank" rel="noopener">{{ publishedLink }}</a><el-button size="small" @click="copyText(publishedLink)">复制</el-button></dd></div>
+      </dl>
+      <el-form v-else label-position="top">
+        <el-form-item :label="$t('m.Contest_Name')">
+          <el-input v-model="publishedForm.title" maxlength="128"></el-input>
+        </el-form-item>
+        <div class="prep-publish-grid">
+          <el-form-item :label="$t('m.Contest_Start_Time')">
+            <el-date-picker v-model="publishedForm.start_time" type="datetime" @change="syncPublishedEnd"></el-date-picker>
+          </el-form-item>
+          <el-form-item :label="$t('m.Contest_End_Time')">
+            <el-date-picker v-model="publishedForm.end_time" type="datetime"></el-date-picker>
+          </el-form-item>
+          <el-form-item v-if="!publishedInfo.team_contest" :label="$t('m.Contest_Password')">
+            <el-input v-model="publishedForm.password" maxlength="32"></el-input>
+          </el-form-item>
+        </div>
+        <p class="prep-publish-note">实时排名{{ publishedInfo.rule_type === 'ACM' ? '，最后一小时封榜，赛后由管理员开榜' : '' }}</p>
+      </el-form>
+      <template #footer>
+        <template v-if="publishedEditing">
+          <el-button @click="publishedEditing = false">{{ $t('m.Cancel') }}</el-button>
+          <el-button type="primary" :loading="publishedSaving" @click="savePublished">保存</el-button>
+        </template>
+        <template v-else-if="publishedInfo">
+          <el-button v-if="publishedInfo.team_contest" @click="openWindow(`/admin/contest/${publishedInfo.id}/teams`)">管理队伍账号</el-button>
+          <el-button @click="openWindow(publishedLink)">打开比赛</el-button>
+          <el-button type="primary" @click="editPublished">编辑</el-button>
+        </template>
+      </template>
+    </LegacyDialog>
+
     <PrepStatementExportDialog v-if="prepRole" v-model:visible="exportVisible"
                                :contest-id="contestID" :contest-title="contest.title" />
   </div>
@@ -299,6 +340,14 @@
         publishForm: {},
         // The team-account publish: its link and the one-time passwords.
         publishResult: null,
+        // The published copy, shown instead of the publish form once there is one.
+        publishedVisible: false,
+        publishedInfo: null,
+        publishedAdmin: null,
+        publishedTeams: 0,
+        publishedEditing: false,
+        publishedForm: {},
+        publishedSaving: false,
         sheetLoading: false,
         exportVisible: false
       }
@@ -519,6 +568,8 @@
         this.exportVisible = true
       },
       openPublish () {
+        // A preparation contest is published once; afterwards this shows the copy.
+        if (this.publishedContests.length) return this.openPublished()
         // The contest window is set here; keep a future one, otherwise
         // suggest tomorrow 09:00 for the usual five hours.
         let start = moment(this.contest.start_time)
@@ -538,6 +589,68 @@
         }
         this.publishVisible = true
         this.loadSelection()
+      },
+      async openPublished () {
+        const id = this.publishedContests[0].id
+        this.publishedVisible = true
+        this.publishedEditing = false
+        this.publishedInfo = null
+        try {
+          const [info, admin] = await Promise.all([api.getContest(id), api.getAdminContest(id)])
+          this.publishedAdmin = admin.data.data
+          this.publishedTeams = info.data.data.team_contest ? (await api.getContestTeams(id)).data.data.length : 0
+          this.publishedInfo = info.data.data
+        } catch (_) {
+          this.publishedVisible = false
+        }
+      },
+      editPublished () {
+        const info = this.publishedInfo
+        this.publishedForm = {
+          title: info.title,
+          start_time: new Date(info.start_time),
+          end_time: new Date(info.end_time),
+          password: this.publishedAdmin.password || ''
+        }
+        this.publishedEditing = true
+      },
+      syncPublishedEnd (start) {
+        if (start) this.publishedForm.end_time = moment(start).add(PUBLISH_DEFAULT_HOURS, 'hours').toDate()
+      },
+      async savePublished () {
+        const form = this.publishedForm
+        const base = this.publishedAdmin
+        if (new Date(form.end_time) <= new Date(form.start_time)) {
+          this.$error(this.$t('m.Prep_Time_Invalid'))
+          return
+        }
+        const freeze = moment(form.end_time).subtract(1, 'hour')
+        this.publishedSaving = true
+        try {
+          await api.editAdminContest({
+            id: base.id,
+            title: form.title,
+            description: base.description,
+            start_time: new Date(form.start_time).toISOString(),
+            end_time: new Date(form.end_time).toISOString(),
+            password: this.publishedInfo.team_contest ? '' : form.password,
+            visible: base.visible,
+            real_time_rank: true,
+            allowed_ip_ranges: base.allowed_ip_ranges || [],
+            rank_freeze_time: base.rule_type === 'ACM' && freeze.isAfter(moment(form.start_time)) ? freeze.toISOString() : null
+          })
+          this.$success('已保存')
+          await this.openPublished()
+          // The published badge carries the copy's title.
+          this.$store.dispatch('getContest').catch(() => {})
+        } catch (_) {
+          // The API client already shows the error.
+        } finally {
+          this.publishedSaving = false
+        }
+      },
+      openWindow (href) {
+        window.open(href, '_blank', 'noopener')
       },
       syncPublishEnd (start) {
         // A new start time brings the usual five hour window with it.
@@ -620,6 +733,18 @@
       ]),
       publishedContests () {
         return this.contest.published_contests || []
+      },
+      publishedLink () {
+        const info = this.publishedInfo
+        if (!info) return ''
+        const route = info.team_contest ? { name: 'contest-arena', params: { contestID: info.id } } : { name: 'contest-details', params: { contestID: info.id } }
+        return new URL(this.$router.resolve(route).href, window.location.origin).href
+      },
+      publishedRankSummary () {
+        const info = this.publishedInfo
+        if (info.rule_type !== 'ACM' || !info.rank_freeze_time) return '实时排名'
+        if (info.rank_unfrozen) return '实时排名，已开榜'
+        return `实时排名，${moment(info.rank_freeze_time).format('MM-DD HH:mm')} 封榜，赛后由管理员开榜`
       },
       myTeam () {
         const team = this.$store.state.user.profile.team
@@ -985,6 +1110,10 @@
 .contest-team strong { font-weight: 650; }
 .contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .contest-team button:hover { color: var(--color-text); }
+.prep-published-info { display: grid; gap: 10px; margin: 0; }
+.prep-published-info > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: center; }
+.prep-published-info dt { color: var(--color-text-muted); font-size: 12px; }
+.prep-published-info dd { margin: 0; color: var(--color-text); font-size: 13px; }
 .prep-published-copy { margin: 0 0 8px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
 .prep-published-copy.is-warning { margin-top: 12px; color: var(--color-text); font-weight: 600; }
 .prep-published-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-subtle); }

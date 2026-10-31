@@ -482,6 +482,15 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.login(self.creator)
         self.assertSuccess(self.client.post(self.url, data={"contest_id": self.contest.id}))
 
+    def test_a_contest_is_published_once_unless_the_copy_is_removed(self):
+        self.login(self.creator)
+        first = self.client.post(self.url, data={"contest_id": self.contest.id})
+        self.assertSuccess(first)
+        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
+                          "This contest has already been published")
+        Contest.objects.filter(id=first.data["data"]["id"]).update(visible=False)
+        self.assertSuccess(self.client.post(self.url, data={"contest_id": self.contest.id}))
+
     def test_publish_without_times_starts_a_fresh_default_window(self):
         # The preparation window is only a placeholder, so a publish that leaves
         # the times out gets the usual default length starting now.
@@ -546,6 +555,8 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.assertNotIn("published_from", published_detail)
 
         self.login(self.creator)
+        # Only one live copy at a time; remove this one to check the window rules.
+        Contest.objects.filter(id=published.id).update(visible=False)
         bad = self.client.post(self.url, data={"contest_id": self.contest.id, "start_time": start.isoformat(),
                                                "end_time": start.isoformat()})
         self.assertFailed(bad, "Start time must occur earlier than end time")

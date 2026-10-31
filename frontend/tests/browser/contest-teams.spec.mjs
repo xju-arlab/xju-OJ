@@ -48,8 +48,9 @@ test.beforeEach(async ({ page }) => {
       } else { error = 'error'; data = 'Invalid username or password' }
     }
     if (path === '/api/logout') state.profile = {}
-    if (path === '/api/contest') {
-      data = url.searchParams.get('id') === '31' ? prep
+    if (path === '/api/contest' && url.searchParams.get('id') === '40') data = { ...contest, id: 40, title: '新生赛正式', status: '1', start_time: iso(24), end_time: iso(29), rank_freeze_time: iso(28) }
+    else if (path === '/api/contest') {
+      data = url.searchParams.get('id') === '31' ? { ...prep, published_contests: state.published ? [{ id: 40, title: '新生赛正式' }] : [] }
         : state.ended ? { ...contest, status: '-1', start_time: iso(-6), end_time: iso(-1), now: iso(0) }
           : state.upcoming ? { ...contest, status: '1', start_time: iso(2), end_time: iso(7), rank_freeze_time: iso(6) } : contest
     }
@@ -62,6 +63,8 @@ test.beforeEach(async ({ page }) => {
     if (path === '/api/contest/prep/plan') data = { items: [], progress: [] }
     if (path === '/api/contest/prep/publish') data = { id: 40, title: body.title, teams: body.teams.map((item, index) => ({ ...item, id: index + 1, username: `team-aaa${index}`, password: 'Pass2345' })) }
     if (path === '/api/contest/announcement') data = []
+    if (path === '/api/admin/contest' && req.method() === 'GET') data = { id: 40, title: '新生赛正式', description: '<p>说明</p>', visible: true, password: null, allowed_ip_ranges: [], rule_type: 'ACM' }
+    if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1 }, { id: 2 }]
     if (path === '/api/admin/contest/teams/sheet') return route.fulfill({ body: '%PDF-1.7', contentType: 'application/pdf' })
     await route.fulfill({ json: { error, data } })
   })
@@ -160,4 +163,28 @@ test('before the start the link says so instead of loading forever', async ({ pa
   await expect(page.locator('.contest-arena-notice')).toContainText('未到开赛时间')
   await expect(page.getByText('本场比赛只对队伍账号开放，当前登录的是 student')).toBeVisible()
   await expect(page.getByText('Loading')).toHaveCount(0)
+})
+
+test('a published preparation contest shows its copy and edits it instead of publishing again', async ({ page }) => {
+  state.published = true
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  await page.goto('/contest/31/')
+  await page.getByRole('button', { name: '已发布' }).click()
+  const dialog = page.locator('.el-dialog').filter({ hasText: '已发布的比赛' })
+  await expect(dialog).toContainText('新生赛正式')
+  await expect(dialog).toContainText('批量队伍账号（2 支）')
+  await expect(dialog.locator('.prep-published-link a')).toHaveText(/\/arena\/40$/)
+  await expect(page.locator('.el-dialog').filter({ hasText: '参赛账号' }).filter({ hasText: '发布比赛' })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '编辑' }).click()
+  await dialog.locator('input[maxlength="128"]').fill('新生赛决赛')
+  const [start, end] = await dialog.locator('.el-date-editor input').all()
+  await start.fill('2026-11-08 09:00:00')
+  await start.press('Enter')
+  await expect(end).toHaveValue('2026-11-08 14:00:00')
+  await dialog.getByRole('button', { name: '保存' }).click()
+  await expect.poll(() => state.writes.find(item => item.path === '/api/admin/contest')).toBeTruthy()
+  const saved = state.writes.find(item => item.path === '/api/admin/contest').body
+  expect(saved).toMatchObject({ id: 40, title: '新生赛决赛', password: '', real_time_rank: true, visible: true, description: '<p>说明</p>' })
+  expect(Date.parse(saved.end_time) - Date.parse(saved.rank_freeze_time)).toBe(3600e3)
+  expect(state.writes.some(item => item.path === '/api/contest/prep/publish')).toBe(false)
 })

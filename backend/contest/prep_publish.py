@@ -24,6 +24,10 @@ from .teams import create_teams
 def publish_prep_contest(prep_contest, overrides):
     # The row lock serializes concurrent publish clicks.
     prep = Contest.objects.select_for_update().get(pk=prep_contest.pk)
+    # Published once; the copy is then adjusted by editing it. A copy that was
+    # deleted or hidden (hiding a contest is how it is removed) no longer counts.
+    if Contest.objects.filter(published_from=prep, visible=True).exists():
+        raise APIError("This contest has already been published")
     problems = list(order_contest_problems(Problem.objects.filter(contest=prep, visible=True)))
     if not problems:
         raise APIError("Upload the contest problems before publishing")
