@@ -1,5 +1,6 @@
 """Headless adapter for codalab/codabench e40d067ea3b61b9d7fa0146b7c075ed3d677862c."""
 import io
+import json
 import math
 import re
 import time
@@ -7,6 +8,9 @@ import urllib.parse
 import zipfile
 
 from transport import RemoteError
+
+# A package's scoring program may end its stdout with this one line for the student.
+FEEDBACK = "XJU_FEEDBACK "
 
 
 def submission_bundle(job):
@@ -66,6 +70,24 @@ class Codabench:
         heartbeat(remote_id=remote_id)
         return remote_id
 
+    def feedback(self, submission):
+        """Return the scoring program's marked feedback line, or "" (best effort, never a verdict).
+
+        The rest of the scoring log can contain hidden answers and is never read.
+        """
+        try:
+            details = self.client.call("GET", "submissions/" + str(submission) + "/get_details/")
+            logs = details.get("logs") if isinstance(details, dict) else None
+            urls = [item.get("data_file") for item in logs or [] if isinstance(item, dict) and item.get("name") == "scoring_stdout"]
+            if len(urls) != 1 or not isinstance(urls[0], str):
+                return ""
+            text = self.client.get_object(urls[0], self.storage_origin).decode("utf-8", "replace")
+            lines = [line for line in text.splitlines() if line.startswith(FEEDBACK)]
+            message = json.loads(lines[-1][len(FEEDBACK):]).get("message") if lines else ""
+            return " ".join(message.split())[:400] if isinstance(message, str) else ""
+        except Exception:  # Feedback must never turn a trusted score into a system error.
+            return ""
+
     def run(self, job, heartbeat):
         remote_id = self.submit(job, heartbeat)
         deadline = time.monotonic() + 1200
@@ -92,9 +114,10 @@ class Codabench:
                         verdict = "MEMORY_LIMIT"
                 return {"status": verdict, "remote_id": remote_id}
             if status == "Finished":
-                rows = result.get("scores", [])
+                rows, scored = result.get("scores", []), remote_id
                 if not rows and len(result.get("children", [])) == 1:
-                    child = self.client.call("GET", "submissions/" + str(result["children"][0]) + "/")
+                    scored = result["children"][0]
+                    child = self.client.call("GET", "submissions/" + str(scored) + "/")
                     rows = child.get("scores", [])
                 scores = {}
                 for row in rows:
@@ -125,6 +148,9 @@ class Codabench:
                         if column not in scores:
                             raise RemoteError("Required score column is missing")
                         output[field] = scores[column]
+                message = self.feedback(scored)
+                if message:
+                    output["feedback"] = message
                 return output
             time.sleep(3)
         return {"status": "SYSTEM_ERROR", "remote_id": remote_id}

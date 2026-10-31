@@ -32,8 +32,9 @@ class AIProblem(models.Model):
 class AIContestConfig(models.Model):
     contest = models.OneToOneField("contest.Contest", on_delete=models.CASCADE, related_name="ai_config")
     selection = models.CharField(max_length=8, default="latest", choices=[("latest", "latest"), ("best", "best")])
-    # score: weighted points (selection applies); acm: solved count, then penalty time.
-    ranking = models.CharField(max_length=8, default="score", choices=[("score", "score"), ("acm", "acm")])
+    # score: weighted points (selection applies); acm: solved count, then penalty time;
+    # oi: best weighted points per problem, then penalty time.
+    ranking = models.CharField(max_length=8, default="score", choices=[("score", "score"), ("acm", "acm"), ("oi", "oi")])
     private_published = models.BooleanField(default=False)
     practice_enabled = models.BooleanField(default=True)
 

@@ -298,6 +298,27 @@ class QuizReviewAndACMTests(APITestCase):
         detail = self.client.get("/api/ai/contest", self.scope).data["data"]
         self.assertEqual(detail["ranking"], "acm")
 
+    def test_oi_sums_best_points_and_breaks_ties_by_penalty(self):
+        AIContestConfig.objects.filter(contest=self.contest).update(ranking="oi")
+        users = [self.create_user(name, name, login=False) for name in ("ann", "bob", "cat", "dan")]
+        base = self.contest.start_time
+        def job(user, status, minutes, score):
+            item = AIJob.objects.create(user=user, problem=self.problem, contest=self.contest, kind="evaluation", official=True,
+                                        category="quiz", problem_version=1, source_sha256="a" * 64, status=status, public_score=score)
+            AIJob.objects.filter(pk=item.pk).update(created_at=base + timedelta(minutes=minutes))
+        job(users[0], "PARTIAL", 4, 60); job(users[0], "WRONG_ANSWER", 9, 0)  # 6 points at 4 min; a worse retry is free
+        job(users[1], "SYSTEM_ERROR", 1, None); job(users[1], "RUNTIME_ERROR", 2, None); job(users[1], "PARTIAL", 3, 60)  # 3 + 20 min
+        job(users[2], "WRONG_ANSWER", 1, 0); job(users[2], "ACCEPTED", 30, 100)
+        job(users[3], "REVIEWING", 5, None)
+        self.client.force_login(self.teacher)
+        board = self.client.get("/api/ai/leaderboard", self.scope).data["data"]
+        rows = board["results"]
+        self.assertEqual(board["ranking"], "oi")
+        self.assertEqual([(r["username"], r["rank"], r["total"], r["penalty"] // 60) for r in rows],
+                         [("cat", 1, 10, 50), ("ann", 2, 6, 4), ("bob", 3, 6, 23), ("dan", 4, 0, 0)])
+        self.assertEqual(rows[1]["scores"][self.problem.code]["time"], 240)
+        self.assertEqual((rows[3]["scores"][self.problem.code]["pending"], rows[3]["scores"][self.problem.code]["score"]), (1, None))
+
     def test_contest_ranking_setting_is_frozen_after_start(self):
         payload = {"contest_id": self.contest.id, "selection": "latest", "ranking": "score", "private_published": False,
                    "practice_enabled": True, "problems": [{"id": self.problem.code, "points": 10}]}

@@ -25,7 +25,7 @@ const problem = {
 let state
 
 test.beforeEach(async ({ page }) => {
-  state = { errors: [], writes: [], draft: { answers: {}, revision: 0 }, jobs: [], attemptsUsed: 0 }
+  state = { errors: [], writes: [], draft: { answers: {}, revision: 0 }, jobs: [], attemptsUsed: 0, ranking: 'acm' }
   page.on('pageerror', error => state.errors.push(error.message))
   await page.route('**/api/**', async route => {
     const req = route.request(); const url = new URL(req.url()); const path = url.pathname.replace(/\/$/, '')
@@ -36,11 +36,14 @@ test.beforeEach(async ({ page }) => {
     if (path.includes('providers')) data = { authentik: { enabled: false }, local: { login_enabled: true, register_enabled: false } }
     if (path.includes('website')) data = { website_name: 'XJU-OJ', allow_register: false }
     if (path === '/api/ai/problems') data = { ...problem, ...(url.searchParams.get('contest_id') ? { practice: false, attemptsUsed: state.attemptsUsed } : {}) }
-    if (path === '/api/ai/contest') data = { id: '23', title: 'ACM 考核', rule_type: 'AI', contest_type: 'Public', status: '0', ranking: 'acm', scorePolicy: 'best',
+    if (path === '/api/ai/contest') data = { id: '23', title: 'ACM 考核', rule_type: 'AI', contest_type: 'Public', status: '0', ranking: state.ranking, scorePolicy: 'best',
       start_time: '2026-10-31T06:00:00Z', end_time: '2026-10-31T08:00:00Z', registered: true, created_by: { username: 'teacher' }, description: '',
       problems: [{ id: 'AI010', title: '线性回归', type: 'logic', points: 10 }, { id: 'AI011', title: 'Softmax', type: 'logic', points: 10 }], totalPoints: 20, accessError: '' }
     if (path === '/api/contest/announcement') data = { results: [], total: 0 }
-    if (path === '/api/ai/leaderboard') data = { ranking: 'acm', selection: 'best', privatePublished: false, results: [
+    if (path === '/api/ai/leaderboard' && state.ranking === 'oi') data = { ranking: 'oi', selection: 'best', privatePublished: false, results: [
+      { rank: 1, userId: 1, username: 'ann', total: 16, penalty: 3000, scores: { AI010: { score: 10, time: 600, tries: 1, pending: 0 }, AI011: { score: 6, time: 1200, tries: 2, pending: 1 } } },
+      { rank: 2, userId: 2, username: 'bob', total: 0, penalty: 0, scores: { AI010: { score: 0, time: null, tries: 3, pending: 0 }, AI011: { score: null, time: null, tries: 0, pending: 1 } } }] }
+    else if (path === '/api/ai/leaderboard') data = { ranking: 'acm', selection: 'best', privatePublished: false, results: [
       { rank: 1, userId: 1, username: 'ann', solved: 2, penalty: 2700, scores: { AI010: { accepted: true, tries: 1, time: 600, pending: 0 }, AI011: { accepted: true, tries: 0, time: 900, pending: 0 } } },
       { rank: 2, userId: 2, username: 'bob', solved: 0, penalty: 0, scores: { AI010: { accepted: false, tries: 2, time: null, pending: 1 }, AI011: { accepted: false, tries: 3, time: null, pending: 0 } } }] }
     if (path === '/api/ai/draft') {
@@ -132,4 +135,19 @@ test('ACM contests rank by solved problems and penalty', async ({ page }) => {
   await expect(rows.first().locator('td.acm-accepted').first()).toContainText('+1')
   await expect(rows.nth(1).locator('td.acm-pending')).toHaveText('?')
   await expect(rows.nth(1).locator('td.acm-failed')).toHaveText('−3')
+})
+
+test('OI contests sum best scores, keep penalty and never show failure counts', async ({ page }) => {
+  state.ranking = 'oi'
+  await page.goto('/ai-studio/contest/23')
+  await expect(page.locator('.contest-meta')).toContainText('OI · 总分 20')
+  await page.getByRole('button', { name: '成绩' }).click()
+  const rows = page.locator('.ai-acm-board tbody tr')
+  await expect(rows.first().locator('td').nth(2)).toHaveText('16')
+  await expect(rows.first().locator('td').nth(3)).toHaveText('50')
+  await expect(rows.first().locator('td.acm-accepted')).toHaveText('1010')
+  await expect(rows.first().locator('td.oi-partial')).toHaveText('6 ?20')
+  await expect(rows.nth(1).locator('td').nth(4)).toHaveText('0')
+  await expect(rows.nth(1).locator('td.acm-pending')).toHaveText('?')
+  await expect(page.locator('.ai-acm-board')).not.toContainText('−')
 })

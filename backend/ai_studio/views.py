@@ -281,7 +281,7 @@ class ContestAdminAPI(APIView):
         config, _ = AIContestConfig.objects.get_or_create(contest=contest)
         require(data.get("selection") in ("latest", "best"), "Invalid selection policy")
         ranking = data.get("ranking", config.ranking)
-        require(ranking in ("score", "acm"), "Invalid ranking rule")
+        require(ranking in ("score", "acm", "oi"), "Invalid ranking rule")
         require(type(data.get("private_published")) is bool and type(data.get("practice_enabled")) is bool, "Invalid publication settings")
         require(not data["private_published"] or contest.end_time < now(), "Private scores cannot be published before the contest ends")
         links = data.get("problems")
@@ -421,9 +421,13 @@ class WorkerAPI(CSRFExemptAPIView):
                     if status == "WRONG_ANSWER" and job.category == "logic" and job.public_score > 0:
                         status = "PARTIAL"
         job.status = status
-        # Never return scoring-container logs: they can include hidden answers.
+        # Never return scoring-container logs: they can include hidden answers. Only the
+        # package's own marked feedback line is shown, to the submitter.
         job.message = {"RUNTIME_ERROR": "运行失败，请检查代码或提交格式。", "TIME_LIMIT": "运行超时。",
                        "MEMORY_LIMIT": "内存超限。", "SYSTEM_ERROR": "评测服务异常，请联系管理员。"}.get(status, "")
+        feedback = data.get("feedback")
+        if job.kind == "evaluation" and data.get("status") == "SCORED" and isinstance(feedback, str):
+            job.message = " ".join(feedback.split())[:400]
         if job.kind == "notebook" and job.output.get("kernel_reset"):
             job.message = "内核已重启，先前变量已清空。请重新运行所需单元格或运行全部。"
         job.finished_at = now()

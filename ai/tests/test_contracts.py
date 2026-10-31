@@ -198,12 +198,13 @@ class DispatchTests(unittest.TestCase):
         job = {**self.job, "remote_id": 42, "judge": {**self.job["judge"], "accuracy_column": "accuracy"}}
         rows = [{"column_key": "score", "score": 0}, {"column_key": "accuracy", "score": 0.25}]
         self.client.call.side_effect = [{"phase": 7, "status": "Finished", "scores": value}
-                                       for value in ([], rows[:1], rows)]
+                                       for value in ([], rows[:1], rows)] + [{"logs": []}]
         with patch("codabench.time.sleep"):
             result = self.adapter.run(job, self.heartbeat)
         self.assertEqual(result["public_score"], 0)
         self.assertEqual(result["accuracy"], 0.25)
-        self.assertEqual([call.args[:2] for call in self.client.call.call_args_list], [("GET", "submissions/42/")] * 3)
+        self.assertEqual([call.args[:2] for call in self.client.call.call_args_list],
+                         [("GET", "submissions/42/")] * 3 + [("GET", "submissions/42/get_details/")])
         self.client.put_zip.assert_not_called()
 
     def test_permanently_missing_scores_fail_after_bounded_wait(self):
@@ -222,6 +223,38 @@ class DispatchTests(unittest.TestCase):
         for details, status in [("Execution Time Limit exceeded. Limit was 5 seconds", "TIME_LIMIT"), ("Submission failed: XJU_MEMORY_LIMIT", "MEMORY_LIMIT"), ("Child task failed", "RUNTIME_ERROR")]:
             self.client.call.return_value = {"phase": 7, "status": "Failed", "status_details": details}
             self.assertEqual(self.adapter.run({**self.job, "remote_id": 42}, self.heartbeat)["status"], status)
+
+    def test_only_the_marked_scoring_feedback_reaches_the_student(self):
+        finished = {"phase": 7, "status": "Finished", "scores": [], "children": [43]}
+        child = {"scores": [{"column_key": "score", "score": 60}]}
+        log = [{"name": "prediction_stdout", "data_file": "http://store/p"}, {"name": "scoring_stdout", "data_file": "http://store/s?sig=1"}]
+        self.client.call.side_effect = [finished, child, {"logs": log}]
+        self.client.get_object.return_value = ("expected 1.25\nXJU_FEEDBACK " + json.dumps({"message": "train 运行出错：\nNameError"}) + "\n").encode()
+        result = self.adapter.run({**self.job, "remote_id": 42}, self.heartbeat)
+        self.assertEqual(result, {"status": "SCORED", "remote_id": 42, "public_score": 60, "feedback": "train 运行出错： NameError"})
+        self.assertEqual(self.client.call.call_args_list[-1].args[:2], ("GET", "submissions/43/get_details/"))
+        self.client.get_object.assert_called_once_with("http://store/s?sig=1", "http://store")
+        for logs, raw in (({"logs": log}, b"expected 1.25\n"), ({"logs": log}, b"XJU_FEEDBACK [1]"), ({"logs": []}, b""),
+                          (RemoteError("forbidden"), b"")):
+            with self.subTest(logs=logs, raw=raw):
+                self.client.call.side_effect = [{**finished, "scores": child["scores"], "children": []}, logs]
+                self.client.get_object.return_value = raw
+                self.assertNotIn("feedback", self.adapter.run({**self.job, "remote_id": 42}, self.heartbeat))
+
+    def test_feedback_object_download_is_bounded_and_origin_checked(self):
+        client = Client("http://service/api/", "private-test-token", "Token")
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = b"12345"
+        client.opener = Mock()
+        client.opener.open.return_value = response
+        with self.assertRaisesRegex(RemoteError, "exceeded limit"):
+            client.get_object("http://store/log?sig=1", "http://store", limit=4)
+        self.assertIsNone(client.opener.open.call_args.args[0].get_header("Authorization"))
+        for url in ("https://other.invalid/log", "http://user@store/log", "http://store/log#x"):
+            with self.assertRaises(RemoteError):
+                client.get_object(url, "http://store")
 
     def test_bundle_contains_only_student_source_and_public_data(self):
         job = {**self.job, "payload": {"cells": ["x = 1", "print(x)"], "files": {"train.csv": "x,y", "../secret.csv": "bad"}}, "judge": {"secret": "hidden"}}

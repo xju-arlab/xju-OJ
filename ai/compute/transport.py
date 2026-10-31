@@ -52,6 +52,20 @@ class Client:
         except (OSError, ValueError):
             raise RemoteError("Object upload failed") from None
 
+    def get_object(self, url, allowed_origin, limit=65536):
+        parsed = urllib.parse.urlsplit(url)
+        origin = parsed.scheme + "://" + parsed.netloc
+        if origin != allowed_origin.rstrip("/") or parsed.username or parsed.fragment:
+            raise RemoteError("Object storage origin is not allowed")
+        try:
+            with self.opener.open(urllib.request.Request(url), timeout=15) as response:
+                raw = response.read(limit + 1)
+        except (OSError, ValueError):
+            raise RemoteError("Object download failed") from None
+        if len(raw) > limit:
+            raise RemoteError("Object exceeded limit")
+        return raw
+
     def get_zip(self, path, limit=16 * 1024 * 1024):
         if path.startswith(("/", "http:", "https:")) or ".." in path:
             raise ValueError("Service paths must be relative")

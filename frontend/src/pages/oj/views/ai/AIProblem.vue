@@ -71,7 +71,7 @@
           </div>
           <div class="studio-notebook-status"><span class="studio-run-state" aria-live="polite">{{ runState ? runLabel : 'Notebook · ' + cells.length + ' 个代码单元格' }}</span><span :class="['studio-kernel', { 'is-busy': running }]"><span></span>Python 3 · {{ running ? '忙碌' : '空闲' }}</span><span>Shift+Enter 运行并前进</span></div>
           <div class="studio-submit-dock">
-            <div class="studio-submit-feedback"><span class="studio-save-state" role="status">{{ saveStatus }}</span><div v-if="latestEvaluation" class="studio-last-evaluation"><span>最近评测</span><EvaluationStatus :record="latestEvaluation" /></div></div>
+            <div class="studio-submit-feedback"><span class="studio-save-state" role="status">{{ saveStatus }}</span><div v-if="latestEvaluation" class="studio-last-evaluation"><span>最近评测</span><EvaluationStatus :record="latestEvaluation" /><p v-if="latestEvaluation.message" class="studio-evaluation-message">{{ latestEvaluation.message }}</p></div></div>
             <button class="studio-button primary" :disabled="submitting || !authenticated" @click="runTask('evaluation')"><Send :size="15" />{{ submitting ? '提交中…' : '提交评测' }}</button>
           </div>
         </section>

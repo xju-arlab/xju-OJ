@@ -348,6 +348,39 @@ def acm_leaderboard(contest, jobs):
     return result
 
 
+def oi_leaderboard(contest, jobs, weights, private):
+    """Best weighted points per problem; ties by penalty = when each best score was first
+    reached + 20 minutes per earlier finished submission on that problem."""
+    rows = {}
+    for job in jobs.order_by("created_at", "id"):
+        row = rows.setdefault(job.user_id, {"userId": job.user_id, "username": job.user.username,
+                                            "total": 0, "penalty": 0, "scores": {}})
+        cell = row["scores"].setdefault(job.problem.code, {"score": None, "time": None, "tries": 0, "pending": 0,
+                                                            "status": None, "submissionId": None, "penalty": 0})
+        if job.status in ACM_IGNORED:
+            continue
+        if job.status in ACTIVE or job.status == "REVIEWING":
+            cell["pending"] += 1
+            continue
+        raw = job.private_score if private and job.private_score is not None else job.public_score
+        points = None if raw is None else round(raw * weights.get(job.problem_id, 0) / 100, 4)
+        if points is not None and points > (cell["score"] or 0):
+            cell.update(score=points, status=job.status, submissionId=str(job.id),
+                        time=max(0, int((job.created_at - contest.start_time).total_seconds())))
+            cell["penalty"] = cell["time"] + ACM_PENALTY_SECONDS * cell["tries"]
+        elif cell["score"] is None:
+            cell.update(score=points if points is not None else cell["score"], status=job.status, submissionId=str(job.id))
+        cell["tries"] += 1
+    for row in rows.values():
+        row["total"] = round(sum(cell["score"] or 0 for cell in row["scores"].values()), 4)
+        row["penalty"] = sum(cell["penalty"] for cell in row["scores"].values() if cell["score"])
+    result = sorted(rows.values(), key=lambda row: (-row["total"], row["penalty"], row["username"], row["userId"]))
+    for index, row in enumerate(result):
+        same = index and (row["total"], row["penalty"]) == (result[index - 1]["total"], result[index - 1]["penalty"])
+        row["rank"] = result[index - 1]["rank"] if same else index + 1
+    return result
+
+
 def leaderboard(request, contest_id):
     contest, config = contest_access(request, contest_id)
     require(contest.real_time_rank or contest.end_time < now() or request.user.is_contest_admin(contest),
@@ -358,6 +391,9 @@ def leaderboard(request, contest_id):
     if config.ranking == "acm":
         return {"privatePublished": private, "selection": config.selection, "ranking": "acm",
                 "results": acm_leaderboard(contest, jobs)}
+    if config.ranking == "oi":
+        return {"privatePublished": private, "selection": "best", "ranking": "oi",
+                "results": oi_leaderboard(contest, jobs, weights, private)}
     selected = select_scores(jobs, config.selection, private)
     rows = {}
     for (user_id, problem_id), (job, score) in selected.items():

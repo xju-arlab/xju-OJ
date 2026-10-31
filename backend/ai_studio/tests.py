@@ -200,6 +200,20 @@ class AIStudioTests(APITestCase):
         self.problem.save()
         self.assertFailed(self.client.get("/api/ai/file", {"problem_id": self.problem.code, "name": "train.csv"}))
 
+    def test_scoring_feedback_is_shown_only_with_trusted_scores(self):
+        created = self.submit().data["data"]
+        claim = self.claim()
+        self.assertSuccess(self.worker("finish", id=claim["id"], lease=claim["lease"], status="SCORED", public_score=60,
+                                       feedback="train 运行出错：\nNameError: name 'loss' is not defined" + "x" * 600))
+        record = self.client.get("/api/ai/jobs", {"id": created["id"]}).data["data"]
+        self.assertEqual(record["status"], "PARTIAL")
+        self.assertTrue(record["message"].startswith("train 运行出错： NameError: name 'loss' is not defined"))
+        self.assertEqual(len(record["message"]), 400)
+        self.submit()
+        claim = self.claim()
+        self.assertSuccess(self.worker("finish", id=claim["id"], lease=claim["lease"], status="RUNTIME_ERROR", feedback="hidden"))
+        self.assertEqual(AIJob.objects.get(pk=claim["id"]).message, "运行失败，请检查代码或提交格式。")
+
     def test_other_user_cannot_read_job_or_reuse_id(self):
         result = self.submit()
         job_id = result.data["data"]["id"]

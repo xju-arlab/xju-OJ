@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   state = { errors: [], writes: [], drafts: {}, jobs: [], authenticated: true, conflict: false }
   state.jobs = [
     { id: 'new', problemId: 'AI005', title: titles[4], type: 'challenge', status: 'SCORING', createdAt: '2026-10-07T18:04:00Z' },
-    { id: 'bad', problemId: 'AI002', title: titles[1], type: 'logic', status: 'WRONG_ANSWER', createdAt: '2026-10-07T18:03:00Z' },
+    { id: 'bad', problemId: 'AI002', title: titles[1], type: 'logic', status: 'WRONG_ANSWER', message: "train 运行出错：NameError: name 'loss' is not defined", createdAt: '2026-10-07T18:03:00Z' },
     { id: 'zero', problemId: 'AI004', title: titles[3], type: 'challenge', status: 'SCORED', publicScore: 0, privateScore: null, privatePublished: false, createdAt: '2026-10-07T18:02:00Z' },
     { id: 'model', problemId: 'AI003', title: titles[2], type: 'model', status: 'ACCEPTED', accuracy: 1, createdAt: '2026-10-07T18:01:00Z' }
   ]
@@ -96,6 +96,11 @@ test('home shows per-problem states, valid zero scores and latest-first activity
   await page.getByRole('textbox', { name: '搜索 AI 题目' }).fill('数据样例 D')
   await expect(page.locator('.studio-table tbody tr')).toHaveCount(1)
   await expect(page.locator('.studio-table')).toContainText('私榜未公布')
+})
+
+test('submission records show the scoring feedback', async ({ page }) => {
+  await page.goto('/ai-studio/submissions')
+  await expect(page.locator('.studio-table .studio-evaluation-message')).toHaveText("train 运行出错：NameError: name 'loss' is not defined")
 })
 
 test('ordinary contest tab fetches AI and preserves ACM pagination', async ({ page }) => {
