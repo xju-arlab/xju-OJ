@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-31T08:41:24Z",
+  "updated_at": "2026-10-31T09:06:35Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "1e200589930ae1ab2a4fae4fa8c8ada402a67d70e421e541cb7e4e22164fdb54",
-      "size": 222326,
-      "normalized_sha256": "1e200589930ae1ab2a4fae4fa8c8ada402a67d70e421e541cb7e4e22164fdb54"
+      "sha256": "28c07fa04b776acbff22c117c7987ae00cb4d0800226db0dc20b8c0be0d1fcb6",
+      "size": 222874,
+      "normalized_sha256": "28c07fa04b776acbff22c117c7987ae00cb4d0800226db0dc20b8c0be0d1fcb6"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -480,9 +480,9 @@
     },
     "backend/account/serializers.py": {
       "role": "index",
-      "sha256": "99afc9d40abe4027bc5a1a3cb726caaf816e0c20e874cf3c38680408e50f24b3",
-      "size": 6100,
-      "normalized_sha256": "99afc9d40abe4027bc5a1a3cb726caaf816e0c20e874cf3c38680408e50f24b3"
+      "sha256": "5870bf4e115eb3bc0323027966e0082087371ee8cd1bb91efd861ff3538bc2bc",
+      "size": 6112,
+      "normalized_sha256": "5870bf4e115eb3bc0323027966e0082087371ee8cd1bb91efd861ff3538bc2bc"
     },
     "backend/account/tasks.py": {
       "role": "index",
@@ -498,9 +498,9 @@
     },
     "backend/account/tests.py": {
       "role": "index",
-      "sha256": "675e7fc50ef03516469bd8bba3e1a431291e1a1a96672ccbd42dcaaebba8710a",
-      "size": 30072,
-      "normalized_sha256": "675e7fc50ef03516469bd8bba3e1a431291e1a1a96672ccbd42dcaaebba8710a"
+      "sha256": "4e9aed319602df6c43c81444ac1a13b96ac6963e3f507a7d1d82ff46c46ae336",
+      "size": 30323,
+      "normalized_sha256": "4e9aed319602df6c43c81444ac1a13b96ac6963e3f507a7d1d82ff46c46ae336"
     },
     "backend/account/tests_legacy_link.py": {
       "role": "index",
@@ -658,9 +658,9 @@
     },
     "backend/ai_studio/services.py": {
       "role": "index",
-      "sha256": "c38c9f07c82386a56ecf536af3f47d51525a60791631bf34f14f5bfc9b7d3873",
-      "size": 24154,
-      "normalized_sha256": "c38c9f07c82386a56ecf536af3f47d51525a60791631bf34f14f5bfc9b7d3873"
+      "sha256": "ccfd047eef8fe269714f6c07ac085857f6fc6f34c6b1e1ad4d29271c78aac1e9",
+      "size": 25116,
+      "normalized_sha256": "ccfd047eef8fe269714f6c07ac085857f6fc6f34c6b1e1ad4d29271c78aac1e9"
     },
     "backend/ai_studio/tests.py": {
       "role": "index",
@@ -676,9 +676,9 @@
     },
     "backend/ai_studio/tests_quiz.py": {
       "role": "index",
-      "sha256": "0a62fc550d9c51dbcf84cb6910aca58a280c62828fe9b146c32d9ff8cd45edc9",
-      "size": 22758,
-      "normalized_sha256": "0a62fc550d9c51dbcf84cb6910aca58a280c62828fe9b146c32d9ff8cd45edc9"
+      "sha256": "c7c7d9d38b3d083e20f6fd3050ed1e0bf13b6d61fbd0be2acbd062f7a5c70efd",
+      "size": 25009,
+      "normalized_sha256": "c7c7d9d38b3d083e20f6fd3050ed1e0bf13b6d61fbd0be2acbd062f7a5c70efd"
     },
     "backend/ai_studio/urls.py": {
       "role": "index",
@@ -688,9 +688,9 @@
     },
     "backend/ai_studio/views.py": {
       "role": "index",
-      "sha256": "95abc3a5b5b40e3a9f062eb478d7f3a23dd3d4ad55898a189830a211d70c8abe",
-      "size": 24781,
-      "normalized_sha256": "95abc3a5b5b40e3a9f062eb478d7f3a23dd3d4ad55898a189830a211d70c8abe"
+      "sha256": "d2031c286f6f69f3e427d736efb6e7508762bc71727cb9e05b59d524872f29d1",
+      "size": 25729,
+      "normalized_sha256": "d2031c286f6f69f3e427d736efb6e7508762bc71727cb9e05b59d524872f29d1"
     },
     "backend/ai_studio/worker_auth.py": {
       "role": "index",
@@ -2790,21 +2790,21 @@
     },
     "frontend/src/i18n/oj/en-US.js": {
       "role": "index",
-      "sha256": "5f0abed31ea0fbfa450ecde84f4e1223dc111f4e2efbb3593343a35ef451f648",
-      "size": 29068,
-      "normalized_sha256": "5f0abed31ea0fbfa450ecde84f4e1223dc111f4e2efbb3593343a35ef451f648"
+      "sha256": "8168af72baa1b3ee47e4914497cb25d4124fcd0c059146f7605da3a254664094",
+      "size": 29082,
+      "normalized_sha256": "8168af72baa1b3ee47e4914497cb25d4124fcd0c059146f7605da3a254664094"
     },
     "frontend/src/i18n/oj/zh-CN.js": {
       "role": "index",
-      "sha256": "29a4c174ce6343a9993359d311b84fad0a0fad0e648bf3e66370bf6c2281f305",
-      "size": 27805,
-      "normalized_sha256": "29a4c174ce6343a9993359d311b84fad0a0fad0e648bf3e66370bf6c2281f305"
+      "sha256": "3a30c084d6ac6bb08331de0ec29c1b58990b62f042af42bcd45c956a6a8a74be",
+      "size": 27817,
+      "normalized_sha256": "3a30c084d6ac6bb08331de0ec29c1b58990b62f042af42bcd45c956a6a8a74be"
     },
     "frontend/src/i18n/oj/zh-TW.js": {
       "role": "index",
-      "sha256": "b02df3ef1aa54c176dfc35bfdfd389e4242ff79a1a5cd3652e1bd7ac798d69f1",
-      "size": 19311,
-      "normalized_sha256": "b02df3ef1aa54c176dfc35bfdfd389e4242ff79a1a5cd3652e1bd7ac798d69f1"
+      "sha256": "fd6e9b8e27db8b2f753fb270167c01aca1b6cbaaf07e0dc42370e5330c857f4b",
+      "size": 19323,
+      "normalized_sha256": "fd6e9b8e27db8b2f753fb270167c01aca1b6cbaaf07e0dc42370e5330c857f4b"
     },
     "frontend/src/pages/admin/App.vue": {
       "role": "index",
@@ -3204,9 +3204,9 @@
     },
     "frontend/src/pages/oj/views/ai/AIContest.vue": {
       "role": "index",
-      "sha256": "82db6963b07a50a10c099ccff73723e6d9ba44fb4747d7e88467d1bf05dc5b6a",
-      "size": 18399,
-      "normalized_sha256": "82db6963b07a50a10c099ccff73723e6d9ba44fb4747d7e88467d1bf05dc5b6a"
+      "sha256": "57bf29fad11c7b7cdc66fd24b79f4e5656cfdd8833f717da6a70c25c7aa98300",
+      "size": 21364,
+      "normalized_sha256": "57bf29fad11c7b7cdc66fd24b79f4e5656cfdd8833f717da6a70c25c7aa98300"
     },
     "frontend/src/pages/oj/views/ai/AIProblem.vue": {
       "role": "index",
@@ -3255,6 +3255,12 @@
       "sha256": "69f23d1bac95edd2ee32cbb1e750118a7c7d8685ef11de5f1f120f104b27d559",
       "size": 1692,
       "normalized_sha256": "69f23d1bac95edd2ee32cbb1e750118a7c7d8685ef11de5f1f120f104b27d559"
+    },
+    "frontend/src/pages/oj/views/ai/SubmissionDialog.vue": {
+      "role": "index",
+      "sha256": "1275acc37b0cf4a9f7addd692878bee981b74ad1de7d6f79a261b353ebdfaca8",
+      "size": 6488,
+      "normalized_sha256": "1275acc37b0cf4a9f7addd692878bee981b74ad1de7d6f79a261b353ebdfaca8"
     },
     "frontend/src/pages/oj/views/ai/api.js": {
       "role": "index",
@@ -3498,9 +3504,9 @@
     },
     "frontend/src/pages/oj/views/setting/children/ProfileSetting.vue": {
       "role": "index",
-      "sha256": "aadb18385050de48be48e0426525a3b1cf6d1ebc903fce9288a92ed9c5f6bf24",
-      "size": 13958,
-      "normalized_sha256": "aadb18385050de48be48e0426525a3b1cf6d1ebc903fce9288a92ed9c5f6bf24"
+      "sha256": "04d28807f04603ab15043c5488bbe29646a43a4328b084ddf72eb48472fa2720",
+      "size": 14355,
+      "normalized_sha256": "04d28807f04603ab15043c5488bbe29646a43a4328b084ddf72eb48472fa2720"
     },
     "frontend/src/pages/oj/views/setting/children/SecuritySetting.vue": {
       "role": "index",
@@ -3810,9 +3816,9 @@
     },
     "frontend/tests/browser/ai-quiz.spec.mjs": {
       "role": "observe",
-      "sha256": "f19f787254cedb2fb628a4856f44a7e08ff2ba80ec41b5e1e5e86dd6024a759c",
-      "size": 11202,
-      "normalized_sha256": "f19f787254cedb2fb628a4856f44a7e08ff2ba80ec41b5e1e5e86dd6024a759c"
+      "sha256": "408711916b203984725bec580257c0ac1ee2f454a350485eba2392a73d9ae014",
+      "size": 11288,
+      "normalized_sha256": "408711916b203984725bec580257c0ac1ee2f454a350485eba2392a73d9ae014"
     },
     "frontend/tests/browser/ai-studio.spec.mjs": {
       "role": "observe",
@@ -3864,9 +3870,9 @@
     },
     "frontend/tests/modern-stack-scan.cjs": {
       "role": "observe",
-      "sha256": "07d2d26ff9abd0f21f052360d0439cdf6b0c06e3705a46b24226395379a0a46a",
-      "size": 19405,
-      "normalized_sha256": "07d2d26ff9abd0f21f052360d0439cdf6b0c06e3705a46b24226395379a0a46a"
+      "sha256": "7556b0dd7f227f0c1333a80aee001eed4b49e0faa351e081007c29d66d2e33c2",
+      "size": 19567,
+      "normalized_sha256": "7556b0dd7f227f0c1333a80aee001eed4b49e0faa351e081007c29d66d2e33c2"
     },
     "frontend/tests/remote_bridge_contract_test.js": {
       "role": "observe",
