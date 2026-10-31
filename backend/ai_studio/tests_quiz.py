@@ -272,7 +272,9 @@ class QuizReviewAndACMTests(APITestCase):
         graded = self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 45}}, format="json")
         self.assertSuccess(graded)
         self.assertEqual((graded.data["data"]["status"], graded.data["data"]["publicScore"]), ("ACCEPTED", 85))
-        self.assertFailed(self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 60}}, format="json"))
+        # A graded card may be rescored; the superseded one may not.
+        self.assertSuccess(self.client.post("/api/admin/ai/reviews", {"id": second["id"], "scores": {"essay": 45}}, format="json"))
+        self.assertFailed(self.client.post("/api/admin/ai/reviews", {"id": first["id"], "scores": {"essay": 45}}, format="json"))
         row = self.client.get("/api/ai/leaderboard", self.scope).data["data"]["results"][0]
         cell = row["scores"][self.problem.code]
         # One wrong try before the accepted card; the superseded card costs nothing.
@@ -314,10 +316,31 @@ class QuizReviewAndACMTests(APITestCase):
         board = self.client.get("/api/ai/leaderboard", self.scope).data["data"]
         rows = board["results"]
         self.assertEqual(board["ranking"], "oi")
+        # Penalty is only the time of each problem's best submission.
         self.assertEqual([(r["username"], r["rank"], r["total"], r["penalty"] // 60) for r in rows],
-                         [("cat", 1, 10, 50), ("ann", 2, 6, 4), ("bob", 3, 6, 23), ("dan", 4, 0, 0)])
-        self.assertEqual(rows[1]["scores"][self.problem.code]["time"], 240)
+                         [("cat", 1, 10, 30), ("bob", 2, 6, 3), ("ann", 3, 6, 4), ("dan", 4, 0, 0)])
+        self.assertEqual(rows[2]["scores"][self.problem.code]["time"], 240)
         self.assertEqual((rows[3]["scores"][self.problem.code]["pending"], rows[3]["scores"][self.problem.code]["score"]), (1, None))
+
+    def test_points_boards_review_every_essay_and_admins_read_submissions(self):
+        AIContestConfig.objects.filter(contest=self.contest).update(ranking="oi")
+        student = self.create_user("student", "student")
+        self.client.post("/api/contest/register", {"contest_id": self.contest.id}, format="json")
+        card = self.submit({"q1": 1, "essay": "方案"})  # cannot pass, but every point counts on an OI board
+        self.assertEqual(card["status"], "REVIEWING")
+        self.assertEqual(self.client.get("/api/ai/jobs", {"id": card["id"]}).data["data"]["payload"]["answers"]["essay"], "方案")
+        self.create_user("other", "other")
+        self.assertFailed(self.client.get("/api/ai/jobs", {"id": card["id"]}))
+        self.client.force_login(self.teacher)
+        detail = self.client.get("/api/ai/jobs", {"id": card["id"]}).data["data"]
+        self.assertEqual((detail["user"]["username"], detail["payload"]["answers"]["essay"]), ("student", "方案"))
+        self.assertEqual(self.client.get("/api/admin/ai/reviews", {"id": card["id"]}).data["data"]["questions"][0]["answer"], "方案")
+        graded = self.client.post("/api/admin/ai/reviews", {"id": card["id"], "scores": {"essay": 30}}, format="json")
+        self.assertEqual((graded.data["data"]["status"], graded.data["data"]["publicScore"]), ("PARTIAL", 30))
+        # A decided card can be rescored.
+        rescored = self.client.post("/api/admin/ai/reviews", {"id": card["id"], "scores": {"essay": 40}}, format="json")
+        self.assertEqual(rescored.data["data"]["publicScore"], 40)
+        self.assertEqual(AIJob.objects.get(pk=card["id"]).user, student)
 
     def test_contest_ranking_setting_is_frozen_after_start(self):
         payload = {"contest_id": self.contest.id, "selection": "latest", "ranking": "score", "private_published": False,

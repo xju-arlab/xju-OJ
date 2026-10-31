@@ -98,9 +98,15 @@ class JobsAPI(APIView):
                 job_id = uuid.UUID(request.GET["id"])
             except ValueError:
                 raise APIError("Invalid submission ID")
-            job = jobs.filter(pk=job_id).first()
-            require(job is not None, "Submission does not exist")
-            return self.success(public_job(job, detail=True))
+            job = AIJob.objects.select_related("problem", "contest", "user", "user__userprofile").filter(pk=job_id).first()
+            # Owners read their own records; a contest's admins read its official submissions.
+            allowed = job is not None and (job.user_id == request.user.id or request.user.is_super_admin() or
+                                           (job.contest_id and job.kind == "evaluation" and request.user.is_contest_admin(job.contest)))
+            require(allowed, "Submission does not exist")
+            result = public_job(job, detail=True)
+            if job.user_id != request.user.id:
+                result["user"] = {"username": job.user.username, "realName": getattr(job.user.userprofile, "real_name", None)}
+            return self.success(result)
         jobs = jobs.filter(kind="evaluation")
         if request.GET.get("problem_id"):
             jobs = jobs.filter(problem__code=request.GET["problem_id"])
@@ -237,6 +243,13 @@ class ReviewAdminAPI(APIView):
     @admin_role_required
     def get(self, request):
         jobs = reviewable_jobs(request.user)
+        if request.GET.get("id"):
+            try:
+                job = jobs.filter(pk=uuid.UUID(request.GET["id"])).first()
+            except ValueError:
+                raise APIError("Invalid submission ID")
+            require(job is not None, "提交不存在或无评阅权限")
+            return self.success(review_item(job))
         if request.GET.get("status", "pending") == "pending":
             jobs = jobs.filter(status="REVIEWING").order_by("created_at", "id")
         else:

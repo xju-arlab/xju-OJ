@@ -118,12 +118,13 @@
             <p>{{ scoreError || '正式比赛提交评测完成后，将在这里显示成绩。' }}</p>
             <router-link class="ai-preview-link" :to="{ name: 'ai-submissions' }">查看我的提交<ChevronRight :size="14" aria-hidden="true" /></router-link>
           </div>
-          <div v-else-if="acm" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th>通过</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td>{{ row.solved }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="acmClass(row.scores[item.id])">{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></td></tr></tbody></table><p class="ai-contest-note">ACM 排名 · 罚时单位为分钟 · 「?」表示评测中</p></div>
-          <div v-else-if="oi" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th>总分</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td>{{ points(row.total) }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="oiClass(row.scores[item.id], item.points)">{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.score">{{ Math.floor(row.scores[item.id].time / 60) }}</small></td></tr></tbody></table><p class="ai-contest-note">OI 排名 · 各题取最高得分 · 罚时单位为分钟 · 「?」表示评测中</p></div>
+          <div v-else-if="acm" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th>通过</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td>{{ row.solved }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="acmClass(row.scores[item.id])"><button v-if="viewable(row, row.scores[item.id])" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></button><template v-else>{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">ACM 排名 · 罚时单位为分钟 · 「?」表示评测中</p></div>
+          <div v-else-if="oi" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th>总分</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td>{{ points(row.total) }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="oiClass(row.scores[item.id], item.points)"><button v-if="viewable(row, row.scores[item.id])" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></button><template v-else>{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">OI 排名 · 各题取最高得分，下方为该次提交时间 · 罚时单位为分钟 · 「?」表示评测中</p></div>
           <div v-else class="problem-table-wrap"><table class="contest-problem-table"><thead><tr><th>排名</th><th>选手</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th><th>总分</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-for="item in contestProblems" :key="item.id">{{ row.scores[item.id]?.score ?? '—' }}</td><td>{{ row.total }}</td></tr></tbody></table><p class="ai-contest-note">{{ contest.privatePublished ? '私榜已公布' : '当前为公榜成绩' }} · {{ contest.scorePolicy === 'best' ? '最高得分' : '最后一次提交' }}</p></div>
         </section>
       </main>
     </template>
+    <SubmissionDialog v-if="viewing" :id="viewing.id" :problem="viewing.problem" :contest-id="String(contest?.id || '')" :can-review="canManage" @close="viewing = null" @graded="load" />
   </div>
 </template>
 
@@ -136,6 +137,7 @@ import store from '@/store'
 import { categoryFor, formatDate } from './studio'
 import { studioApi, request } from './api'
 import EvaluationStatus from './EvaluationStatus.vue'
+import SubmissionDialog from './SubmissionDialog.vue'
 import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
 
 const route = useRoute(); const router = useRouter()
@@ -146,9 +148,15 @@ const contestProblems = computed(() => contest.value?.problems || [])
 const totalPoints = computed(() => contest.value?.totalPoints || 0)
 const acm = computed(() => contest.value?.ranking === 'acm')
 const oi = computed(() => contest.value?.ranking === 'oi')
+const viewing = ref(null)
+const currentUser = computed(() => store.getters.user || {})
+const canManage = computed(() => Boolean(store.getters.isSuperAdmin || (contest.value?.created_by?.id && contest.value.created_by.id === currentUser.value.id)))
+const viewable = (row, cell) => Boolean(cell?.submissionId && (canManage.value || row.userId === currentUser.value.id))
+const openSubmission = (cell, item) => { viewing.value = { id: cell.submissionId, problem: item } }
+const clock = seconds => [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60].map((part, index) => index ? String(part).padStart(2, '0') : String(part)).join(':')
 const points = value => Number.isFinite(value) ? String(Math.round(value * 100) / 100) : '0'
 const oiMark = cell => !cell ? '' : (cell.score !== null ? points(cell.score) : cell.tries ? '0' : '') + (cell.pending ? (cell.score !== null || cell.tries ? ' ?' : '?') : '')
-const oiClass = (cell, full) => !cell ? '' : cell.score > 0 && cell.score >= full ? 'acm-accepted' : cell.pending && cell.score === null ? 'acm-pending' : cell.score > 0 ? 'oi-partial' : ''
+const oiClass = (cell, full) => !cell ? '' : cell.pending && cell.score === null ? 'oi-pending' : cell.score === null && !cell.tries ? '' : cell.score > 0 && cell.score >= full ? 'oi-full' : cell.score > 0 ? 'oi-partial' : 'oi-zero'
 const acmClass = cell => !cell ? '' : cell.accepted ? 'acm-accepted' : cell.pending ? 'acm-pending' : cell.tries ? 'acm-failed' : ''
 const acmMark = cell => !cell ? '' : cell.accepted ? '+' + (cell.tries || '') : cell.pending ? '?' : cell.tries ? '−' + cell.tries : ''
 const description = computed(() => DOMPurify.sanitize(contest.value?.description || ''))
@@ -225,7 +233,13 @@ onBeforeUnmount(() => { generation++; clearTimeout(timer) })
 .ai-acm-board .acm-accepted { color: var(--oj-success); font-weight: 600; }
 .ai-acm-board .acm-failed { color: var(--oj-danger); }
 .ai-acm-board .acm-pending { color: var(--oj-info); }
-.ai-acm-board .oi-partial { color: var(--oj-warning); font-weight: 600; }
+.ai-acm-board td.oi-full { background: var(--tag-tools-bg); color: var(--cat-tools); font-weight: 600; }
+.ai-acm-board td.oi-partial { background: var(--tag-course-bg); color: var(--cat-course); font-weight: 600; }
+.ai-acm-board td.oi-zero { background: var(--tag-research-bg); color: var(--cat-research); font-weight: 600; }
+.ai-acm-board td.oi-pending { color: var(--oj-info); }
+.ai-acm-board td.oi-full small, .ai-acm-board td.oi-partial small, .ai-acm-board td.oi-zero small { color: inherit; opacity: .75; font-weight: 400; }
+.ai-board-cell { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }.ai-board-cell:hover, .ai-board-cell:focus-visible { text-decoration: underline; }
+.ai-problem-type.blue { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
 .problem-table-wrap { position: relative; }
 .contest-problem-table { min-width: 760px; }
 .contest-problem-table .problem-status { width: auto; white-space: nowrap; }

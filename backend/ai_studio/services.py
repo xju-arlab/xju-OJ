@@ -158,8 +158,11 @@ def create_quiz_job(request, data, problem, contest, job_id):
     quiz, key, pass_score = problem.statement["quiz"], problem.judge["answers"], problem.judge.get("pass_score", 100)
     fields = {"status": quiz_status(grade(quiz, key, payload["answers"]), pass_score),
               "public_score": grade(quiz, key, payload["answers"]), "finished_at": stamp}
-    if review_ceiling(quiz, key, payload["answers"]) >= pass_score and any(payload["answers"][q["id"]] for q in text_questions(quiz)):
-        # Only a card that can still pass waits for a teacher; a newer card replaces an unreviewed one.
+    ranking = AIContestConfig.objects.filter(contest=contest).values_list("ranking", flat=True).first() if contest else None
+    answered = any(payload["answers"][q["id"]] for q in text_questions(quiz))
+    if answered and (ranking in ("oi", "score") or review_ceiling(quiz, key, payload["answers"]) >= pass_score):
+        # Every point counts on a points board; under ACM only a card that can still pass waits
+        # for a teacher. A newer card replaces an unreviewed one.
         fields = {"status": "REVIEWING", "public_score": None, "finished_at": None, "message": "客观题已判分，主观题待老师评阅。"}
         AIJob.objects.filter(user=user, problem=problem, contest=contest, kind="evaluation", status="REVIEWING").update(
             status="SUPERSEDED", finished_at=stamp, message="已被新的提交替代，未评阅。")
@@ -200,8 +203,10 @@ def review_job(user, data):
         raise APIError("Invalid submission ID")
     job = reviewable_jobs(user).select_for_update(of=("self",)).filter(pk=job_id).first()
     require(job is not None, "提交不存在或无评阅权限")
-    require(job.status == "REVIEWING", "该提交不在待评阅状态")
     quiz, key = job.problem.statement["quiz"], job.judge["answers"]
+    # Pending cards, and decided cards with answered essays (a teacher may score or rescore them).
+    require(job.status == "REVIEWING" or (job.status in ("ACCEPTED", "PARTIAL", "WRONG_ANSWER") and
+            any(job.payload["answers"].get(q["id"]) for q in text_questions(quiz))), "该提交不在可评阅状态")
     manual = manual_input(quiz, job.payload["answers"], data.get("scores"))
     job.public_score = grade(quiz, key, job.payload["answers"], manual)
     job.status = quiz_status(job.public_score, job.judge.get("pass_score", 100))
@@ -349,8 +354,8 @@ def acm_leaderboard(contest, jobs):
 
 
 def oi_leaderboard(contest, jobs, weights, private):
-    """Best weighted points per problem; ties by penalty = when each best score was first
-    reached + 20 minutes per earlier finished submission on that problem."""
+    """Best weighted points per problem; ties by penalty = sum of the times at which each
+    problem's best (non-zero) score was first reached."""
     rows = {}
     for job in jobs.order_by("created_at", "id"):
         row = rows.setdefault(job.user_id, {"userId": job.user_id, "username": job.user.username,
@@ -367,9 +372,10 @@ def oi_leaderboard(contest, jobs, weights, private):
         if points is not None and points > (cell["score"] or 0):
             cell.update(score=points, status=job.status, submissionId=str(job.id),
                         time=max(0, int((job.created_at - contest.start_time).total_seconds())))
-            cell["penalty"] = cell["time"] + ACM_PENALTY_SECONDS * cell["tries"]
+            cell["penalty"] = cell["time"]
         elif cell["score"] is None:
-            cell.update(score=points if points is not None else cell["score"], status=job.status, submissionId=str(job.id))
+            cell.update(score=points, status=job.status, submissionId=str(job.id),
+                        time=max(0, int((job.created_at - contest.start_time).total_seconds())))
         cell["tries"] += 1
     for row in rows.values():
         row["total"] = round(sum(cell["score"] or 0 for cell in row["scores"].values()), 4)

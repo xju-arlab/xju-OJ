@@ -137,7 +137,7 @@ test('ACM contests rank by solved problems and penalty', async ({ page }) => {
   await expect(rows.nth(1).locator('td.acm-failed')).toHaveText('−3')
 })
 
-test('OI contests sum best scores, keep penalty and never show failure counts', async ({ page }) => {
+test('OI contests sum best scores, color cells by score and open own submissions', async ({ page }) => {
   state.ranking = 'oi'
   await page.goto('/ai-studio/contest/23')
   await expect(page.locator('.contest-meta')).toContainText('OI · 总分 20')
@@ -145,9 +145,10 @@ test('OI contests sum best scores, keep penalty and never show failure counts', 
   const rows = page.locator('.ai-acm-board tbody tr')
   await expect(rows.first().locator('td').nth(2)).toHaveText('16')
   await expect(rows.first().locator('td').nth(3)).toHaveText('50')
-  await expect(rows.first().locator('td.acm-accepted')).toHaveText('1010')
-  await expect(rows.first().locator('td.oi-partial')).toHaveText('6 ?20')
-  await expect(rows.nth(1).locator('td').nth(4)).toHaveText('0')
-  await expect(rows.nth(1).locator('td.acm-pending')).toHaveText('?')
+  await expect(rows.first().locator('td.oi-full')).toHaveText('100:10:00')
+  await expect(rows.first().locator('td.oi-partial')).toHaveText('6 ?0:20:00')
+  await expect(rows.nth(1).locator('td.oi-zero')).toHaveText('0')
+  await expect(rows.nth(1).locator('td.oi-pending')).toHaveText('?')
   await expect(page.locator('.ai-acm-board')).not.toContainText('−')
+  await expect(rows.first().locator('button.ai-board-cell')).toHaveCount(0)
 })
