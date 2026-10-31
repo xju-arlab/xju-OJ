@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-10-31T09:25:21Z",
+  "updated_at": "2026-10-31T09:42:19Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "fbd49af154974d89d2ce2b0c1f5a071285f4ffb91c182ba1d2137cd6b9577342",
-      "size": 223128,
-      "normalized_sha256": "fbd49af154974d89d2ce2b0c1f5a071285f4ffb91c182ba1d2137cd6b9577342"
+      "sha256": "fb451b9e3c8f9c87cc290f8bd197ef6666feae5c7dde03e6294028a956d47329",
+      "size": 223184,
+      "normalized_sha256": "fb451b9e3c8f9c87cc290f8bd197ef6666feae5c7dde03e6294028a956d47329"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -652,9 +652,9 @@
     },
     "backend/ai_studio/quiz.py": {
       "role": "index",
-      "sha256": "d88b07e9d21124c4a06250ec3d377bde6a495906c67c66838b820677f0ac413d",
-      "size": 4857,
-      "normalized_sha256": "d88b07e9d21124c4a06250ec3d377bde6a495906c67c66838b820677f0ac413d"
+      "sha256": "c55608e84cd62bc68d7a615ba7304d4c92b976552ebb5303e857cbc14fd467ff",
+      "size": 5279,
+      "normalized_sha256": "c55608e84cd62bc68d7a615ba7304d4c92b976552ebb5303e857cbc14fd467ff"
     },
     "backend/ai_studio/services.py": {
       "role": "index",
@@ -676,9 +676,9 @@
     },
     "backend/ai_studio/tests_quiz.py": {
       "role": "index",
-      "sha256": "a8bb15f5803fd72572c13507ce952c0a123df70bcfc1d997c4f2d688885d9034",
-      "size": 26114,
-      "normalized_sha256": "a8bb15f5803fd72572c13507ce952c0a123df70bcfc1d997c4f2d688885d9034"
+      "sha256": "6ac72bd52956996b3ae864ff28168662e5fd6f883b11cb942bdb38873177313c",
+      "size": 26531,
+      "normalized_sha256": "6ac72bd52956996b3ae864ff28168662e5fd6f883b11cb942bdb38873177313c"
     },
     "backend/ai_studio/urls.py": {
       "role": "index",
@@ -3258,9 +3258,9 @@
     },
     "frontend/src/pages/oj/views/ai/SubmissionDialog.vue": {
       "role": "index",
-      "sha256": "872f44ac74f43ec66850972995ce7b627c16fa102717ca9fb18188a48f7fc896",
-      "size": 7252,
-      "normalized_sha256": "872f44ac74f43ec66850972995ce7b627c16fa102717ca9fb18188a48f7fc896"
+      "sha256": "c3b4447688ee5a5993a7c408b7d4a7ab8f405e091f8ca15a0f990370aa1c0809",
+      "size": 7679,
+      "normalized_sha256": "c3b4447688ee5a5993a7c408b7d4a7ab8f405e091f8ca15a0f990370aa1c0809"
     },
     "frontend/src/pages/oj/views/ai/api.js": {
       "role": "index",
