@@ -14,6 +14,7 @@ from .contracts import ACTIVE, TERMINAL, cells_input, finite_score, judge_input,
 from .models import AIContestConfig, AIContestProblem, AIDraft, AIJob, AIProblem, AIProblemImport, AIServiceState, AIWorker
 from .packages import IMPORT_ACTIVE, managed_problems, service_lock
 from .worker_auth import authenticate_worker
+from .quiz import breakdown
 from .services import (contest_access, contest_detail, create_job, leaderboard, problem_access, problem_leaderboard,
                        public_job, public_problem, quiz_attempts, review_item, review_job, reviewable_jobs, save_draft)
 
@@ -99,13 +100,20 @@ class JobsAPI(APIView):
             except ValueError:
                 raise APIError("Invalid submission ID")
             job = AIJob.objects.select_related("problem", "contest", "user", "user__userprofile").filter(pk=job_id).first()
-            # Owners read their own records; a contest's admins read its official submissions.
-            allowed = job is not None and (job.user_id == request.user.id or request.user.is_super_admin() or
-                                           (job.contest_id and job.kind == "evaluation" and request.user.is_contest_admin(job.contest)))
+            # Owners read their own records; a contest's admins read its official submissions; once the
+            # contest is over everyone may read its answer cards with the key (code stays private).
+            admin = bool(job and job.contest_id and request.user.is_contest_admin(job.contest)) or request.user.is_super_admin()
+            ended = bool(job and job.contest_id and job.official and job.category == "quiz" and job.contest.end_time < now())
+            allowed = job is not None and (job.user_id == request.user.id or (admin and job.kind == "evaluation") or ended)
             require(allowed, "Submission does not exist")
             result = public_job(job, detail=True)
+            if job.category == "quiz" and job.kind == "evaluation" and (admin or ended) and job.judge.get("answers"):
+                quiz = job.problem.statement.get("quiz", {})
+                result["breakdown"] = breakdown(quiz, job.judge["answers"], job.payload.get("answers", {}),
+                                                (job.output or {}).get("review", {}).get("scores"))
             if job.user_id != request.user.id:
-                result["user"] = {"username": job.user.username, "realName": getattr(job.user.userprofile, "real_name", None)}
+                result["user"] = {"username": job.user.username,
+                                  "realName": getattr(job.user.userprofile, "real_name", None) if admin else None}
             return self.success(result)
         jobs = jobs.filter(kind="evaluation")
         if request.GET.get("problem_id"):

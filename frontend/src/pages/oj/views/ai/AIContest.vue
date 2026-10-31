@@ -24,6 +24,7 @@
               </div>
             </div>
           </div>
+          <div class="contest-countdown" :aria-label="countdownCaption"><span>{{ countdownCaption }}</span><strong>{{ countdownValue }}</strong></div>
         </div>
         <dl class="contest-meta">
           <div><dt><CalendarDays aria-hidden="true" />开始时间</dt><dd>{{ formatDate(contest.start_time) }} <small>北京时间</small></dd></div>
@@ -118,8 +119,8 @@
             <p>{{ scoreError || '正式比赛提交评测完成后，将在这里显示成绩。' }}</p>
             <router-link class="ai-preview-link" :to="{ name: 'ai-submissions' }">查看我的提交<ChevronRight :size="14" aria-hidden="true" /></router-link>
           </div>
-          <div v-else-if="acm" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th v-if="showNames">姓名</th><th>通过</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-if="showNames">{{ row.realName || '—' }}</td><td>{{ row.solved }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="acmClass(row.scores[item.id])"><button v-if="viewable(row, row.scores[item.id])" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></button><template v-else>{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">ACM 排名 · 罚时单位为分钟 · 「?」表示评测中</p></div>
-          <div v-else-if="oi" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th v-if="showNames">姓名</th><th>总分</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-if="showNames">{{ row.realName || '—' }}</td><td>{{ points(row.total) }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="oiClass(row.scores[item.id], item.points)"><button v-if="viewable(row, row.scores[item.id])" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></button><template v-else>{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">OI 排名 · 各题取最高得分，下方为该次提交时间 · 罚时单位为分钟 · 「?」表示评测中</p></div>
+          <div v-else-if="acm" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th v-if="showNames">姓名</th><th>通过</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-if="showNames">{{ row.realName || '—' }}</td><td>{{ row.solved }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="acmClass(row.scores[item.id])"><button v-if="viewable(row, row.scores[item.id], item)" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></button><template v-else>{{ acmMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.accepted">{{ Math.floor(row.scores[item.id].time / 60) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">ACM 排名 · 罚时单位为分钟 · 「?」表示评测中</p></div>
+          <div v-else-if="oi" class="problem-table-wrap"><table class="contest-problem-table ai-acm-board"><thead><tr><th>排名</th><th>选手</th><th v-if="showNames">姓名</th><th>总分</th><th>罚时</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-if="showNames">{{ row.realName || '—' }}</td><td>{{ points(row.total) }}</td><td>{{ Math.floor(row.penalty / 60) }}</td><td v-for="item in contestProblems" :key="item.id" :class="oiClass(row.scores[item.id], item.points)"><button v-if="viewable(row, row.scores[item.id], item)" class="ai-board-cell" :aria-label="'查看 ' + row.username + ' 的 ' + item.id + ' 提交'" @click="openSubmission(row.scores[item.id], item)">{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></button><template v-else>{{ oiMark(row.scores[item.id]) }}<small v-if="row.scores[item.id]?.time !== null && row.scores[item.id]?.time !== undefined">{{ clock(row.scores[item.id].time) }}</small></template></td></tr></tbody></table><p class="ai-contest-note">OI 排名 · 各题取最高得分，下方为该次提交时间 · 罚时单位为分钟 · 「?」表示评测中</p></div>
           <div v-else class="problem-table-wrap"><table class="contest-problem-table"><thead><tr><th>排名</th><th>选手</th><th v-for="item in contestProblems" :key="item.id">{{ item.id }}</th><th>总分</th></tr></thead><tbody><tr v-for="row in scores" :key="row.userId"><td>{{ row.rank }}</td><td>{{ row.username }}</td><td v-for="item in contestProblems" :key="item.id">{{ row.scores[item.id]?.score ?? '—' }}</td><td>{{ row.total }}</td></tr></tbody></table><p class="ai-contest-note">{{ contest.privatePublished ? '私榜已公布' : '当前为公榜成绩' }} · {{ contest.scorePolicy === 'best' ? '最高得分' : '最后一次提交' }}</p></div>
         </section>
       </main>
@@ -149,10 +150,21 @@ const totalPoints = computed(() => contest.value?.totalPoints || 0)
 const acm = computed(() => contest.value?.ranking === 'acm')
 const oi = computed(() => contest.value?.ranking === 'oi')
 const viewing = ref(null)
+const clockNow = ref(Date.now()); let clockOffset = 0
+const clockTimer = setInterval(() => { clockNow.value = Date.now() }, 1000)
+const countdownCaption = computed(() => contest.value?.status === '1' ? '距开始' : contest.value?.status === '0' ? '距结束' : '已结束')
+const countdownValue = computed(() => {
+  if (!contest.value || contest.value.status === '-1') return '00:00:00'
+  const target = Date.parse(contest.value.status === '1' ? contest.value.start_time : contest.value.end_time)
+  const seconds = Math.max(0, Math.floor((target - clockNow.value - clockOffset) / 1000))
+  const clock = [Math.floor(seconds / 3600) % 24, Math.floor(seconds % 3600 / 60), seconds % 60].map(part => String(part).padStart(2, '0')).join(':')
+  return seconds >= 86400 ? Math.floor(seconds / 86400) + 'd ' + clock : clock
+})
 const showNames = computed(() => scores.value.some(row => 'realName' in row))
 const currentUser = computed(() => store.getters.user || {})
 const canManage = computed(() => Boolean(store.getters.isSuperAdmin || (contest.value?.created_by?.id && contest.value.created_by.id === currentUser.value.id)))
-const viewable = (row, cell) => Boolean((cell?.submissionId || cell?.pendingId) && (canManage.value || row.userId === currentUser.value.id))
+// After the contest every answer card is public; code stays with its owner and the admins.
+const viewable = (row, cell, item) => Boolean((cell?.submissionId || cell?.pendingId) && (canManage.value || row.userId === currentUser.value.id || (contest.value?.status === '-1' && item?.type === 'quiz')))
 // A "?" cell opens the submission still being judged or reviewed; others open the counted one.
 const openSubmission = (cell, item) => { viewing.value = { id: (cell.pending && cell.pendingId) || cell.submissionId, problem: item } }
 const clock = seconds => Math.floor(seconds / 3600) + ':' + String(Math.floor(seconds % 3600 / 60)).padStart(2, '0')
@@ -175,6 +187,7 @@ async function load () {
   const scope = { contest_id: route.params.contestID }
   try {
     const detail = await studioApi('contest', 'get', scope)
+    if (detail.now) clockOffset = Date.parse(detail.now) - Date.now()
     if (current !== generation) return
     contest.value = detail; error.value = ''
     if (authenticated.value) {
@@ -201,7 +214,7 @@ async function register () {
 }
 watch(() => [route.params.contestID, authenticated.value], () => { contest.value = null; scores.value = []; tab.value = 'overview'; load() }, { immediate: true })
 watch(tab, load)
-onBeforeUnmount(() => { generation++; clearTimeout(timer) })
+onBeforeUnmount(() => { generation++; clearTimeout(timer); clearInterval(clockTimer) })
 </script>
 
 <style scoped lang="less">
@@ -240,6 +253,8 @@ onBeforeUnmount(() => { generation++; clearTimeout(timer) })
 .ai-acm-board td.oi-zero { background: var(--tag-research-bg); color: var(--cat-research); font-weight: 600; }
 .ai-acm-board td.oi-pending, .ai-acm-board td.acm-pending { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); font-weight: 600; }
 .ai-acm-board td.oi-full small, .ai-acm-board td.oi-partial small, .ai-acm-board td.oi-zero small, .ai-acm-board td.oi-pending small { color: inherit; opacity: .75; font-weight: 400; }
+.ai-acm-board th, .ai-acm-board td { padding: 6px 10px; line-height: 1.35; }
+.ai-acm-board td small { line-height: 1.2; }
 .ai-board-cell { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }.ai-board-cell:hover, .ai-board-cell:focus-visible { text-decoration: underline; }
 .ai-problem-type.blue { background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
 .problem-table-wrap { position: relative; }

@@ -17,6 +17,7 @@
           <li v-for="question in questions" :key="question.id">
             <StatementText class="ai-submission-prompt" :text="question.prompt" />
             <p class="ai-submission-answer">{{ answerText(question) }}</p>
+            <p v-if="result[question.id]" class="ai-submission-key"><strong>{{ result[question.id].earned ?? '待评' }} / {{ result[question.id].points }} 分</strong><span v-if="question.kind !== 'text'">正确答案：{{ answerText(question, result[question.id].answer) }}</span><span v-else-if="!reviewing">参考要点：{{ result[question.id].rubric }}</span></p>
             <label v-if="reviewing && review[question.id]" class="ai-submission-score">评分（满分 {{ review[question.id].points }}）<input v-model.number="scores[question.id]" type="number" min="0" :max="review[question.id].points" step="0.5" /><small>参考要点：{{ review[question.id].rubric }}</small></label>
           </li>
         </ol>
@@ -38,11 +39,12 @@ const props = defineProps({ id: { type: String, required: true }, problem: { typ
 const emit = defineEmits(['close', 'graded'])
 const record = ref(null); const quiz = ref(null); const reviewInfo = ref(null); const scores = ref({}); const error = ref(''); const saving = ref(false)
 const questions = computed(() => quiz.value?.questions || [])
+const result = computed(() => Object.fromEntries((record.value?.breakdown || []).map(item => [item.id, item])))
 const review = computed(() => Object.fromEntries((reviewInfo.value?.questions || []).map(item => [item.id, item])))
 const reviewing = computed(() => Boolean(props.canReview && reviewInfo.value?.questions?.length && !['SUPERSEDED', 'CANCELLED'].includes(record.value?.status)))
 
-function answerText (question) {
-  const value = record.value.payload?.answers?.[question.id]
+function answerText (question, given) {
+  const value = given !== undefined ? given : record.value.payload?.answers?.[question.id]
   if (value === null || value === undefined || value === '') return '未作答'
   if (question.kind === 'single') return question.options?.[value] ?? String(value)
   if (question.kind === 'multiple') return value.map(index => question.options?.[index] ?? index).join('；')
@@ -81,6 +83,7 @@ onMounted(load)
 .ai-submission-cell pre { margin: 0; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-subtle); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-submission-answers { margin: 14px 0 0; padding-left: 20px; }.ai-submission-answers li { margin-bottom: 14px; font-size: 13px; }
 .ai-submission-answer { margin-top: 6px; padding: 8px 10px; border-radius: 4px; background: var(--color-bg-subtle); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-submission-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--color-text-muted); white-space: pre-wrap; }.ai-submission-key strong { color: var(--color-text); font-family: var(--font-mono); }
 .ai-submission-score { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }.ai-submission-score input { width: 90px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 4px; }.ai-submission-score small { flex-basis: 100%; color: var(--color-text-muted); }
 .studio-dialog-actions { align-items: center; }
 </style>

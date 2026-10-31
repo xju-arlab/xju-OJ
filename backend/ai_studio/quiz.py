@@ -52,6 +52,20 @@ def earned(question, key, answer):
     return float(question["points"]) if answer == key["answer"] else 0.0
 
 
+def breakdown(quiz, key, answers, manual=None):
+    """Per-question points with the expected answer (objective) or rubric (free text)."""
+    items = []
+    for question in quiz["questions"]:
+        expected, answer = key[question["id"]], answers.get(question["id"])
+        item = {"id": question["id"], "points": question["points"]}
+        if question["kind"] == "text":
+            item.update(earned=(manual or {}).get(question["id"]) if answer else 0.0, rubric=expected.get("rubric", ""))
+        else:
+            item.update(earned=round(earned(question, expected, answer), 2), answer=expected["answer"])
+        items.append(item)
+    return items
+
+
 def text_questions(quiz):
     return [question for question in quiz["questions"] if question["kind"] == "text"]
 

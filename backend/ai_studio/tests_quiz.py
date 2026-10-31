@@ -345,6 +345,22 @@ class QuizReviewAndACMTests(APITestCase):
         self.assertEqual(rescored.data["data"]["publicScore"], 40)
         self.assertEqual(AIJob.objects.get(pk=card["id"]).user, student)
 
+    def test_answer_cards_and_key_become_public_after_the_contest(self):
+        AIContestConfig.objects.filter(contest=self.contest).update(ranking="oi")
+        self.create_user("student", "student")
+        self.client.post("/api/contest/register", {"contest_id": self.contest.id}, format="json")
+        card = self.submit({"q1": 0, "essay": "方案"})
+        self.assertNotIn("breakdown", self.client.get("/api/ai/jobs", {"id": card["id"]}).data["data"])
+        self.create_user("classmate", "classmate")
+        self.assertFailed(self.client.get("/api/ai/jobs", {"id": card["id"]}))
+        Contest.objects.filter(pk=self.contest.pk).update(end_time=now() - timedelta(minutes=1))
+        detail = self.client.get("/api/ai/jobs", {"id": card["id"]}).data["data"]
+        self.assertEqual((detail["user"]["username"], detail["user"]["realName"]), ("student", None))
+        keyed = {item["id"]: item for item in detail["breakdown"]}
+        self.assertIn("answer", keyed["q1"])
+        self.assertIsNone(keyed["essay"]["earned"])  # not reviewed yet
+        self.assertIn("rubric", keyed["essay"])
+
     def test_contest_ranking_setting_is_frozen_after_start(self):
         payload = {"contest_id": self.contest.id, "selection": "latest", "ranking": "score", "private_published": False,
                    "practice_enabled": True, "problems": [{"id": self.problem.code, "points": 10}]}

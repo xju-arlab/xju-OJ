@@ -141,6 +141,8 @@ test('OI contests sum best scores, color cells by score and open own submissions
   state.ranking = 'oi'
   await page.goto('/ai-studio/contest/23')
   await expect(page.locator('.contest-meta')).toContainText('OI · 总分 20')
+  await expect(page.locator('.contest-countdown')).toContainText('距结束')
+  await expect(page.locator('.contest-countdown strong')).toHaveText(/^\d{2}:\d{2}:\d{2}$/)
   await page.getByRole('button', { name: '成绩' }).click()
   const rows = page.locator('.ai-acm-board tbody tr')
   await expect(rows.first().locator('td').nth(2)).toHaveText('16')
