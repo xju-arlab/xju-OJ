@@ -66,7 +66,12 @@ test.beforeEach(async ({ page }) => {
     if (path === '/api/contest/prep/plan') data = { items: [], progress: [] }
     if (path === '/api/contest/prep/publish') data = { id: 40, title: body.title, teams: body.teams.map((item, index) => ({ ...item, id: index + 1, username: `team-aaa${index}`, password: 'Pass2345' })) }
     if (path === '/api/contest/announcement') data = []
-    if (path === '/api/contest_submissions') data = { results: [], total: 0 }
+    if (path === '/api/contest_submissions') {
+      data = { total: 2, results: [
+        { id: 's1', problem: 'A', result: 0, statistic_info: { time_cost: 10, memory_cost: 1024 }, language: 'C++', username: 'team-abcd', create_time: iso(-1), show_link: true },
+        { id: 's2', problem: 'A', result: -1, statistic_info: { time_cost: 10, memory_cost: 1024 }, language: 'C++', username: 'root', create_time: iso(-1), show_link: false }
+      ] }
+    }
     if (path === '/api/admin/contest' && req.method() === 'GET') data = { id: 40, title: '新生赛正式', description: '<p>说明</p>', visible: true, password: null, allowed_ip_ranges: [], rule_type: 'ACM' }
     if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1, name: 'Team Alpha' }, { id: 2, name: 'Team Beta' }]
     if (path === '/api/admin/contest/teams' && req.method() === 'POST') data = body.teams.map((item, index) => ({ ...item, id: index + 3, username: `team-new${index}`, password: 'Pass6789' }))
@@ -265,4 +270,8 @@ test('star teams take no place on the board and contest admins add teams from th
   await dialog.getByRole('button', { name: /取消|Cancel/ }).click()
   await page.locator('tr.rank-star-row .rank-problem-link').click()
   await expect(page).toHaveURL(/\/contest\/22\/submissions\?.*username=team-wxyz/)
+  // Submissions name the team; other accounts keep their username.
+  await expect(page.locator('.submission-team')).toHaveText('Team Alpha')
+  await expect(page.locator('.el-table th').filter({ hasText: '队伍' })).toHaveCount(1)
+  await expect(page.locator('tbody')).toContainText('root')
 })

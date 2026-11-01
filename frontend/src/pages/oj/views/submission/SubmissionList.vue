@@ -153,10 +153,14 @@
             key: 'language'
           },
           {
+            isAuthorColumn: true,
             title: this.$t('m.Author'),
             width: 116,
             align: 'center',
             render: (h, params) => {
+              // Team accounts show as their team; they have no user home to open.
+              const team = this.teamNames[params.row.username]
+              if (team) return h('span', { class: 'submission-team', title: `${team}（${params.row.username}）` }, team)
               return h('a', {
                 style: {
                   'display': 'inline-block',
@@ -188,6 +192,7 @@
         refreshTimer: null,
         requestInFlight: false,
         requestGeneration: 0,
+        teamNames: {},
         disposed: false
       }
     },
@@ -213,6 +218,22 @@
         }
         this.routeName = this.$route.name
         this.getSubmissions()
+      },
+      // The contest board is the one list of team names every participant may read.
+      async loadTeamNames () {
+        const contestID = this.contestID
+        if (!this.teamContest) return
+        const names = {}
+        try {
+          for (let offset = 0; ; offset += 250) {
+            const data = (await api.getContestRank({ contest_id: contestID, limit: 250, offset })).data.data
+            data.results.forEach(row => { if (row.team) names[row.user.username] = row.team.name })
+            if (offset + 250 >= data.total) break
+          }
+        } catch (_) {
+          return
+        }
+        if (!this.disposed && contestID === this.contestID) this.teamNames = names
       },
       buildQuery () {
         return {
@@ -347,6 +368,10 @@
       },
       rejudgeColumnVisible () {
         return !this.contestID && this.user.admin_type === USER_TYPE.SUPER_ADMIN
+      },
+      teamContest () {
+        const contest = this.$store.state.contest.contest
+        return Boolean(this.contestID && contest.team_contest && String(contest.id) === String(this.contestID))
       }
     },
     watch: {
@@ -361,12 +386,21 @@
       },
       'isAuthenticated' () {
         this.init()
+      },
+      teamContest: {
+        immediate: true,
+        handler (team) {
+          const column = this.columns.find(item => item.isAuthorColumn)
+          if (column) Object.assign(column, { title: team ? '队伍' : this.$t('m.Author'), width: team ? 170 : 116 })
+          if (team) this.loadTeamNames()
+        }
       }
     }
   }
 </script>
 
 <style scoped lang="less">
+  :deep(.submission-team) { display: inline-block; max-width: 150px; overflow: hidden; color: var(--color-text); text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; cursor: default; }
   .flex-container {
     #main {
       flex: auto;
