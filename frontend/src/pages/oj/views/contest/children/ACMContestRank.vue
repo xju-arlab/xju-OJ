@@ -364,12 +364,15 @@
   :deep(.rank-real-name) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   :deep(.rank-problem-link) { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: center; cursor: pointer; }
   :deep(.rank-problem-link:hover), :deep(.rank-problem-link:focus-visible) { outline: none; text-decoration: underline; }
-  :deep(.el-table__body tr:hover > td.el-table__cell) { background-color: var(--color-bg) !important; }
+  // Hover follows the pointer through :hover alone. With fixed columns Element also sets a JS hover-row
+  // class (30 ms debounce, then rAF) that lingers on rows the pointer already left, and fades cells for 0.25 s.
+  :deep(.el-table .el-table__body td.el-table__cell) { transition: none; }
+  :deep(.el-table__body tr.hover-row > td.el-table__cell) { background-color: inherit; }
   :deep(.el-table__body tr:hover > td.el-table__cell.rank-hover-cell) { background-color: var(--color-bg-subtle) !important; }
-  :deep(.el-table__body tr:hover > td.el-table__cell.first-ac) { background-color: #157f66 !important; }
-  :deep(.el-table__body tr:hover > td.el-table__cell.ac) { background-color: var(--tag-tools-bg) !important; }
-  :deep(.el-table__body tr:hover > td.el-table__cell.wa) { background-color: var(--tag-research-bg) !important; }
-  :deep(.el-table__body td.el-table__cell.frozen), :deep(.el-table__body tr:hover > td.el-table__cell.frozen) { background-color: #e3eefa !important; }
+  :deep(.el-table__body td.el-table__cell.first-ac) { background-color: #157f66 !important; }
+  :deep(.el-table__body td.el-table__cell.ac) { background-color: var(--tag-tools-bg) !important; }
+  :deep(.el-table__body td.el-table__cell.wa) { background-color: var(--tag-research-bg) !important; }
+  :deep(.el-table__body td.el-table__cell.frozen) { background-color: #e3eefa !important; }
   :deep(.rank-problem-pending) { display: block; color: #2873be; font-weight: 700; }
   :deep(.rank-team) { display: inline-block; max-width: 150px; overflow: hidden; color: var(--color-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; cursor: default; vertical-align: middle; }
   :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }

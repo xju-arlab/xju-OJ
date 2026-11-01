@@ -122,6 +122,26 @@ test('the board shows team names, members on hover and pending cells while froze
   await expect(page).toHaveURL(/problemID=A/)
 })
 
+test('board hover stays on the row under the pointer and never repaints problem cells', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.adminRow = true
+  await page.goto('/contest/22/rank')
+  const rows = page.locator('.el-table__body tr.el-table__row')
+  await expect(rows).toHaveCount(3)
+  await rows.nth(2).hover()
+  await expect(rows.nth(2)).toHaveClass(/hover-row/)
+  // Element's JS hover-row lags behind fast pointer moves; on rows the pointer has left it changes nothing.
+  await page.evaluate(() => document.querySelectorAll('.el-table__body tr.el-table__row').forEach((tr, index) => index < 2 && tr.classList.add('hover-row')))
+  // Past Element's 0.25 s fade, should one come back.
+  await page.waitForTimeout(300)
+  await expect(rows.nth(0).locator('td.ac')).toHaveCSS('background-color', 'rgba(15, 123, 108, 0.12)')
+  await expect(rows.nth(1).locator('td.first-ac')).toHaveCSS('background-color', 'rgb(21, 127, 102)')
+  await expect(rows.nth(1).locator('td.rank-hover-cell').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(rows.nth(2).locator('td.rank-hover-cell').first()).toHaveCSS('background-color', 'rgb(247, 246, 243)')
+  await expect(rows.nth(2).locator('td.frozen')).toHaveCSS('background-color', 'rgb(227, 238, 250)')
+  await expect(rows.nth(2).locator('td').first()).toHaveCSS('transition-duration', '0s')
+})
+
 test('publishing for team accounts takes a roster instead of a password and hands back the link', async ({ page }) => {
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
   await page.goto('/contest/31/')
