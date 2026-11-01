@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T10:18:32Z",
+  "updated_at": "2026-11-01T10:45:15Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "05f3afb4ccf2f0c80aadbfd8c10fc353cc750dd80e3f5612164793b5640b0c5a",
-      "size": 229067,
-      "normalized_sha256": "05f3afb4ccf2f0c80aadbfd8c10fc353cc750dd80e3f5612164793b5640b0c5a"
+      "sha256": "31842a18712ddd12721bbb1c4a169a521c4ef0e7f23119948d6654343f81def9",
+      "size": 229189,
+      "normalized_sha256": "31842a18712ddd12721bbb1c4a169a521c4ef0e7f23119948d6654343f81def9"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3408,9 +3408,9 @@
     },
     "frontend/src/pages/oj/views/contest/RankAwardsEditor.vue": {
       "role": "index",
-      "sha256": "7cf3b624f315cb55abaae7923e5840f3294ba271dce75d47e14abb0427df404c",
-      "size": 5651,
-      "normalized_sha256": "7cf3b624f315cb55abaae7923e5840f3294ba271dce75d47e14abb0427df404c"
+      "sha256": "24f70f47ea4c9a9bcf478ae42b411a9c9e6da7241444ac1d86a21517a2feb778",
+      "size": 5808,
+      "normalized_sha256": "24f70f47ea4c9a9bcf478ae42b411a9c9e6da7241444ac1d86a21517a2feb778"
     },
     "frontend/src/pages/oj/views/contest/children/ACMContestRank.vue": {
       "role": "index",
@@ -3816,9 +3816,9 @@
     },
     "frontend/src/styles/iview-custom.less": {
       "role": "index",
-      "sha256": "0e38bb7703f49e9230f31b9200d4e48e727ab3066893fdc815758de566cad68c",
-      "size": 3196,
-      "normalized_sha256": "0e38bb7703f49e9230f31b9200d4e48e727ab3066893fdc815758de566cad68c"
+      "sha256": "f1de048d13ba151e205899574b2f2da5902d02dd4bb57518f054579dcf905e1a",
+      "size": 3730,
+      "normalized_sha256": "f1de048d13ba151e205899574b2f2da5902d02dd4bb57518f054579dcf905e1a"
     },
     "frontend/src/styles/judge-status.less": {
       "role": "index",
@@ -3960,9 +3960,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "d2db42564fa5cc056ed24369bc3c64ce6caaa455da0e0956657f5eb3b6547b2b",
-      "size": 34618,
-      "normalized_sha256": "d2db42564fa5cc056ed24369bc3c64ce6caaa455da0e0956657f5eb3b6547b2b"
+      "sha256": "50da071b8b5e8234415bb7cd8253526f4a13cb1faf79749713a9ffe43a5f96e9",
+      "size": 34604,
+      "normalized_sha256": "50da071b8b5e8234415bb7cd8253526f4a13cb1faf79749713a9ffe43a5f96e9"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",
