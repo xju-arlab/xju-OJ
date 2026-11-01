@@ -12,9 +12,10 @@ const ContestPrepAssign = () => import('./children/ContestPrepAssign.vue')
 const ContestPrepReview = { name: 'ContestPrepReview', render: () => null }
 const PrepInvite = () => import('./PrepInvite.vue')
 const ContestArena = () => import('./ContestArena.vue')
+const ContestWaiting = () => import('./ContestWaiting.vue')
 
 export {
   ContestDetails, ContestList, ContestProblemList, ContestRank, ACMContestHelper,
   ContestPrepProblems, ContestPrepProblemEdit, ContestPrepUpload, ContestPrepRoles, ContestPrepAssign,
-  ContestPrepReview, PrepInvite, ContestArena
+  ContestPrepReview, PrepInvite, ContestArena, ContestWaiting
 }

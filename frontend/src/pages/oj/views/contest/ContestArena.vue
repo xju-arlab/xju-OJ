@@ -47,11 +47,13 @@
     methods: {
       formatTime (value) { return moment(value).format('YYYY-MM-DD HH:mm') },
       enter () { this.$router.replace(`/arena/${this.contestID}/`) },
+      // A team that signs in before the start waits on the poster carousel.
+      wait () { this.$router.replace({ name: 'contest-waiting', params: { contestID: this.contestID } }) },
       route () {
         const team = this.profile.team
         // Once the contest is over its pages are open to everyone, read only.
         if (this.contest.status === '-1') return this.enter()
-        if (team && String(team.contest_id) === this.contestID) return this.enter()
+        if (team && String(team.contest_id) === this.contestID) return this.contest.status === '1' ? this.wait() : this.enter()
         if (team) return
         if (!this.isAuthenticated) { this.mode = 'login'; return }
         const admin = this.contest.created_by.id === this.user.id || this.user.admin_type === 'Super Admin'

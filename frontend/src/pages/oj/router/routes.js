@@ -105,6 +105,13 @@ export default [
     meta: {title: 'Contest', arena: true},
     component: Contest.ContestArena
   },
+  // The poster carousel a signed-in team watches until the contest starts.
+  {
+    name: 'contest-waiting',
+    path: '/arena/:contestID/waiting',
+    meta: {title: 'Contest', arena: true},
+    component: Contest.ContestWaiting
+  },
   // One-time preparation invite; the token travels in the URL fragment.
   {
     name: 'prep-invite',

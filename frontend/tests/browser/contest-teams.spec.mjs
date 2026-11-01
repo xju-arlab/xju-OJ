@@ -189,6 +189,38 @@ test('before the start the link says so instead of loading forever', async ({ pa
   await expect(page.getByText('Loading')).toHaveCount(0)
 })
 
+test('a team that signs in before the start waits on the poster carousel until it begins', async ({ page }) => {
+  state.upcoming = true
+  await page.goto('/arena/22')
+  await page.getByPlaceholder('team-xxxx').fill('team-abcd')
+  await page.locator('input[type=password]').fill('Pass2345')
+  await page.getByRole('button', { name: '登录并进入比赛' }).click()
+  await expect(page).toHaveURL(/\/arena\/22\/waiting$/)
+  const active = page.locator('.poster.is-active')
+  await expect(page.locator('.poster')).toHaveCount(6)
+  await expect(active.locator('.poster-team')).toContainText('Team Alpha')
+  await expect(active.locator('.poster-kind')).toHaveText('正式队')
+  await expect(active.locator('.poster-members')).toHaveText(/A1\s+·\s+A2/)
+  await expect(active.locator('.poster-clock')).toHaveText(/^0[12]:\d{2}:\d{2}$/)
+  await page.locator('.arena-waiting-dot').nth(2).click()
+  await expect(page.locator('.poster').nth(2)).toHaveClass(/is-active/)
+  // The contest pages send the team back to wait; once it starts they let it in.
+  await page.goto('/arena/22/')
+  await expect(page).toHaveURL(/\/arena\/22\/waiting$/)
+  state.upcoming = false
+  await page.goto('/arena/22/waiting')
+  await expect(page).toHaveURL(/\/arena\/22\/$/)
+})
+
+test('contest admins preview the waiting carousel with placeholder team text', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  await page.goto('/arena/22/waiting')
+  await expect(page.locator('.poster.is-active .poster-team')).toContainText('队伍名称')
+  await expect(page.locator('.poster.is-active .poster-status')).toHaveText('比赛已开始')
+  await page.getByRole('button', { name: '进入比赛页' }).click()
+  await expect(page).toHaveURL(/\/arena\/22\/$/)
+})
+
 test('a published preparation contest shows its copy and edits it instead of publishing again', async ({ page }) => {
   state.published = true
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }

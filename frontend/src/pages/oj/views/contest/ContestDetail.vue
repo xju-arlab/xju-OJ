@@ -409,13 +409,17 @@
         })
       },
       async guardArena (data) {
-        // A running team contest's link takes its team accounts and contest
-        // admins; everyone else goes to the sign-in.
+        // A team contest's link, before and during the contest, takes its team
+        // accounts and contest admins; everyone else goes to the sign-in. Teams
+        // wait on the poster carousel until the start.
         try { await this.$store.dispatch('getProfile') } catch (_) {}
         const { user, team } = this.$store.state.user.profile
         const admin = user && (data.created_by.id === user.id || user.admin_type === USER_TYPE.SUPER_ADMIN)
-        if (!admin && !(team && String(team.contest_id) === String(data.id))) {
+        const mine = team && String(team.contest_id) === String(data.id)
+        if (!admin && !mine) {
           this.$router.replace({ name: 'contest-arena', params: { contestID: data.id } })
+        } else if (mine && data.status === CONTEST_STATUS.NOT_START) {
+          this.$router.replace({ name: 'contest-waiting', params: { contestID: data.id } })
         }
       },
       openTab (tab) {

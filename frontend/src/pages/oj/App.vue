@@ -19,7 +19,7 @@ import NavBar from '@oj/components/NavBar.vue'
 import { arenaContest, enterArena, leaveArena } from '@/utils/arena'
 
 // Team accounts may open their contest, their submissions and the sign-out page only.
-const TEAM_ROUTES = ['submission-details', 'logout', 'contest-arena']
+const TEAM_ROUTES = ['submission-details', 'logout', 'contest-arena', 'contest-waiting']
 
 export default {
   name: 'app', components: { NavBar },
