@@ -47,6 +47,7 @@ class ContestTeamTest(APITestCase):
         team = ContestTeam.objects.get(name="算法一队")
         self.assertEqual(team.members, ["张三", "李四"])
         self.assertEqual(team.user.userprofile.real_name, "张三,李四")
+        self.assertEqual(team.user.userprofile.language, "zh-CN")
         self.assertEqual(ContestTeam.objects.get(name="Team B").user.userprofile.real_name, "Ann")
         self.assertTrue(ContestParticipation.objects.filter(contest=self.contest, user=team.user).exists())
         self.assertTrue(ACMContestRank.objects.filter(contest=self.contest, user=team.user).exists())

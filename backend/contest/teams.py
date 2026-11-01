@@ -19,6 +19,8 @@ from .models import ACMContestRank, ContestParticipation, ContestTeam, OIContest
 # Usernames are team- plus four letters; passwords are read off paper, so
 # characters that look alike are left out.
 PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+# Teams sign in on contest pages only, with no settings page to pick a language.
+TEAM_LANGUAGE = "zh-CN"
 # Generated passwords carry about 46 random bits, so a light hash keeps a
 # roster of hundreds fast; Django rehashes with its default cost on first login.
 PASSWORD_ITERATIONS = 20000
@@ -80,7 +82,8 @@ def create_teams(contest, roster):
     for item, username in zip(roster, team_usernames(len(roster))):
         password = team_password()
         user = User.objects.create(username=username, password=hash_team_password(password))
-        UserProfile.objects.create(user=user, real_name=team_real_name(item["name"], item["members"]))
+        UserProfile.objects.create(user=user, real_name=team_real_name(item["name"], item["members"]),
+                                   language=TEAM_LANGUAGE)
         team = ContestTeam.objects.create(contest=contest, user=user, **item)
         ContestParticipation.objects.create(contest=contest, user=user)
         if contest.rule_type == ContestRuleType.ACM:
