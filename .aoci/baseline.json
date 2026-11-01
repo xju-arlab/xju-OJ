@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T04:39:03Z",
+  "updated_at": "2026-11-01T05:13:37Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "08b98a320a2f422c8ef5bc10f176a59e993131051abfdeebfc11fa7e23365c00",
-      "size": 234609,
-      "normalized_sha256": "08b98a320a2f422c8ef5bc10f176a59e993131051abfdeebfc11fa7e23365c00"
+      "sha256": "d7b8a45346135f4c840bc90db31e2119c805a5052f7e02e98f002a0155b54e64",
+      "size": 234715,
+      "normalized_sha256": "d7b8a45346135f4c840bc90db31e2119c805a5052f7e02e98f002a0155b54e64"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -2844,21 +2844,21 @@
     },
     "frontend/src/i18n/oj/en-US.js": {
       "role": "index",
-      "sha256": "29fdf6b10463867e19004c00e34950b215c527242824989b96c69d371e92f295",
-      "size": 29108,
-      "normalized_sha256": "29fdf6b10463867e19004c00e34950b215c527242824989b96c69d371e92f295"
+      "sha256": "31dbc70c6ecd54744017f24631b271a393e95e4c28d06fdf354b150848630d1e",
+      "size": 29130,
+      "normalized_sha256": "31dbc70c6ecd54744017f24631b271a393e95e4c28d06fdf354b150848630d1e"
     },
     "frontend/src/i18n/oj/zh-CN.js": {
       "role": "index",
-      "sha256": "c69b069594df909bb47e8aefb775daba46a4eba98b2f317f60eb596889389987",
-      "size": 27846,
-      "normalized_sha256": "c69b069594df909bb47e8aefb775daba46a4eba98b2f317f60eb596889389987"
+      "sha256": "2ef9cf9ae6dcb3e20848da80fe6ca19902cc6c5ca5c3315a3330c8d5f76cc171",
+      "size": 27867,
+      "normalized_sha256": "2ef9cf9ae6dcb3e20848da80fe6ca19902cc6c5ca5c3315a3330c8d5f76cc171"
     },
     "frontend/src/i18n/oj/zh-TW.js": {
       "role": "index",
-      "sha256": "2ec12a2e2ea2587a49b0984084bd8a8572719aa16e28d116783b2e85581c68f7",
-      "size": 19352,
-      "normalized_sha256": "2ec12a2e2ea2587a49b0984084bd8a8572719aa16e28d116783b2e85581c68f7"
+      "sha256": "80eb3da1a5a1dcd8562df1113d20973a536034140dfc920498a19421e5f4a3ea",
+      "size": 19373,
+      "normalized_sha256": "80eb3da1a5a1dcd8562df1113d20973a536034140dfc920498a19421e5f4a3ea"
     },
     "frontend/src/pages/admin/App.vue": {
       "role": "index",
@@ -3384,9 +3384,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/ACMContestRank.vue": {
       "role": "index",
-      "sha256": "4155e134a2202fa36c6846d7717de5f479f2ecfc103019afa2262087b270fa67",
-      "size": 16063,
-      "normalized_sha256": "4155e134a2202fa36c6846d7717de5f479f2ecfc103019afa2262087b270fa67"
+      "sha256": "684ac7ca410b843be07d0215d7265c684f3824bfda20e0fc74d6f82df3daf690",
+      "size": 17041,
+      "normalized_sha256": "684ac7ca410b843be07d0215d7265c684f3824bfda20e0fc74d6f82df3daf690"
     },
     "frontend/src/pages/oj/views/contest/children/ACMHelper.vue": {
       "role": "index",
@@ -3462,9 +3462,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/contestRankMixin.js": {
       "role": "index",
-      "sha256": "79f5bc08fe96897b08549615ee97ef5dfd1c74b22fc98665a23cc0992d0319e9",
-      "size": 7591,
-      "normalized_sha256": "79f5bc08fe96897b08549615ee97ef5dfd1c74b22fc98665a23cc0992d0319e9"
+      "sha256": "1d5c889ce2579ce5aa3b8f38515069ba25b407a1915cab159f978005b41685af",
+      "size": 8208,
+      "normalized_sha256": "1d5c889ce2579ce5aa3b8f38515069ba25b407a1915cab159f978005b41685af"
     },
     "frontend/src/pages/oj/views/contest/children/prepProblemService.js": {
       "role": "index",
@@ -3918,9 +3918,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "232f89c7753438c5d95c43b1893ad0be564b282d44a7e9ceaf1127fa98c427c1",
-      "size": 17471,
-      "normalized_sha256": "232f89c7753438c5d95c43b1893ad0be564b282d44a7e9ceaf1127fa98c427c1"
+      "sha256": "1f289c4eccb68c27ba86a630e1010d3d776d0619cdb31fed43546fcf772576e3",
+      "size": 18401,
+      "normalized_sha256": "1f289c4eccb68c27ba86a630e1010d3d776d0619cdb31fed43546fcf772576e3"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",
