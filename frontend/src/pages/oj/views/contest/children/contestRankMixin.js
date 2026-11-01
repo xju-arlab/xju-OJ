@@ -52,9 +52,9 @@ export default {
       if (this.contest.team_contest) return !row.team || Boolean(row.team.star)
       return Boolean(row.team && row.team.star)
     },
-    // The place, badged when it advances or wins a medal, and how far it moved
-    // since the freeze. The arrow hangs off the badge's side, so every place
-    // stays centred in its column.
+    // The place, bold when it advances or wins a medal (the row then carries a
+    // colour bar), and how far it moved since the freeze. The arrow hangs off
+    // the number's side, so every place stays centred in its column.
     renderPlace (h, params) {
       const place = this.rankPlace(params)
       const tier = placeTier(place, this.awardRanges)
@@ -71,9 +71,10 @@ export default {
     awardsSaved () {
       this.$store.dispatch('getContest')
     },
-    rankRowClass ({ row }) {
+    rankRowClass ({ row, rowIndex }) {
       const campus = this.showCampus && row.team && CAMPUSES[row.team.campus] ? `rank-campus-${row.team.campus}` : ''
-      return [this.unofficial(row) ? 'rank-star-row' : '', campus].filter(Boolean).join(' ')
+      const tier = placeTier(this.rankPlace({ row, index: rowIndex }), this.awardRanges)
+      return [this.unofficial(row) ? 'rank-star-row' : '', campus, tier ? `rank-tier-${tier.key}` : ''].filter(Boolean).join(' ')
     },
     renderUserName (h, row, attrs) {
       return h('a', attrs, [this.unofficial(row) ? h('span', { class: 'rank-star-mark', 'aria-label': '打星' }, '★') : null, row.user.username])

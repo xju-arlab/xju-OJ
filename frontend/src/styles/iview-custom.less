@@ -25,42 +25,36 @@ table {
   font-weight: 650;
 }
 
-// Board places: plain numbers, and for advancing and medal places the number
-// sits on a lucide line icon (shield, badge) in Notion's quiet colours. The
-// movement since the freeze hangs off the right side, so places stay centred.
-@rank-shield: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z";
-@rank-badge: "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z";
-.rank-icon(@path; @fill; @stroke) {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='@{fill}' stroke='@{stroke}' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='@{path}'/%3E%3C/svg%3E");
+// Board places: plain numbers. An advancing or medal place is bold and its
+// row carries a 3px colour bar down the place cell's left edge; the legend and
+// the awards editor use the same bar. Movement since the freeze hangs off the
+// number's right side, so places stay centred.
+.rank-tier(@tier; @color) {
+  .el-table__body tr.rank-tier-@{tier} > td.rank-place-column { box-shadow: inset 3px 0 0 @color; }
+  .rank-tier-mark.is-@{tier}, .rank-award-legend > .is-@{tier}::before { background: @color; }
 }
-.rank-tier(@tier; @path; @fill; @stroke; @text) {
-  .rank-place.is-@{tier} { color: @text; font-weight: 600; .rank-icon(@path; @fill; @stroke); }
-  .rank-tier-icon.is-@{tier}, .rank-award-legend > .is-@{tier}::before { .rank-icon(@path; @fill; @stroke); }
-}
-.rank-tier(advance; @rank-shield; "%23e7f3f8"; "%236fa6c8"; #2b6a91);
-.rank-tier(gold; @rank-badge; "%23fbf3db"; "%23d4a33b"; #8f6512);
-.rank-tier(silver; @rank-badge; "%23f1f1ef"; "%23a5a49f"; #5f5e5a);
-.rank-tier(bronze; @rank-badge; "%23f8ece3"; "%23c48a60"; #8a5634);
+.rank-tier(advance; #4f88c6);
+.rank-tier(gold; #c99a3a);
+.rank-tier(silver; #9ea3ab);
+.rank-tier(bronze; #bd8659);
 
 .el-table .rank-place-column .cell { padding: 0 4px; overflow: visible; }
 .rank-place-cell { position: relative; display: inline-flex; vertical-align: middle; }
 .rank-place {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  min-width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
-  background: center / 30px 30px no-repeat;
   color: var(--color-text);
   font-size: 13px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-// The shield's middle sits a little above its box's.
-.rank-place.is-advance { padding-bottom: 2px; box-sizing: border-box; }
-.rank-place.is-unranked { color: var(--color-text-faint); }
-.rank-tier-icon { display: inline-block; width: 16px; height: 16px; background: center / contain no-repeat; vertical-align: -3px; }
+.rank-place[class*='is-'] { font-weight: 650; }
+.rank-place.is-unranked { color: var(--color-text-faint); font-weight: 500; }
+.rank-tier-mark { display: inline-block; width: 3px; height: 12px; border-radius: 2px; }
 .rank-move {
   position: absolute;
   top: 50%;
@@ -78,13 +72,13 @@ table {
 .rank-award-legend {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   color: var(--color-text-muted);
   font-size: 12px;
   white-space: nowrap;
 }
-.rank-award-legend > span { display: inline-flex; align-items: center; gap: 4px; }
-.rank-award-legend > span::before { content: ''; width: 16px; height: 16px; background: center / contain no-repeat; }
+.rank-award-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.rank-award-legend > span::before { content: ''; width: 3px; height: 12px; border-radius: 2px; }
 .rank-settings-row .rank-award-button + .rank-download { margin-left: 8px; }
 @media (max-width: 760px) {
   .rank-settings-row .rank-award-button + .rank-download { margin-left: 0; }

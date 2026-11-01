@@ -338,7 +338,11 @@ test('contest admins set medals as a count or a floored percentage and the place
   const places = page.locator('.el-table__body tr.el-table__row .rank-place')
   await expect(places.nth(0)).toHaveClass(/is-gold/)
   await expect(places.nth(1)).toHaveClass(/is-silver/)
-  await expect(places.nth(0)).toHaveCSS('background-image', /svg/)
+  // A tier is a bold place and a colour bar down the place cell's left edge.
+  const tiered = page.locator('.el-table__body tr.el-table__row')
+  await expect(tiered.nth(0)).toHaveClass(/rank-tier-gold/)
+  await expect(tiered.nth(0).locator('td').first()).toHaveCSS('box-shadow', 'rgb(201, 154, 58) 3px 0px 0px 0px inset')
+  await expect(tiered.nth(1)).toHaveClass(/rank-tier-silver/)
 })
 
 test('the live board shows how far each team moved since the freeze', async ({ page }) => {
