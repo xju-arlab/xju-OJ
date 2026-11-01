@@ -6,13 +6,12 @@
 .gitattributes[FV3T]: F:为导入的三个上游源码树保留历史空白检查兼容性 | R:- | A:backend/**；frontend/**；server/** | S:这里只关闭空白告警，不执行换行转换
 .gitignore[FS6T]: F:排除环境配置、凭据、评测数据、运行资产和机器绑定的MCP配置 | R:code:.env.example | A:Git ignore patterns | S:忽略.env及其变体但保留.env.example；已跟踪文件仍须独立审查
 AGENTS.md[SG7S]: F:规定前端开发桥、提交校验与AOCI认知和维护合同 | R:code:compose.dev.yaml,code:deploy.sh | A:./deploy.sh --dev frontend；AOCI MCP工作流 | S:生产不得加载开发覆盖；压缩恢复必须重新完整交付索引；语义只能由模型依据源码创作
-README.en.md[SG5S]: F:英文说明产品能力、宿主要求、部署配置和日常运维入口 | R:code:.env.example,code:deploy.sh | A:安装与运维文档 | S:默认监听回环；拉取源码后须执行部署；Java和文件IO要求宿主Landlock ABI3以上，Ubuntu22.04默认内核不足
-README.md[SG6M]: F:说明宿主要求、统一部署、OIDC关联、前端发布、自托管字体及AI工作台运维入口 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md,code:ai/README.md,code:deploy/ops/fetch-fonts.py | A:部署与运维说明 | S:仅前端发布需既有完整发布且变更限frontend或AOCI索引；Java和文件IO需Landlock ABI3；AI计算服务另行部署；站点字体须在服务器运行fetch-fonts生成
+README.en.md[SG5S]: F:英文说明产品能力（含队伍账号比赛与比赛筹备工作区）、技术栈徽章、宿主要求、部署配置、日常运维入口和仓库目录 | R:code:.env.example,code:deploy.sh,code:ai/README.md | A:安装与运维文档 | S:默认监听回环；拉取源码后须执行部署；Java和文件IO要求宿主Landlock ABI3以上，Ubuntu22.04默认内核不足
+README.md[SG6M]: F:说明产品亮点（含队伍账号比赛与比赛筹备工作区）与技术栈徽章、宿主要求、统一部署、OIDC关联、前端发布、自托管字体、AI工作台运维入口和仓库目录 | R:code:deploy.sh,code:docs/operations/release-and-recovery.md,code:ai/README.md,code:deploy/ops/fetch-fonts.py,code:deploy/ops/configure-authentik-oidc.py | A:部署与运维说明 | S:仅前端发布需既有完整发布且变更限frontend或AOCI索引；Java和文件IO需Landlock ABI3；AI计算服务另行部署；站点字体须在服务器运行fetch-fonts生成
 compose.dev.yaml[OR7T]: F:为宿主Vite开放仅回环可用的后端端口和开发CSRF来源 | R:code:deploy.sh,code:backend/oj/production_settings.py | A:backend-api开发覆盖 | S:仅由--dev frontend加载；直接Compose调用可绕过部署脚本对绑定地址的校验
 compose.yaml[OR9M]: F:编排OJ数据、API与Worker、判题、前端及初始化服务并挂接AI认证文件 | R:code:deploy.sh,code:backend/deploy/entrypoint.sh,code:server/judge-server/server/entrypoint.sh,code:ai/compose.yaml | A:Compose服务；init profile；RUNTIME_ROOT；TRUSTED_PROXY_CIDRS；AI_WORKER_TOKEN_FILE | S:生产仅frontend公开端口；AI计算另行编排，后端令牌来自私有data/config文件；项目名决定网络卷身份；判题只读rootfs保留降权能力；Worker健康不等于消费成功
 deploy.sh[OV9L]: F:验证源码配置与宿主能力，复用或构建组件镜像并备份迁移发布和验证服务 | R:code:compose.yaml,code:compose.dev.yaml,code:docker-bake.hcl,code:deploy/ops/check-judge-host.py | A:--dry-run；--config-only；--frontend-only；--dev frontend；ENV_FILE；BUILD_TARGETS | S:生产要求干净HEAD和排他锁；按镜像真实修订复用；全栈及开发构建前检查Landlock，frontend-only与config-only跳过；frontend-only只允许frontend和AOCI索引变更；containerd镜像存储下本机前端基础镜像按摘要引用；构建前探测华为云内网Debian源，不通则用公网源，npm无内网源固定用华为云公网源；私有pg_dump成功才迁移，备份不含文件和Redis；HTTP、Worker与新鲜心跳均通过才更新发布指针；磁盘写满时状态文件写失败也会判构建失败
 docker-bake.hcl[OV8S]: F:声明前端基础与应用、后端、判题工具链及服务和数据库构建目标 | R:code:frontend/Dockerfile,code:backend/Dockerfile,code:server/Dockerfile | A:GIT_SHA；IMAGE_REGISTRY；CACHE_REGISTRY；BUILD_NETWORK；DEBIAN_MIRROR与NPM_REGISTRY；Buildx targets | S:默认仅linux/amd64；前后端子目录构建而判题和Postgres使用根上下文；GIT_SHA负责标签与OCI修订号但不校验工作树；DEBIAN_MIRROR只进后端目标，NPM_REGISTRY只进前端目标
-docker-compose.yml[OR4T]: F:保留旧Redis4、Postgres10和一体后端的部署定义 | R:code:compose.yaml | A:旧docker-compose入口 | S:会公开80和443端口并使用旧数据目录；当前生产入口明确使用compose.yaml，不可混用
 
 ===/home/winbeau/xju-arlab/xju-oj/.github/workflows/===
 publish-release-images.yml[OV8L]: F:构建六类发布镜像，扫描后晋级不可变标签并发布digest清单 | R:code:docker-bake.hcl,code:deploy/images/postgres/Dockerfile | A:workflow_dispatch(source_sha,release_id)；release-manifest.json | S:命名空间随仓库所有者；数据镜像要求零Critical，应用镜像阻断有修复版本的Critical；数据镜像使用流程提交，应用镜像使用输入提交
@@ -20,23 +19,15 @@ regression.yml[OQ7S]: F:在推送和PR中验证前后端、部署、传统判题
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/===
 .coveragerc[FQ3T]: F:配置覆盖率报告排除路由、迁移、测试和XSS实现 | R:- | A:coverage配置 | S:-
-.dockerignore[FV5T]: F:排除后端构建中的运行数据、密钥、依赖和旧网关配置 | R:code:backend/Dockerfile | A:Docker ignore patterns | S:旧nginx和supervisor仅留作参考，不进入后端镜像
+.dockerignore[FV5T]: F:排除后端构建中的运行数据、密钥、依赖与本地缓存 | R:code:backend/Dockerfile | A:Docker ignore patterns | S:后端镜像以backend目录为构建上下文，根目录dockerignore不生效
 .flake8[FQ3T]: F:设置后端Python风格检查范围、行长和引号规范 | R:- | A:flake8配置 | S:-
 .gitignore[FV3T]: F:排除Python构建产物、测试报告和旧后端运行目录 | R:- | A:Git ignore patterns | S:-
 Dockerfile[OV8S]: F:以锁定uv依赖构建后端环境并提供API和Worker共用运行镜像，运行层含XeLaTeX与中文排版支持 | R:code:backend/pyproject.toml,code:backend/uv.lock,code:backend/deploy/entrypoint.sh,code:backend/contest/statement_pdf.py,code:docker-bake.hcl | A:backend-deps；backend-build；backend-runtime；DEBIAN_MIRROR；PYPI_INDEX_URL | S:运行阶段复制虚拟环境且不重新解依赖；入口先准备密钥后降权；源码目录构建，根dockerignore不生效；TeX包装在运行层，镜像约增240MB；Debian源默认华为云公网源；PYPI_INDEX_URL须与uv.lock写死的华为云地址一致，单改则--locked失败
 LICENSE[SG2T]: F:保留上游后端MIT授权及版权声明 | R:- | A:MIT许可 | S:-
-README-CN.md[SG2T]: F:保留上游OnlineJudge2.0功能和安装说明 | R:code:backend/README.md | A:历史中文文档 | S:旧版本说明不代表当前依赖
-README.md[SG5S]: F:说明后端模块边界、锁定环境与华为云PyPI镜像、运行入口与历史兼容约束 | R:code:backend/pyproject.toml,code:backend/uv.lock,code:backend/deploy/entrypoint.sh | A:开发与运维命令 | S:Redis DB1用于会话缓存，DB4用于任务；历史JSON迁移需保持可加载；换镜像须重锁审查，不得解除--locked
-init_db.sh[XD4T]: F:启动旧版本地Postgres和Redis开发容器并可初始化数据库 | R:code:backend/manage.py | A:POSTGRES_USER；POSTGRES_PASSWORD；--migrate | S:会强制重建命名开发容器；不应对生产执行；现推荐根开发入口
+README.md[SG5S]: F:说明后端模块边界、锁定环境与华为云PyPI镜像、运行入口，并保留上游OnlineJudge说明 | R:code:backend/pyproject.toml,code:backend/uv.lock,code:backend/deploy/entrypoint.sh | A:开发与运维命令 | S:Redis DB1用于会话缓存，DB4用于任务；历史JSON迁移需保持可加载；换镜像须重锁审查，不得解除--locked
 manage.py[EG5T]: F:加载oj.settings并执行Django管理命令 | R:code:backend/oj/settings.py | A:命令行Django管理入口 | S:命令输出前额外打印Django版本，自动解析JSON需处理前缀
 pyproject.toml[FV7T]: F:声明后端Python版本范围及精确锁定的运行、测试和风格依赖 | R:code:backend/uv.lock,code:backend/Dockerfile | A:uv项目；dependency-groups | S:仅支持Python3.10且不打包本项目；历史迁移仍依赖jsonfield
 uv.lock[FV7L]: F:锁定后端Python3.10依赖图、包来源及分发文件摘要 | R:code:backend/pyproject.toml,code:backend/Dockerfile | A:uv frozen sync锁文件 | S:分发地址写死华为云公网PyPI镜像，镜像索引不给size和上传时间；换源用uv重锁并核对版本与hash不变，不能手改
-
-===/home/winbeau/xju-arlab/xju-oj/backend/.github/===
-issue_template.md[SQ2T]: F:保留上游问题报告所需的复现和日志信息模板 | R:- | A:问题报告说明 | S:嵌套目录模板不会成为根仓库模板
-
-===/home/winbeau/xju-arlab/xju-oj/backend/.github/workflows/===
-release.yml[OV3T]: F:保留上游标签触发的多架构镜像发布流程 | R:code:backend/Dockerfile | A:上游release流程 | S:嵌套工作流不会在单仓库中触发
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/account/===
 decorators.py[MI8S]: F:执行登录、角色、题目所有权和比赛参与权限检查 | R:code:backend/account/models.py,code:backend/contest/models.py | A:login_required；admin_role_required；check_contest_permission；ensure_created_by | S:权限装饰器不保存共享request；筹备比赛对非成员报不存在，成员跳过窗口、报名和密码门禁；ensure_created_by对筹备比赛题只放行超管和比赛创建者；赛后登录用户免报名密码练习，已结束的队伍比赛匿名也可只读；赛前仅开放详情；非实时OI赛中隐藏排名和提交
@@ -167,21 +158,8 @@ prep.py[EB9L]: F:提供筹备比赛成员与姓名、一次性邀请与链接管
 ===/home/winbeau/xju-arlab/xju-oj/backend/deploy/===
 entrypoint.sh[OR8M]: F:准备后端运行目录和密钥并启动API、Worker及一次性管理命令 | R:code:backend/Dockerfile,code:compose.yaml | A:bootstrap-runtime；migrate；api；worker；manage | S:生产缺少Django密钥即失败；API默认2进程每进程4线程；公开头像设0644但私有目录保持限制；bootstrap递归归属需与判题挂载权限一致
 health_check.py[OR5T]: F:通过网站API的HTTP和JSON错误状态判断后端健康 | R:code:backend/conf/views.py | A:BACKEND_HEALTH_URL；进程退出码 | S:请求超时3秒，不证明Worker能够消费任务
-requirements.txt[FV3T]: F:保留框架升级前的依赖版本兼容参考 | R:code:backend/pyproject.toml | A:旧pip需求列表 | S:当前依赖以uv.lock为准
 runtime_smoke.py[TR6T]: F:验证后端网站API及Redis会话和任务库连接 | R:code:backend/oj/settings.py | A:check_api；check_redis；--worker | S:仅用30秒临时键验证DB1写读，不证明真实判题或任务消费
-supervisord.conf[RW3T]: F:保留旧一体镜像同时运行网关、API和Worker的进程配置 | R:code:backend/deploy/entrypoint.sh | A:旧supervisor配置 | S:当前Docker构建排除此文件
 worker_smoke.py[TR6T]: F:投递临时文件删除任务以证明Dramatiq消费能力 | R:code:backend/utils/tasks.py | A:WORKER_SMOKE_TIMEOUT；退出码 | S:会写入/data临时探针文件，默认等待20秒，超时仅报告失败
-
-===/home/winbeau/xju-arlab/xju-oj/backend/deploy/nginx/===
-api_proxy.conf[FN3T]: F:保留旧一体镜像的后端代理头和上传限制 | R:code:backend/deploy/nginx/nginx.conf | A:旧nginx include | S:当前后端镜像排除该文件
-https_redirect.conf[FN3T]: F:旧网关仅放行判题心跳HTTP，其余转HTTPS | R:code:backend/deploy/nginx/nginx.conf | A:旧nginx locations | S:-
-locations.conf[FN3T]: F:保留旧public、API、管理端和前台静态路由 | R:code:backend/deploy/nginx/nginx.conf | A:旧nginx locations | S:-
-nginx.conf[RN3T]: F:保留旧后端一体镜像的HTTP及TLS网关配置 | R:code:backend/deploy/nginx/locations.conf | A:旧8000/1443监听 | S:不参与当前Compose运行路径
-
-===/home/winbeau/xju-arlab/xju-oj/backend/deploy/test_case_rsync/===
-Dockerfile[OV3T]: F:构建旧测试数据rsync辅助镜像 | R:code:backend/deploy/test_case_rsync/run.sh | A:Alpine3.6镜像入口 | S:-
-rsyncd.conf[FN3T]: F:声明只读testcase模块及文件认证的rsync服务 | R:code:backend/deploy/test_case_rsync/run.sh | A:873端口；testcase模块 | S:-
-run.sh[OD4T]: F:运行旧测试数据主从rsync同步循环并准备密码文件 | R:code:backend/deploy/test_case_rsync/rsyncd.conf | A:RSYNC_MODE；RSYNC_MASTER_ADDR | S:从节点使用--delete，会删除主节点不存在的文件
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/docs/===
 data.json[SG2S]: F:保存上游历史发行说明及本地版本比较基线 | R:code:backend/conf/views.py | A:update数组 | S:不是本项目当前发布版本
@@ -336,6 +314,8 @@ inventory.sh[OO6T]: F:记录运行文件规模、数据库版本迁移和Redis�
 seed-demo-problems.py[OD7L]: F:校验或创建两个公开验收示例题及固定测试数据 | R:code:backend/problem/models.py,code:docs/operations/demo-problems.md | A:DEMO_PROBLEMS_MODE；SEED_DEMO_PROBLEMS_CREATOR；manage.py shell | S:默认check零业务写入；apply只创建缺失对象，现有不匹配立即失败；异常删除本次创建目录；示例测试ID含连字符，清理逻辑不能假定全部为十六进制ID
 check-judge-host.py[OR8T]: F:探测Linux宿主Landlock能力并拒绝不满足Java和文件IO沙箱要求的部署 | R:code:deploy.sh,code:server/judger/src/filesystem.c | A:probe_landlock_abi；main；退出码0或1 | S:只读查询无需root且仅支持x86_64和aarch64；ABI低于3或探测被拒均失败；不会自动升级内核或关闭隔离
 fetch-fonts.py[OU6S]: F:把Geist、Source Serif 4、Noto Sans/Serif SC和JetBrains Mono的Google Fonts分片镜像到公开数据目录并生成fonts.css | R:code:frontend/nginx/nginx.conf,code:frontend/index.html,code:compose.yaml | A:--output；--url-prefix；FAMILIES | S:宿主无写权限，须在backend-api容器内以backend用户运行；只接受fonts.gstatic.com的woff2并校验字段与魔数；文件按内容哈希命名，新目录整体替换旧目录
+configure-authentik-oidc.py[OI7S]: F:交互保存Authentik客户端密钥并更新部署环境中的OIDC配置 | R:code:.env.example,code:deploy.sh | A:--env-file；--issuer；--client-id；--secret-file | S:密钥文件0600且不打印内容；目前先写密钥后验证环境文件，后续失败可能造成配置部分更新
+diagnose-avatar-production.sh[OO5M]: F:检查线上头像URL、容器挂载和文件权限并输出诊断资料 | R:code:compose.yaml | A:头像生产诊断脚本；REPO_ROOT | S:主要为只读调查但会显示用户资料和日志，输出应留在私有环境；REPO_ROOT默认生产检出路径而非脚本所在目录
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/contracts/===
 api-compatibility.md[SG6S]: F:记录单仓库迁移前的前后端API、上传包装和持久化身份约束 | R:code:backend/oj/urls.py,code:frontend/src/pages/oj/api.js | A:历史API兼容清单 | S:包含旧源码路径和阶段零事实，不能据此推断新增远程判题、报名和OIDC的当前契约
@@ -469,12 +449,6 @@ playwright.config.mjs[TQ6T]: F:配置单Worker的真实浏览器组件回归与�
 ===/home/winbeau/xju-arlab/xju-oj/frontend/admin/===
 index.html[EU5T]: F:加载管理端运行配置与自托管字体并挂载Vite管理应用 | R:code:frontend/src/pages/admin/index.js,code:deploy/ops/fetch-fonts.py | A:/admin/入口HTML | S:runtime-config必须先于模块入口执行；字体样式表来自运行数据，构建时原样保留链接
 
-===/home/winbeau/xju-arlab/xju-oj/frontend/deploy/===
-Dockerfile[OV2T]: F:保留Node6挂载源码现场构建的旧前端容器定义 | R:code:frontend/deploy/run.sh | A:旧/OJ_FE镜像 | S:不参与当前frontend/Dockerfile构建
-nginx.conf[RN3S]: F:保留旧前端容器代理与静态路径配置 | R:code:frontend/deploy/run.sh | A:旧80端口网关 | S:使用/app/dist和oj-backend旧路径，不能用于当前拓扑
-run.sh[OV3T]: F:在旧挂载源码容器内安装npm依赖、构建DLL并启动Nginx | R:code:frontend/deploy/Dockerfile | A:旧前端启动脚本 | S:依赖已删除的Webpack流程及旧淘宝registry，不是当前部署入口
-sentry_release.sh[OV3T]: F:保留旧Sentry源码映射上传脚本 | R:- | A:USE_SENTRY；SENTRY_AUTH_TOKEN | S:令牌通过命令参数传递且镜像浮动，不应复用为当前发布链
-
 ===/home/winbeau/xju-arlab/xju-oj/frontend/docker-entrypoint.d/===
 20-runtime-config.sh[OC7T]: F:在Nginx启动时生成域名版本及认证展示的浏览器配置 | R:code:frontend/src/utils/runtime.js | A:/runtime-config.js；APP_DOMAIN；PUBLIC_BASE_URL；AUTHENTIK_* | S:按字节转义JSON控制字符并保留UTF8；布尔值仅接受true或false；生产开发fixtures始终关闭
 25-trusted-proxies.sh[ON8T]: F:生成Nginx可信代理地址及真实客户端IP和协议映射配置 | R:code:frontend/nginx/nginx.conf,code:deploy.sh | A:TRUSTED_PROXY_CIDRS；trusted-proxies.conf | S:默认不信任转发头；用原始连接对端识别代理，仅可信入口可指定http或https；地址还由deploy校验且禁止全网CIDR
@@ -501,7 +475,6 @@ zh-TW.js[FL4L]: F:提供题库、题面数据范围与样例解释、比赛、�
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/===
 App.vue[EU4T]: F:提供管理端根路由视图和页面基础字体布局 | R:code:frontend/src/pages/admin/index.js,code:frontend/src/styles/tokens.css | A:管理端根组件 | S:字体取共享界面无衬线变量；不设antialiased字体平滑，避免macOS文字发细
 api.js[IN7M]: F:封装后台业务API及CSRF、错误提示和失效登录跳转 | R:code:frontend/src/utils/apiError.js,code:backend/oj/urls.py | A:默认API对象；getContestTeamGroups/getContestTeams/createContestTeams/setContestTeamStar/resetContestTeamPassword/deleteContestTeam | S:依据JSON error判断业务成功；网络和非字符串错误统一提取，避免错误处理再次抛异常
-index.html[EU2T]: F:保留旧构建器的管理端HTML模板 | R:code:frontend/admin/index.html | A:旧自动注入入口模板 | S:当前Vite使用frontend/admin/index.html
 index.js[EU7T]: F:启动管理SPA并注册路由、状态、国际化和兼容UI组件 | R:code:frontend/src/pages/admin/router.js,code:frontend/src/store/index.js,code:frontend/src/shared/ui/legacy-ui.js | A:Vue应用挂载#app | S:入口固定初始语言zh-CN；旧消息方法经全局属性适配
 remoteBridge.js[IN6T]: F:通过浏览器助手事件获取Codeforces题面供后台导入 | R:code:frontend/static/userscripts/xju-oj-remote-bridge.user.js | A:supportsRemoteProblemImport；collectCodeforcesProblemPage | S:以随机请求ID匹配回复，3分钟超时后移除监听；要求助手至少0.3版
 router.js[EU7S]: F:定义后台页面及AI题目编辑、主观题评阅、比赛队伍账号和共用导入导出路由 | R:code:frontend/src/pages/admin/views/Home.vue,code:frontend/src/pages/admin/views/problem/ImportAndExport.vue,code:frontend/src/pages/admin/views/contest/ContestTeams.vue,code:frontend/src/utils/chunkRecovery.js | A:以/admin为基址；/ai/problems；/ai/reviews；/ai/problem/batch_ops；/contest/:contestId/teams | S:AI导入与普通导入共用页面壳按路由切换；Home只做登录守卫，业务权限由后端执行；发布后旧标签页动态加载失败时刷新一次；lint:modern要求Problem和Dashboard保持懒加载原文
@@ -512,7 +485,6 @@ Accordion.vue[EU3T]: F:提供带标题及头部插槽的可折叠内容容器 | 
 CodeMirror.vue[IU5T]: F:将管理端旧代码编辑事件适配到共享CodeMirror组件 | R:code:frontend/src/shared/editors/CodeMirrorAdapter.vue | A:value/modelValue；mode；change/input/update事件 | S:modelValue存在时优先于value，保留旧输入事件契约
 KatexEditor.vue[EU4T]: F:实时预览管理端输入的数学公式 | R:- | A:KaTeX公式输入与HTML预览 | S:使用throwOnError=false，另捕获渲染异常
 Panel.vue[EU4T]: F:提供管理页面标题、操作区与内容面板样式 | R:code:frontend/src/pages/admin/index.js | A:title；small；title/header/default插槽 | S:small模式仍有700px最小宽度
-ScreenFull.vue[EU4T]: F:保留未接入当前页面的全屏切换图标组件 | R:- | A:click；width/height/color | S:未被页面引用；旧screenfull.enabled与版本6不兼容
 SideMenu.vue[EU5T]: F:按权限展示用户、普通题库、AI题库（含主观题评阅）及比赛后台菜单 | R:code:frontend/src/store/index.js,code:frontend/src/pages/admin/router.js | A:后台侧栏；AI题目管理、主观题评阅和导入导出入口 | S:使用Element Plus子菜单并随当前路由更新高亮；菜单隐藏不能代替后端授权
 Simditor.vue[IU5T]: F:将旧富文本组件接口转接到共享编辑器并透传图片上传与紧凑模式 | R:code:frontend/src/shared/editors/RichTextEditorAdapter.vue | A:value/modelValue；imageUpload；compact/placeholder；change/input/update/upload事件 | S:toolbar属性被接受但未传给适配器，modelValue优先，compact与placeholder直接透传
 TopNav.vue[EU3T]: F:显示管理后台首页及当前区域的面包屑 | R:- | A:topNavName插槽 | S:-
@@ -525,7 +497,6 @@ Save.vue[EU2T]: F:提供统一主按钮外观及本地化标签的保存按钮 |
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/views/===
 Home.vue[EU6S]: F:加载后台用户并组织侧栏、页面切换和公式编辑壳层 | R:code:frontend/src/pages/admin/api.js,code:frontend/src/store/index.js | A:beforeRouteEnter；后台布局 | S:子页按路由path重建，防止编辑对象在不同ID间复用；守卫仅检查登录，具体权限由后端执行；不设antialiased字体平滑以免macOS文字发细
-index.js[EU3T]: F:集中导出管理端页面组件的兼容入口 | R:code:frontend/src/pages/admin/router.js | A:管理页面命名导出 | S:当前router使用独立动态导入
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/views/contest/===
 Contest.vue[EU7M]: F:创建编辑三种赛制比赛并分别落实传统题目或AI计分配置，可设ACM封榜时间，并可将新比赛创建为筹备工作区 | R:code:frontend/src/pages/admin/views/contest/ContestProblemComposer.vue,code:frontend/src/pages/admin/views/ai/ContestSettings.vue | A:比赛创建编辑表单；preparation开关；freezeEnabled；syncEnd | S:新建ACM/OI默认筹备，隐藏时间、可见性与封榜且不提交时间；远程题仅ACM；比赛与题目配置不原子，失败保留已建比赛；新建时改开始即结束取+5小时；封榜默认最后1小时
@@ -535,7 +506,6 @@ ContestTeams.vue[EU6S]: F:后台按比赛导入队伍CSV生成账号，展示一
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/views/general/===
 Announcement.vue[EU6M]: F:复用表单管理站点或比赛公告及可见性 | R:code:frontend/src/pages/admin/components/Simditor.vue,code:frontend/src/pages/admin/api.js | A:公告列表与创建编辑弹窗 | S:按路由contestId切换API；正文安全清洗由后端持久化层完成
-Conf.vue[EU4S]: F:提供SMTP设置、测试邮件和网站配置的旧后台界面 | R:code:frontend/src/pages/admin/api.js | A:配置表单 | S:当前后台路由未挂载此页
 Dashboard.vue[EU5M]: F:展示管理用户最近会话、系统统计与产品更新说明 | R:code:frontend/src/pages/admin/api.js | A:后台仪表盘 | S:更新说明是静态文本；会话为空安全回退，多个会话按真实时间排序
 JudgeServer.vue[EU6S]: F:轮询显示判题节点状态和令牌并允许禁用与删除节点 | R:code:backend/conf/views.py | A:判题节点管理页 | S:每5秒刷新且离开路由停止；原始令牌仅应由后端超级管理员授权返回
 Login.vue[EU6S]: F:提供管理端本地或Authentik登录与显式开发登录入口 | R:code:frontend/src/utils/runtime.js,code:frontend/src/pages/admin/api.js | A:后台登录页 | S:先取profile建立CSRF上下文再提交本地登录；OIDC返回固定/admin/路径
@@ -553,7 +523,6 @@ App.vue[EU7T]: F:组织OJ导航内容壳和OIDC错误提示，控制AI题目Note
 api.js[IN7L]: F:封装用户端题目比赛、提交、账户、收藏、个人题目、开榜、已发布副本编辑、队伍添加、筹备工作区题目分配、验题与题面PDF导出、邀请及远程恢复API | R:code:backend/oj/urls.py,code:frontend/src/utils/apiError.js,code:backend/contest/views/prep.py,code:backend/contest/views/admin.py | A:默认API对象；pollContestAnnouncementList；recoverRemoteSubmission；createPrepContest/setContestRankFreeze/getAdminContest/editAdminContest/getContestTeams/createContestTeams；startPrepReview/endPrepReview/publishPrepContest/exportPrepStatements；getPrepPlan/addPrepPlanItem/updatePrepPlanItem/deletePrepPlanItem | S:JSON error决定成功；公告轮询超时10秒且静默；筹备创建、开榜、副本编辑与加队走admin路径仅管理员；规划项只传要改的字段；撤销邀请不带id即全撤；PDF导出错误也以JSON blob返回
 authError.js[LI6T]: F:将OIDC回调错误代码映射安全文案并从URL移除该参数 | R:code:backend/account/oidc.py,code:frontend/src/pages/oj/App.vue | A:authErrorMessageKey；removeAuthError；parseAuthError | S:未知输入从不回传供渲染，保留其他查询参数和hash
 contestAnnouncements.mjs[LB6T]: F:筛选最近十分钟可见比赛公告并按发布时间倒序排列 | R:code:frontend/src/pages/oj/components/ContestAnnouncementBanner.vue | A:ANNOUNCEMENT_VISIBLE_MS；activeContestAnnouncements | S:允许不足1秒的未来时钟偏差以兼容HTTP Date精度，过期边界严格排除
-index.html[EU2T]: F:保留旧构建器的用户端加载动画和HTML入口模板 | R:code:frontend/index.html | A:旧自动注入模板 | S:当前Vite使用根frontend/index.html
 index.js[EU7T]: F:启动用户SPA并注册状态、国际化、编辑显示及旧UI兼容能力 | R:code:frontend/src/pages/oj/router/index.js,code:frontend/src/store/index.js,code:frontend/src/shared/ui/legacy-ui.js | A:Vue应用挂载#app | S:图表组件按需异步加载；剪贴板依赖浏览器安全上下文API
 remoteBridge.js[IN7T]: F:在OJ与用户脚本间探测版本、派发任务并筛选状态事件 | R:code:frontend/static/userscripts/xju-oj-remote-bridge.user.js | A:dispatchRemoteSubmission；subscribeRemoteBridgeEvents；isRemoteBridgeInstalled | S:schema保持v1，最低助手1.1.0；DOM就绪标记只表示可用性，不构成可信判题证明
 submissionStatus.js[LU6T]: F:把本地判题及远程登录验证同步状态转为标签和提示 | R:code:frontend/src/utils/constants.js | A:isSubmissionPending；submissionStatus | S:结果6、7、9仍待判；远程超过3分钟未更新显示同步提醒，不自行改成失败终态
@@ -716,56 +685,26 @@ loader.css[FU3S]: F:显示SPA加载前的九格动画及旧背景样式 | R:code
 ===/home/winbeau/xju-arlab/xju-oj/frontend/static/userscripts/===
 xju-oj-remote-bridge.user.js[IN8L]: F:通过浏览器会话向三类远程OJ提交、恢复查询并持久回传判题事件 | R:code:frontend/src/pages/oj/remoteBridge.js,code:backend/submission/remote.py | A:用户脚本1.1.0；远程任务事件；题面采集；任务恢复 | S:事件持久保存到后端确认才删除；多标签租约限制重复；提交结果不确定时不自动重发；凭据留浏览器且账号归属检查；仍不能独立证明远程成绩
 
-===/home/winbeau/xju-arlab/xju-oj/ops/===
-configure-authentik-oidc.py[OI7S]: F:交互保存Authentik客户端密钥并更新部署环境中的OIDC配置 | R:code:.env.example,code:deploy.sh | A:--env-file；--issuer；--client-id；--secret-file | S:密钥文件0600且不打印内容；目前先写密钥后验证环境文件，后续失败可能造成配置部分更新
-
-===/home/winbeau/xju-arlab/xju-oj/scripts/===
-diagnose-avatar-production.sh[OO5M]: F:检查线上头像URL、容器挂载和文件权限并输出诊断资料 | R:code:compose.yaml | A:头像生产诊断脚本 | S:主要为只读调查但会显示用户资料和日志，输出应留在私有环境；不等价于修复或发布
-
 ===/home/winbeau/xju-arlab/xju-oj/server/===
 .dockerignore[FV4T]: F:排除旧server上下文中的构建产物和运行目录 | R:code:server/Dockerfile | A:Docker忽略规则 | S:当前根上下文构建实际采用仓库根.dockerignore
 Dockerfile[OV9S]: F:构建固定语言工具链、Seccomp沙箱和Python判题服务运行镜像 | R:code:server/judger/CMakeLists.txt,code:server/judge-server/server/entrypoint.sh,code:docker-bake.hcl | A:judge-toolchain；judge-server；镜像版本参数 | S:使用仓库根作为context；编译和运行用户身份分离；最终镜像保留判题必需编译器但移除沙箱构建工具；基础镜像绑定digest，不能靠放开容器权限修复判题
 LICENSES.md[SG4T]: F:说明JudgeServer与Judger两份上游许可证的保留边界 | R:code:server/judge-server/LICENSE,code:server/judger/LICENSE | A:许可证归属说明 | S:本文件不替代或改写原SATA文本
-README.md[SG6T]: F:说明判题HTTP服务、原生沙箱、统一构建及支持的绑定边界 | R:code:server/Dockerfile,code:docs/contracts/judge-server-protocol.md | A:判题模块构建与检查说明 | S:构建上下文必须是仓库根；健康只证明本机存活；生产支持Python绑定，Node和Lua仅历史源码
-
-===/home/winbeau/xju-arlab/xju-oj/server/judge-server/.github/workflows/===
-release.yml[OV3T]: F:保留JudgeServer上游标签发布Docker镜像工作流 | R:code:server/judge-server/Dockerfile | A:历史GitHub发布流程 | S:嵌套工作流在本单仓库不触发
+README.md[SG6T]: F:说明判题HTTP服务、原生沙箱、统一构建及支持的绑定边界 | R:code:server/Dockerfile,code:docs/contracts/judge-server-protocol.md | A:判题模块构建与检查说明 | S:构建上下文必须是仓库根；健康只证明本机存活；只支持Python绑定，Node、Lua绑定和客户端示例已移除
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judge-server/===
 .gitignore[FV3T]: F:排除JudgeServer临时测试、日志和Python产物 | R:- | A:Git忽略规则 | S:-
-.travis.yml[OQ3T]: F:保留上游构建JudgeServer及运行客户端测试的流程 | R:code:server/judge-server/Dockerfile | A:历史Travis配置 | S:不参与根仓库当前CI
-Dockerfile[OV3S]: F:保留上游Ubuntu18.04多语言JudgeServer镜像定义 | R:code:server/Dockerfile | A:历史Docker构建入口 | S:依赖已不存在的Judger子目录；生产应使用根上下文的server/Dockerfile
 LICENSE[SG2T]: F:保留JudgeServer上游SATA许可证和版权归属 | R:- | A:SATA许可文本 | S:-
 README.md[SG4T]: F:介绍JudgeServer协议与同级Judger运行依赖 | R:code:server/README.md | A:JudgeServer说明 | S:阶段性尚未处理构建的文字已陈旧，当前构建事实见server/Dockerfile
 docker-compose.example.yml[OR5T]: F:示例化独立判题服务的根上下文构建及受限运行配置 | R:code:server/Dockerfile,code:compose.yaml | A:独立JudgeServer Compose示例 | S:目标为judge-server且根目录只读；仍需可达的外部backend-api及密钥文件
 pyproject.toml[FV7T]: F:锁定JudgeServer的Python版本范围和HTTP服务运行依赖 | R:code:server/judge-server/uv.lock,code:server/Dockerfile | A:uv项目元数据 | S:仅支持Python3.10且不打包服务本身；独立于后端依赖环境
 uv.lock[FV6M]: F:固定JudgeServer Python3.10依赖图及分发文件摘要 | R:code:server/judge-server/pyproject.toml | A:uv冻结锁文件 | S:使用官方PyPI分发来源，修改依赖须通过uv解析而非手改摘要
 
-===/home/winbeau/xju-arlab/xju-oj/server/judge-server/client/PHP/===
-JudgeClient.php[LN5S]: F:封装PHP对判题、SPJ编译和存活接口的JSON请求 | R:code:server/judge-server/client/PHP/languages.php | A:JudgeClient；judge；compileSpj；ping | S:原令牌先SHA256再发送；curl未设置超时；HTTP与JSON错误未严格区分
-client.php[TN3T]: F:演示PHP客户端的多语言普通与SPJ判题调用 | R:code:server/judge-server/client/PHP/JudgeClient.php | A:PHP调用示例 | S:含占位令牌和旧语言配置，不是生产验收
-languages.php[FC4T]: F:提供PHP示例客户端的旧语言编译运行与SPJ配置 | R:code:server/judge-server/client/PHP/JudgeClient.php | A:语言配置数组 | S:Python3字节码路径绑定3.5，Java参数包含已淘汰选项，不代表当前后端语言选项
-
-===/home/winbeau/xju-arlab/xju-oj/server/judge-server/client/Python/===
-client.py[LN5S]: F:提供Python判题客户端及多语言和动态测试用例调用示例 | R:code:server/judge-server/client/Python/languages.py | A:JudgeServerClient；judge；compile_spj；ping | S:test_case与test_case_id互斥；摘要认证保持协议；requests调用没有超时
-languages.py[FC4S]: F:为Python示例客户端定义编译运行与SPJ模板 | R:code:server/judge-server/client/Python/client.py | A:各语言配置字典 | S:Python3字节码路径固定3.6且仍含Python2，不等于当前生产语言集合
-
-===/home/winbeau/xju-arlab/xju-oj/server/judge-server/client/go/===
-README.md[SN3T]: F:说明Go判题客户端的上游安装和示例入口 | R:code:server/judge-server/client/go/client.go | A:Go客户端使用文档 | S:-
-client.go[LN5S]: F:实现Go判题HTTP请求、响应转换及客户端配置 | R:code:server/judge-server/client/go/options.go,code:server/judge-server/client/go/judge.go | A:Client；Resp；NewClient；Ping；CompileSpj | S:NewClient复用可变DefaultOptions指针使实例相互影响；读响应失败未关闭Body；协议错误保存在Resp.Err而非返回error
-judge.go[LN5T]: F:构造Go判题请求并序列化发送judge端点 | R:code:server/judge-server/client/go/client.go | A:JudgeRequest；JudgeWithRequest；Judge | S:兼容Judge方法把time.Duration直接转整数，调用者必须明确毫秒协议单位；未支持动态test_case字段
-languages.go[FC4S]: F:声明Go客户端编译运行结构及旧语言默认模板 | R:code:server/judge-server/client/go/judge.go | A:LangConfig；CompileConfig；RunConfig；SPJConfig | S:PY3模板绑定cpython35，Java依赖旧安全管理器；不决定生产后端语言配置
-options.go[FC4T]: F:定义Go客户端端点、令牌摘要及超时的选项函数 | R:code:server/judge-server/client/go/client.go | A:DefaultOptions；WithEndpointURL；WithToken；WithTimeout | S:默认超时10秒，显式0表示无限；DefaultOptions为可变全局指针
-
-===/home/winbeau/xju-arlab/xju-oj/server/judge-server/client/go/examples/===
-example.go[TN3S]: F:演示Go客户端多语言、SPJ和编译错误处理 | R:code:server/judge-server/client/go/client.go | A:main示例 | S:导入上游包且使用占位令牌
-
 ===/home/winbeau/xju-arlab/xju-oj/server/judge-server/examples/spj/===
 coprime_composite.cpp[KB8S]: F:按输入和选手输出文件验证与给定整数互质的合数答案 | R:code:server/judge-server/server/judge_client.py | A:argv输入及输出路径；退出0为AC、1为WA、2为调用或题目输入错误 | S:严格解析uint64且只接受可选正号；用确定性七基MillerRabin避免大数试除超时；两个文件只读打开以满足c_cpp沙箱；拒绝多余输出
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judge-server/server/===
 .python-version[FV3T]: F:声明JudgeServer开发解释器为Python3.10 | R:code:server/judge-server/pyproject.toml | A:pyenv版本文件 | S:-
-compiler.py[AW8T]: F:在编译身份下通过原生沙箱执行编译并返回产物路径或编译错误 | R:code:server/judge-server/server/config.py,code:server/judger/bindings/Python/_judger/__init__.py | A:Compiler.compile | S:不修改进程全局cwd，命令使用绝对路径；Go冷缓存编译时间至少15秒CPU和30秒墙钟；跨工作进程锁由调用方持有；编译器不使用Seccomp
+compiler.py[AW8T]: F:在编译身份下通过原生沙箱执行编译并返回产物路径或编译错误 | R:code:server/judge-server/server/config.py,code:server/judger/bindings/Python/_judger/__init__.py | A:Compiler.compile | S:不修改进程全局cwd，命令使用绝对路径；Go冷缓存编译至少30秒CPU和60秒墙钟，CI共享机上15秒会超；跨工作进程锁由调用方持有；编译器不使用Seccomp
 config.py[FC8T]: F:定义判题工作区、锁文件、运行身份和输出及进程数量上限 | R:code:server/judge-server/server/judge_client.py,code:server/judge-server/server/entrypoint.sh | A:路径与UID/GID常量；资源限额 | S:导入时按账户名查UID/GID，必须先创建镜像内用户；锁目录独立于所有沙箱可写目录
 entrypoint.sh[OR8T]: F:初始化私有工作区及锁文件并监督Gunicorn和心跳循环 | R:code:server/judge-server/server/server.py,code:server/judge-server/server/service.py | A:JUDGER_HTTP_WORKERS；JUDGER_HTTP_THREADS；HEARTBEAT_INTERVAL | S:启动会清空临时提交和SPJ产物但不碰测试数据；HTTP工作进程最多4个；心跳失败不终止服务；锁目录root独占
 exception.py[CR4T]: F:定义编译、SPJ、认证和判题服务的协议异常类型 | R:code:server/judge-server/server/server.py | A:JudgeServerException及子类 | S:消息存于message属性，普通str(exception)不包含它
@@ -778,21 +717,9 @@ utils.py[CS8T]: F:提供节点资源信息、受保护锁文件打开和运行�
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judger/===
 .gitignore[FV3T]: F:排除Judger编译产物、日志及绑定依赖目录 | R:- | A:Git忽略规则 | S:-
-.travis.yml[OQ3T]: F:保留上游在Ubuntu16与18容器运行沙箱测试的流程 | R:code:server/judger/CMakeLists.txt | A:历史Travis任务 | S:不是根仓库当前CI入口
 CMakeLists.txt[OV7T]: F:编译Judger命令行可执行文件并以受限权限安装到固定路径 | R:code:server/judger/src/main.c,code:server/judger/src/runner.c | A:libjudger.so构建与install | S:名称虽为.so却是可执行程序；链接pthread和seccomp；输出在源码output目录，安装权限仅owner读与执行
 LICENSE[SG2T]: F:保留Judger上游SATA授权及版权归属 | R:- | A:SATA许可文本 | S:-
 README.md[SS6T]: F:说明原生沙箱与绑定边界及2.1.4隔离和回收能力 | R:code:server/judger/src/runner.c,code:server/judger/src/filesystem.c | A:Judger模块说明 | S:File IO依赖Landlock ABI3及以上；原生版本和Python绑定须同步结果码；描述不等于所有遗留绑定均已适配
-
-===/home/winbeau/xju-arlab/xju-oj/server/judger/bindings/Lua/===
-LICENSE[SG2T]: F:保留Judger Lua绑定的MIT授权与版权声明 | R:- | A:MIT许可文本 | S:-
-Makefile[OV4T]: F:构建与安装Lua调用Judger的共享库 | R:code:server/judger/bindings/Lua/judger.c | A:all；install；clean；LUAVER | S:固定对象清单缺少当前文件系统和新增语言规则，需适配后才能作为现代沙箱构建入口
-judger.c[LS5M]: F:把Lua参数表转换原生沙箱配置并返回资源和结果字段 | R:code:server/judger/src/runner.h | A:luaopen_judger；run | S:旧适配器未传max_stack、cwd及内存检查模式；数字一律按int写入不匹配当前64位资源字段，不能假定兼容现行核心
-
-===/home/winbeau/xju-arlab/xju-oj/server/judger/bindings/NodeJS/===
-binding.gyp[OV3T]: F:声明旧Node原生绑定的node-gyp编译目标 | R:code:server/judger/bindings/NodeJS/judger.cc | A:judger addon target | S:-
-judger.cc[LS5M]: F:将旧V8对象转换命令行并同步调用Judger解析结果 | R:code:server/judger/src/main.c | A:Node原生run及结果常量 | S:拼接字符串交给popen且固定缓冲区strcpy，存在注入和溢出风险；V8接口陈旧；当前生产走Python绑定
-package.json[FV4T]: F:声明旧Node原生绑定的构建和测试依赖 | R:code:server/judger/bindings/NodeJS/binding.gyp | A:npm build；npm test | S:测试命令调用sudo；老node-gyp与Mocha不代表生产Node判题工具链
-readme.md[SL3T]: F:保留旧Node绑定安装步骤及文件输出已知问题 | R:code:server/judger/bindings/NodeJS/package.json | A:Node绑定使用说明 | S:问题记录来自旧版本，未证明当前File IO仍相同
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judger/bindings/Python/===
 .gitignore[FV3T]: F:排除Python绑定构建分发及包元数据 | R:- | A:Git忽略规则 | S:-
@@ -801,11 +728,6 @@ setup.cfg[FV5T]: F:声明Judger Python包名称、版本及自动包发现 | R:c
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judger/bindings/Python/_judger/===
 __init__.py[LS8T]: F:验证Python调用参数并以独立进程执行原生沙箱读取JSON结果 | R:code:server/judger/src/main.c,code:server/judger/src/runner.h | A:run；VERSION；结果及错误常量 | S:采用argv数组无shell展开；UNLIMITED参数省略以使用原生默认；communicate无外部超时，依赖runner回收；版本2.1.4含cwd错误码
-
-===/home/winbeau/xju-arlab/xju-oj/server/judger/demo/===
-1.in[TB2T]: F:提供Hello World沙箱演示的单词输入 | R:code:server/judger/demo/main.c | A:演示标准输入 | S:-
-demo.py[TS3T]: F:演示编译C程序后通过Python绑定调用沙箱 | R:code:server/judger/bindings/Python/_judger/__init__.py | A:Python示例入口 | S:旧示例指定root运行身份，当前安全配置会拒绝
-main.c[TB2T]: F:读取一个单词并输出Hello演示结果 | R:code:server/judger/demo/1.in | A:main | S:固定数组scanf未限宽，仅用于受控演示
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judger/src/===
 argtable3.c[LG5L]: F:实现内嵌argtable3命令行解析、帮助格式及参数容器管理 | R:code:server/judger/src/argtable3.h | A:arg_parse；arg_intn；arg_strn；arg_freetable | S:第三方源码附带原授权；arg_int最终存入int且超出INT范围报错，不能因中间strtol使用long就认为支持64位资源数
