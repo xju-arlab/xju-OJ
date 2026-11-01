@@ -218,7 +218,8 @@ test('star teams take no place on the board and contest admins add teams from th
   await page.goto('/contest/22/rank')
   const starRow = page.locator('tr.rank-star-row')
   await expect(starRow).toHaveCount(1)
-  await expect(starRow.locator('.rank-team')).toHaveText('打星Team Beta')
+  await expect(starRow.locator('.rank-team')).toHaveText('★Team Beta')
+  await expect(starRow.locator('.rank-star-mark')).toHaveCount(1)
   await expect(starRow.locator('td').first()).toHaveText('*')
   await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
 

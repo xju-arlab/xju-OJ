@@ -189,6 +189,9 @@ export default {
       params: params
     })
   },
+  getContestTeamGroups () {
+    return ajax('admin/contest/team_groups', 'get')
+  },
   getContestTeams (contestID) {
     return ajax('admin/contest/teams', 'get', {
       params: { contest_id: contestID }

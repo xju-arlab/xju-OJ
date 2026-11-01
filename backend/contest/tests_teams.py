@@ -122,6 +122,22 @@ class ContestTeamTest(APITestCase):
             "problem_id": problem.id, "language": "C", "code": "int main() {}"}, format="json")
         self.assertFailed(response, "A team account only submits in its own contest")
 
+    def test_deleting_the_contest_removes_its_team_accounts(self):
+        item = self.generate(("Team A", []), ("Star", []))[0]
+        other = Contest.objects.create(
+            title="Other", description="", real_time_rank=True, rule_type="ACM", created_by=self.root,
+            start_time=timezone.now(), end_time=timezone.now() + timedelta(hours=5))
+        self.client.post(self.url, data={"contest_id": other.id, "teams": [
+            {"name": "Kept", "members": []}]}, format="json")
+        groups = self.client.get(self.reverse("contest_team_group_api")).data["data"]
+        self.assertEqual({(group["id"], group["team_count"]) for group in groups}, {(self.contest.id, 2), (other.id, 1)})
+        self.assertSuccess(self.client.delete(f"{self.reverse('contest_admin_api')}?id={self.contest.id}"))
+        self.assertFalse(User.objects.filter(id=item["user_id"]).exists())
+        self.assertEqual(list(User.objects.filter(username__startswith="team-").values_list("contest_team__name", flat=True)),
+                         ["Kept"])
+        self.create_admin()
+        self.assertFailed(self.client.get(self.reverse("contest_team_group_api")))
+
     def test_reset_password_and_delete(self):
         item, busy = self.generate(("Team A", []), ("Team B", []))
         reset = self.client.put(self.url, data={"contest_id": self.contest.id, "id": item["id"]}, format="json")

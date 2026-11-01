@@ -67,6 +67,29 @@
       </div>
     </Panel>
 
+    <Panel title="比赛队伍账号">
+      <p class="team-group-note">队伍账号按比赛成组，不进上方用户列表；比赛删除时一并删除。</p>
+      <el-table :data="teamGroups" size="small" empty-text="暂无队伍账号">
+        <el-table-column label="比赛" min-width="220">
+          <template #default="{ row }"><span class="team-group-id">#{{ row.id }}</span>{{ row.title }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">{{ {'1': '未开始', '0': '进行中', '-1': '已结束'}[row.status] || row.status }}</template>
+        </el-table-column>
+        <el-table-column label="比赛时间" min-width="200">
+          <template #default="{ row }">{{ $filters.localtime(row.start_time) }} — {{ $filters.localtime(row.end_time) }}</template>
+        </el-table-column>
+        <el-table-column label="队伍" width="150">
+          <template #default="{ row }">{{ row.team_count }} 队<span v-if="row.star_count" class="team-group-star">（打星 {{ row.star_count }}）</span></template>
+        </el-table-column>
+        <el-table-column fixed="right" label="操作" width="96">
+          <template #default="{ row }">
+            <el-button size="small" @click="$router.push({ name: 'contest-teams', params: { contestId: row.id } })">管理</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </Panel>
+
     <Panel>
       <template #title><span >{{$t('m.Import_User')}}
         <el-popover placement="right" trigger="hover">
@@ -276,6 +299,7 @@
         // 当前页码
         currentPage: 1,
         selectedUsers: [],
+        teamGroups: [],
         formGenerateUser: {
           prefix: '',
           suffix: '',
@@ -287,6 +311,7 @@
     },
     mounted () {
       this.getUserList(1)
+      api.getContestTeamGroups().then(res => { this.teamGroups = res.data.data }, () => {})
     },
     methods: {
       // 切换页码回调
@@ -434,4 +459,8 @@
       text-align: left;
     }
   }
+
+  .team-group-note { margin: 0 0 10px; color: var(--color-text-muted); font-size: 12px; }
+  .team-group-id { margin-right: 6px; color: var(--color-text-faint); font-family: var(--font-mono); }
+  .team-group-star { color: #b7791f; }
 </style>

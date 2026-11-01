@@ -224,7 +224,7 @@
 </script>
 <style scoped lang="less">
   :deep(.rank-team) { color: var(--color-text); font-weight: 600; cursor: default; }
-  :deep(.rank-star-tag) { display: inline-block; margin-right: 4px; padding: 0 4px; border-radius: 3px; background: #f4ead6; color: #94661a; font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: 1px; }
+  :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }
   :deep(.el-table__body tr.rank-star-row > td.el-table__cell) { background-color: #fcf9f2; }
   :deep(.rank-star-row .rank-team) { color: var(--color-text-muted); }
   .echarts {

@@ -6,17 +6,17 @@ from ipaddress import ip_network
 
 import dateutil.parser
 from django.db import transaction
-from django.db.models import ProtectedError
+from django.db.models import Count, ProtectedError, Q
 from django.http import FileResponse, HttpResponse
 from django.utils.timezone import now
 
-from account.decorators import check_contest_permission, ensure_created_by
+from account.decorators import check_contest_permission, ensure_created_by, super_admin_required
 from account.models import User
 from submission.models import Submission, JudgeStatus
 from utils.api import APIError, APIView, validate_serializer
 from utils.cache import cache
 from utils.constants import CacheKey, ContestPrepState, ContestRuleType, PREP_PLACEHOLDER_DAYS
-from utils.shortcuts import rand_str
+from utils.shortcuts import datetime2str, rand_str
 from utils.tasks import delete_files
 from ..models import Contest, ContestAnnouncement, ACMContestRank, ContestTeam
 from ..statement_pdf import PDF_TIMEOUT_SECONDS, StatementPDFError
@@ -154,7 +154,10 @@ class ContestAPI(APIView):
             from ai_studio.models import AIJob
             if AIJob.objects.filter(contest=contest).exists():
                 return self.error("This AI contest has submissions. Hide it to preserve grading records.")
-        contest.delete()
+        with transaction.atomic():
+            # Team accounts live only in their contest; left behind they would show up as site users.
+            User.objects.filter(contest_team__contest=contest).delete()
+            contest.delete()
         return self.success()
 
 
@@ -402,6 +405,18 @@ class ContestTeamAPI(APIView):
         cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
         forget_frozen_board(contest)
         return self.success()
+
+
+class ContestTeamGroupAPI(APIView):
+    @super_admin_required
+    def get(self, request):
+        """Team accounts grouped by contest, the way the user list shows them."""
+        contests = Contest.objects.annotate(team_count=Count("teams"), star_count=Count("teams", filter=Q(teams__star=True))) \
+            .filter(team_count__gt=0).order_by("-start_time")
+        return self.success([{"id": contest.id, "title": contest.title, "status": contest.status,
+                              "start_time": datetime2str(contest.start_time), "end_time": datetime2str(contest.end_time),
+                              "team_count": contest.team_count, "star_count": contest.star_count}
+                             for contest in contests])
 
 
 class ContestTeamSheetAPI(APIView):

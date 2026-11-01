@@ -31,7 +31,7 @@ export default {
     renderTeamName (h, team) {
       const members = team.members.length ? '队员：' + team.members.join('、') : team.name
       return h('span', { class: 'rank-team', title: (team.star ? '打星队伍 · ' : '') + members }, [
-        team.star ? h('small', { class: 'rank-star-tag' }, '打星') : null, team.name
+        team.star ? h('span', { class: 'rank-star-mark', 'aria-label': '打星' }, '★') : null, team.name
       ])
     },
     getContestRankData (page = 1, refresh = false) {

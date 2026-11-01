@@ -357,7 +357,7 @@
   :deep(.el-table__body td.el-table__cell.frozen), :deep(.el-table__body tr:hover > td.el-table__cell.frozen) { background-color: #e3eefa !important; }
   :deep(.rank-problem-pending) { display: block; color: #2873be; font-weight: 700; }
   :deep(.rank-team) { display: inline-block; max-width: 150px; overflow: hidden; color: var(--color-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; cursor: default; vertical-align: middle; }
-  :deep(.rank-star-tag) { display: inline-block; margin-right: 4px; padding: 0 4px; border-radius: 3px; background: #f4ead6; color: #94661a; font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: 1px; }
+  :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }
   :deep(.el-table__body tr.rank-star-row > td.el-table__cell.rank-hover-cell) { background-color: #fcf9f2; }
   :deep(.rank-star-row .rank-team) { color: var(--color-text-muted); }
   .rank-freeze-banner { display: flex; min-height: 44px; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--color-border); background: #eef4fb; color: #2873be; font-size: 13px; }
