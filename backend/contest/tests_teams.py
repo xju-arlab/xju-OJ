@@ -65,7 +65,7 @@ class ContestTeamTest(APITestCase):
         access = self.client.get(self.reverse("contest_access_api"), data={"contest_id": self.contest.id})
         self.assertTrue(access.data["data"]["access"])
         rank = self.client.get(self.reverse("contest_rank_api"), data={"contest_id": self.contest.id, "limit": 10})
-        self.assertEqual(rank.data["data"]["results"][0]["team"], {"name": "Team A", "members": []})
+        self.assertEqual(rank.data["data"]["results"][0]["team"], {"name": "Team A", "members": [], "star": False})
         profile = self.client.get(self.reverse("user_profile_api")).data["data"]
         self.assertEqual(profile["team"]["contest_id"], self.contest.id)
 
@@ -76,6 +76,32 @@ class ContestTeamTest(APITestCase):
             response = self.client.post(self.url, data={"contest_id": self.contest.id, "teams": teams}, format="json")
             self.assertFailed(response)
         self.assertEqual(ContestTeam.objects.count(), 1)
+
+    def test_star_teams_compete_without_a_place(self):
+        response = self.client.post(self.url, data={"contest_id": self.contest.id, "teams": [
+            {"name": "Team A", "members": []}, {"name": "Star", "members": ["王五"], "star": True},
+            {"name": "Team B", "members": []}]}, format="json")
+        self.assertSuccess(response)
+        official, star, last = response.data["data"]
+        self.assertEqual((official["star"], star["star"]), (False, True))
+        for item, solved in ((star, 3), (official, 2), (last, 1)):
+            ACMContestRank.objects.filter(user_id=item["user_id"]).update(accepted_number=solved)
+
+        def places():
+            results = self.client.get(self.reverse("contest_rank_api"), data={
+                "contest_id": self.contest.id, "limit": 10, "force_refresh": "1"}).data["data"]["results"]
+            return [(row["team"]["name"], row["place"]) for row in results]
+
+        self.assertEqual(places(), [("Star", None), ("Team A", 1), ("Team B", 2)])
+        # The second page keeps counting official places from the first.
+        page = self.client.get(self.reverse("contest_rank_api"), data={
+            "contest_id": self.contest.id, "limit": 1, "offset": 2}).data["data"]["results"]
+        self.assertEqual(page[0]["place"], 2)
+        toggled = self.client.patch(self.url, data={"contest_id": self.contest.id, "id": star["id"], "star": False},
+                                    format="json")
+        self.assertSuccess(toggled)
+        self.assertFalse(toggled.data["data"]["star"])
+        self.assertEqual(places(), [("Star", 1), ("Team A", 2), ("Team B", 3)])
 
     def test_only_contest_admins_manage_team_accounts(self):
         self.create_admin()
@@ -154,6 +180,7 @@ class ContestTeamSheetTest(APITestCase):
         self.assertIn(r"\xjurow{A\&B\_\%队}{赵一}{team-abcd}{Ab3dEf7g}", source)
         self.assertIn(r"Team \& contest", source)
         self.assertEqual(source.count(r"\xjurow{"), 31)
+        self.assertIn(r"\xjurow{Star（打星）}", render_team_sheet("Team", [dict(self.teams[0], name="Star", star=True)]))
 
     def test_contest_admins_download_the_sheet(self):
         with mock.patch("contest.views.admin.compile_team_sheet", return_value=b"%PDF-1.7") as compile_sheet:

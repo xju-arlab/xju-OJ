@@ -1,5 +1,6 @@
-// Team rosters for contest team accounts: a CSV of team name and up to three
-// members, and the account sheet handed back once with the passwords.
+// Team rosters for contest team accounts: a CSV of team name, up to three
+// members and an optional team type, and the account sheet handed back once
+// with the passwords.
 import axios from 'axios'
 import papa from 'papaparse'
 
@@ -29,13 +30,22 @@ export function surnameTeamName (members, taken) {
   return name
 }
 
+// The fifth column: 正式队伍 when left out, or 打星队伍; null for anything else.
+export function teamIsStar (kind) {
+  if (/^(正式(队伍?)?|official)?$/i.test(kind)) return false
+  if (/^(打星(队伍?)?|[*★]|star)$/i.test(kind)) return true
+  return null
+}
+
 export function parseRoster (text, skipHeader, existingNames = []) {
   const rows = papa.parse(text, { skipEmptyLines: 'greedy' }).data
     .map(cells => cells.map(cell => String(cell ?? '').trim()))
   const teams = (skipHeader ? rows.slice(1) : rows).map((cells, index) => ({
     line: index + (skipHeader ? 2 : 1),
     name: cells[0] || '',
-    members: cells.slice(1, 4).filter(Boolean)
+    members: cells.slice(1, 4).filter(Boolean),
+    kind: cells[4] || '',
+    star: teamIsStar(cells[4] || '')
   })).filter(team => team.name || team.members.length)
   const taken = new Set([...existingNames, ...teams.map(team => team.name).filter(Boolean)])
   for (const team of teams) {
@@ -50,12 +60,15 @@ export function parseRoster (text, skipHeader, existingNames = []) {
 // Problems the server would also reject, reported per CSV line.
 export function rosterErrors (teams, existingNames = []) {
   const errors = []
-  const seen = new Set(existingNames)
+  const existing = new Set(existingNames)
+  const seen = new Set()
   for (const team of teams) {
     if (!team.name) errors.push(`第 ${team.line} 行缺少队伍名`)
     else if (team.name.length > TEAM_NAME_MAX) errors.push(`第 ${team.line} 行队伍名超过 ${TEAM_NAME_MAX} 字`)
+    else if (existing.has(team.name)) errors.push(`第 ${team.line} 行队伍「${team.name}」已在本场比赛中`)
     else if (seen.has(team.name)) errors.push(`第 ${team.line} 行队伍名「${team.name}」重复`)
     if (team.members.some(member => member.length > MEMBER_NAME_MAX)) errors.push(`第 ${team.line} 行队员名超过 ${MEMBER_NAME_MAX} 字`)
+    if (team.star === null) errors.push(`第 ${team.line} 行队伍类型「${team.kind}」应为正式队伍或打星队伍`)
     seen.add(team.name)
   }
   if (teams.length > 500) errors.push('一次最多导入 500 支队伍')
@@ -72,7 +85,7 @@ function csvCell (value) {
 // The A4 slips to cut apart; the server typesets what it is sent and keeps nothing.
 export async function downloadTeamSheet (contestId, link, teams) {
   const res = await axios.post('admin/contest/teams/sheet', {
-    contest_id: contestId, link, teams: teams.map(({ name, members, username, password }) => ({ name, members, username, password }))
+    contest_id: contestId, link, teams: teams.map(({ name, members, username, password, star }) => ({ name, members, username, password, star }))
   }, { responseType: 'blob' })
   if (res.data.type !== 'application/pdf') {
     const body = JSON.parse(await res.data.text())
@@ -93,10 +106,10 @@ function saveBlob (filename, blob) {
 }
 
 export function downloadTeamAccounts (filename, teams) {
-  const lines = [['队伍名', '队员1', '队员2', '队员3', '用户名', '密码']]
+  const lines = [['队伍名', '队员1', '队员2', '队员3', '队伍类型', '用户名', '密码']]
   for (const team of teams) {
     const members = [...team.members, '', '', ''].slice(0, 3)
-    lines.push([team.name, ...members, team.username, team.password])
+    lines.push([team.name, ...members, team.star ? '打星队伍' : '正式队伍', team.username, team.password])
   }
   // The BOM lets Excel read the sheet as UTF-8.
   saveBlob(filename, new Blob(['\ufeff' + lines.map(line => line.map(csvCell).join(',')).join('\r\n')],

@@ -44,7 +44,8 @@ def render_team_sheet(header, teams):
     """LaTeX source with one boxed row per team; every field is user text and is escaped."""
     rows = []
     for team in teams:
-        fields = [escape(team["name"]), escape("、".join(team["members"][:3])),
+        name = team["name"] + ("（打星）" if team.get("star") else "")
+        fields = [escape(name), escape("、".join(team["members"][:3])),
                   escape(team["username"]), escape(team["password"])]
         rows.append(r"\xjurow" + "".join("{" + field + "}" for field in fields))
     return TEMPLATE.replace("%%HEADER%%", escape(header)).replace("%%ROWS%%", "\n".join(rows))

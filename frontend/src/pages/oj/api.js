@@ -430,6 +430,9 @@ export default {
   getContestTeams (contestID) {
     return ajax('admin/contest/teams', 'get', { params: { contest_id: contestID } })
   },
+  createContestTeams (contestID, teams) {
+    return ajax('admin/contest/teams', 'post', { data: { contest_id: contestID, teams } })
+  },
   setContestRankFreeze (contestID, unfrozen) {
     return ajax('admin/contest/rank_freeze', 'post', {
       data: { contest_id: contestID, unfrozen }

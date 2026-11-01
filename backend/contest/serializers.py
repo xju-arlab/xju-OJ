@@ -44,6 +44,7 @@ class ContestRankFreezeSerializer(serializers.Serializer):
 class ContestTeamInputSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
+    star = serializers.BooleanField(required=False, default=False)
 
 
 class CreateContestTeamsSerializer(serializers.Serializer):
@@ -56,6 +57,7 @@ class ContestTeamAccountSerializer(serializers.Serializer):
     members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
     username = serializers.CharField(max_length=32)
     password = serializers.CharField(max_length=32)
+    star = serializers.BooleanField(required=False, default=False)
 
 
 class ContestTeamSheetSerializer(serializers.Serializer):
@@ -68,6 +70,10 @@ class ContestTeamSheetSerializer(serializers.Serializer):
 class ContestTeamPasswordSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     id = serializers.IntegerField()
+
+
+class ContestTeamKindSerializer(ContestTeamPasswordSerializer):
+    star = serializers.BooleanField()
 
 
 class ContestAdminSerializer(serializers.ModelSerializer):

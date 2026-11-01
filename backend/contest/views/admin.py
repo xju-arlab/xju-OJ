@@ -29,7 +29,7 @@ from ..serializers import (ContestAnnouncementSerializer, ContestAdminSerializer
                            CreateConetestSeriaizer, CreateContestAnnouncementSerializer,
                            EditConetestSeriaizer, EditContestAnnouncementSerializer,
                            ACMContesHelperSerializer, ContestRankFreezeSerializer,
-                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer,
+                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer, ContestTeamKindSerializer,
                            ContestTeamSheetSerializer, )
 
 
@@ -354,10 +354,24 @@ class ContestTeamAPI(APIView):
         """Create one account per roster row and register it; plaintext passwords are returned only here."""
         contest = self.load_contest(request, request.data["contest_id"])
         with transaction.atomic():
+            # Additions to one contest run one at a time, so the name check sees every team.
+            Contest.objects.select_for_update().filter(id=contest.id).first()
             created = create_teams(contest, request.data["teams"])
         cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
         forget_frozen_board(contest)
         return self.success(created)
+
+    @validate_serializer(ContestTeamKindSerializer)
+    def patch(self, request):
+        """Make a team official or a star team (打星)."""
+        contest = self.load_contest(request, request.data["contest_id"])
+        team = ContestTeam.objects.select_related("user").filter(id=request.data["id"], contest=contest).first()
+        if not team:
+            return self.error("Team does not exist")
+        team.star = request.data["star"]
+        team.save(update_fields=["star"])
+        forget_frozen_board(contest)
+        return self.success(team_data(team))
 
     @validate_serializer(ContestTeamPasswordSerializer)
     def put(self, request):

@@ -248,8 +248,16 @@ class ContestRankAPI(APIView):
                 qs = self.get_rank()
                 cache.set(cache_key, qs)
         # Team accounts show as their team name, with members on hover.
-        teams = {user_id: {"name": name, "members": members} for user_id, name, members in
-                 ContestTeam.objects.filter(contest=self.contest).values_list("user_id", "name", "members")}
+        teams = {user_id: {"name": name, "members": members, "star": star} for user_id, name, members, star in
+                 ContestTeam.objects.filter(contest=self.contest).values_list("user_id", "name", "members", "star")}
+        # Places count official entries only; a star team (打星) has none.
+        board = rows if frozen else qs
+        places, place = {}, 0
+        for item in board:
+            user_id = item["user"]["id"] if frozen else item.user_id
+            if not teams.get(user_id, {}).get("star"):
+                place += 1
+                places[user_id] = place
 
         if download_csv:
             data = rows if frozen else serializer(qs, many=True, is_contest_admin=is_contest_admin).data
@@ -284,7 +292,9 @@ class ContestRankAPI(APIView):
                 for index, item in enumerate(data):
                     worksheet.write_string(index + 1, 0, str(item["user"]["id"]))
                     # A team shows as its name; its real name lists the members.
-                    worksheet.write_string(index + 1, 1, teams.get(item["user"]["id"], {}).get("name") or item["user"]["username"])
+                    team = teams.get(item["user"]["id"], {})
+                    worksheet.write_string(index + 1, 1, (team.get("name") or item["user"]["username"]) +
+                                           ("（打星）" if team.get("star") else ""))
                     worksheet.write_string(index + 1, 2, item["user"]["real_name"] or "")
                     worksheet.write_string(index + 1, 3, str(item["accepted_number"]))
                     worksheet.write_string(index + 1, 4, str(item["submission_number"]))
@@ -307,5 +317,6 @@ class ContestRankAPI(APIView):
             page_qs["results"] = serializer(page_qs["results"], many=True, is_contest_admin=is_contest_admin).data
         for row in page_qs["results"]:
             row["team"] = teams.get(row["user"]["id"])
+            row["place"] = places.get(row["user"]["id"])
         page_qs["frozen"] = frozen
         return self.success(page_qs)

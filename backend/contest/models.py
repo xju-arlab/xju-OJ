@@ -223,6 +223,8 @@ class ContestTeam(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="contest_team")
     name = models.TextField()
     members = JSONField(default=list)
+    # A star team (打星) competes but takes no place on the official ranking.
+    star = models.BooleanField(default=False)
     create_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:

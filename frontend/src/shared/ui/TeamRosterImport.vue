@@ -12,6 +12,7 @@
       <li>每行一支队伍：<code>队伍名,队员1,队员2,队员3</code></li>
       <li>队员不足三人时后面留空，逗号照写：<code>xx队,tom,,</code> 或 <code>xx队,tom,jerry,</code></li>
       <li>队伍名留空时按队员姓氏取名：<code>,赵一,孙二,</code> 记为赵孙队</li>
+      <li>第 5 列可写队伍类型 <code>正式队伍</code> 或 <code>打星队伍</code>，不写即正式：<code>xx队,tom,,,打星队伍</code></li>
       <li>每支队伍生成一个 team-xxxx 账号和 8 位密码</li>
     </ul>
     <ul v-if="errors.length" class="team-roster-errors" role="alert">
@@ -19,11 +20,16 @@
       <li v-if="errors.length > 6">另有 {{ errors.length - 6 }} 处问题</li>
     </ul>
     <div v-else-if="teams.length" class="team-roster-preview">
-      <p>共 {{ teams.length }} 支队伍</p>
+      <p>共 {{ teams.length }} 支队伍<template v-if="starCount">，其中打星 {{ starCount }} 支</template></p>
       <table>
-        <thead><tr><th>#</th><th>队伍名</th><th>队员</th></tr></thead>
+        <thead><tr><th>#</th><th>队伍名</th><th>队员</th><th>类型</th></tr></thead>
         <tbody>
-          <tr v-for="(team, index) in teams" :key="team.line"><td>{{ index + 1 }}</td><td>{{ team.name }}<small v-if="team.derived" class="team-roster-derived">按姓氏</small></td><td>{{ team.members.join('、') || '—' }}</td></tr>
+          <tr v-for="(team, index) in teams" :key="team.line">
+            <td>{{ index + 1 }}</td>
+            <td>{{ team.name }}<small v-if="team.derived" class="team-roster-derived">按姓氏</small></td>
+            <td>{{ team.members.join('、') || '—' }}</td>
+            <td :class="{ 'team-roster-star': team.star }">{{ team.star ? '打星' : '正式' }}</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -43,6 +49,9 @@
     data () {
       return { fileName: '', text: '', cells: null, skipHeader: false, teams: [], errors: [] }
     },
+    computed: {
+      starCount () { return this.teams.filter(team => team.star).length }
+    },
     methods: {
       async pick (event) {
         const file = event.target.files && event.target.files[0]
@@ -58,7 +67,7 @@
       parse () {
         this.teams = parseRoster(this.text, this.skipHeader, this.existingNames)
         this.errors = this.teams.length ? rosterErrors(this.teams, this.existingNames) : ['文件里没有队伍']
-        this.$emit('update:teams', this.errors.length ? [] : this.teams.map(({ name, members }) => ({ name, members })))
+        this.$emit('update:teams', this.errors.length ? [] : this.teams.map(({ name, members, star }) => ({ name, members, star })))
       },
       reset () {
         Object.assign(this, { fileName: '', text: '', cells: null, skipHeader: false, teams: [], errors: [] })
@@ -75,7 +84,7 @@
   .team-roster-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .team-roster-file { min-width: 0; color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
   .team-roster-hint { margin: 0; padding-left: 18px; color: var(--color-text-faint); font-size: 12px; line-height: 1.7; }
-  .team-roster-hint code { padding: 0 4px; border-radius: 3px; background: var(--color-bg-subtle); color: var(--color-text); font-family: var(--font-mono); }
+  .team-roster-hint code { padding: 0 4px; border-radius: 3px; background: var(--color-bg-subtle); color: var(--color-text); font-family: var(--font-mono); white-space: nowrap; }
   .team-roster-errors { margin: 0; padding: 8px 10px 8px 26px; border-radius: var(--radius-sm); background: var(--tag-research-bg); color: var(--oj-danger, #c4554d); font-size: 12px; line-height: 1.6; }
   .team-roster-preview p { margin: 0 0 6px; color: var(--color-text-muted); font-size: 12px; }
   .team-roster-preview { max-height: 220px; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px; }
@@ -83,5 +92,7 @@
   .team-roster-preview th { color: var(--color-text-muted); font-weight: 600; text-align: left; }
   .team-roster-preview th, .team-roster-preview td { padding: 4px 6px; border-bottom: 1px solid var(--color-border); }
   .team-roster-derived { margin-left: 6px; color: var(--color-text-faint); font-size: 11px; }
+  .team-roster-preview td:last-child { width: 44px; color: var(--color-text-faint); }
+  .team-roster-preview td.team-roster-star { color: #b7791f; font-weight: 600; }
   .team-roster-preview td:first-child { width: 32px; color: var(--color-text-faint); font-variant-numeric: tabular-nums; }
 </style>

@@ -12,7 +12,7 @@
     <div v-if="showChart" class="echarts">
       <ECharts :options="options" ref="chart" auto-resize></ECharts>
     </div>
-    <Table ref="tableRank" class="auto-resize" :columns="columns" :data="dataRank" disabled-hover></Table>
+    <Table ref="tableRank" class="auto-resize" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
     <Pagination :total="total"
                 :page-size="limit" @update:page-size="limit = $event"
                 :current="page" @update:current="page = $event"
@@ -44,21 +44,14 @@
             align: 'center',
             width: 60,
             render: (h, params) => {
-              return h('span', {}, params.index + (this.page - 1) * this.limit + 1)
+              return h('span', {}, this.rankPlace(params))
             }
           },
           {
             title: this.$t('m.User_User'),
             align: 'center',
             render: (h, params) => {
-              // A team account shows its team name, with the members on hover.
-              const team = params.row.team
-              if (team) {
-                return h('span', {
-                  class: 'rank-team',
-                  title: team.members.length ? '队员：' + team.members.join('、') : team.name
-                }, team.name)
-              }
+              if (params.row.team) return this.renderTeamName(h, params.row.team)
               return h('a', {
                 style: {
                   display: 'inline-block',
@@ -231,6 +224,9 @@
 </script>
 <style scoped lang="less">
   :deep(.rank-team) { color: var(--color-text); font-weight: 600; cursor: default; }
+  :deep(.rank-star-tag) { display: inline-block; margin-right: 4px; padding: 0 4px; border-radius: 3px; background: #f4ead6; color: #94661a; font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: 1px; }
+  :deep(.el-table__body tr.rank-star-row > td.el-table__cell) { background-color: #fcf9f2; }
+  :deep(.rank-star-row .rank-team) { color: var(--color-text-muted); }
   .echarts {
     height: 320px;
     width: 100%;

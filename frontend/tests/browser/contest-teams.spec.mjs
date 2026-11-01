@@ -59,12 +59,16 @@ test.beforeEach(async ({ page }) => {
     }
     if (path === '/api/languages') data = { languages: [{ name: 'C++', description: 'G++', content_type: 'text/x-c++src', config: { template: '' } }], spj_languages: [] }
     if (path === '/api/contest_rank') data = state.admin ? { ...rank, frozen: false } : rank
+    if (path === '/api/contest_rank' && state.star) {
+      data = { ...rank, frozen: false, results: rank.results.map((row, index) => index ? { ...row, team: { ...row.team, star: true }, place: null } : { ...row, place: 1 }) }
+    }
     if (path.startsWith('/api/contest/prep/problem')) data = [{ id: 9, _id: 'A', title: 'A+B', visible: true }]
     if (path === '/api/contest/prep/plan') data = { items: [], progress: [] }
     if (path === '/api/contest/prep/publish') data = { id: 40, title: body.title, teams: body.teams.map((item, index) => ({ ...item, id: index + 1, username: `team-aaa${index}`, password: 'Pass2345' })) }
     if (path === '/api/contest/announcement') data = []
     if (path === '/api/admin/contest' && req.method() === 'GET') data = { id: 40, title: '新生赛正式', description: '<p>说明</p>', visible: true, password: null, allowed_ip_ranges: [], rule_type: 'ACM' }
-    if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1 }, { id: 2 }]
+    if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1, name: 'Team Alpha' }, { id: 2, name: 'Team Beta' }]
+    if (path === '/api/admin/contest/teams' && req.method() === 'POST') data = body.teams.map((item, index) => ({ ...item, id: index + 3, username: `team-new${index}`, password: 'Pass6789' }))
     if (path === '/api/admin/contest/teams/sheet') return route.fulfill({ body: '%PDF-1.7', contentType: 'application/pdf' })
     await route.fulfill({ json: { error, data } })
   })
@@ -81,6 +85,7 @@ test('the team link signs in with a password and stays inside the contest withou
   await expect(page).toHaveURL(/\/arena\/22\/$/)
   await expect(page.locator('#header')).toHaveCount(0)
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('Team Alpha')
+  await expect(page.locator('.contest-team-add')).toHaveCount(0)
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('A1、A2')
   // Moving inside the contest keeps the link's URLs; anywhere else leads back.
   await page.locator('.contest-tabs').getByText(/题目|Problems/).first().click()
@@ -115,16 +120,16 @@ test('publishing for team accounts takes a roster instead of a password and hand
   await dialog.locator('.el-switch').first().click()
   await expect(dialog.getByText('密码', { exact: true })).toHaveCount(0)
   await dialog.locator('input[type=file]').setInputFiles({
-    name: 'teams.csv', mimeType: 'text/csv', buffer: Buffer.from('队伍名,队员1,队员2,队员3\nTeam Alpha,A1,A2,\nTeam Beta,B1,,,\n,赵一,孙二,\n')
+    name: 'teams.csv', mimeType: 'text/csv', buffer: Buffer.from('队伍名,队员1,队员2,队员3,队伍类型\nTeam Alpha,A1,A2,\nTeam Beta,B1,,,打星队伍\n,赵一,孙二,\n')
   })
-  await expect(dialog.locator('.team-roster-preview')).toContainText('共 3 支队伍')
+  await expect(dialog.locator('.team-roster-preview')).toContainText('共 3 支队伍，其中打星 1 支')
   await expect(dialog.locator('.team-roster-preview')).toContainText('赵孙队')
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '发布比赛' }).click()
   expect((await download).suggestedFilename()).toBe('contest-40-teams.csv')
   const publish = state.writes.find(item => item.path === '/api/contest/prep/publish')
-  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'] }, { name: 'Team Beta', members: ['B1'] },
-    { name: '赵孙队', members: ['赵一', '孙二'] }])
+  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'], star: false },
+    { name: 'Team Beta', members: ['B1'], star: true }, { name: '赵孙队', members: ['赵一', '孙二'], star: false }])
   expect(publish.body.password).toBe('')
   // Ranks are live and an ACM board freezes for the last hour.
   expect(publish.body.real_time_rank).toBe(true)
@@ -135,7 +140,7 @@ test('publishing for team accounts takes a roster instead of a password and hand
   await page.locator('.el-dialog').filter({ hasText: '比赛链接' }).getByRole('button', { name: '导出 PDF' }).click()
   expect((await sheet).suggestedFilename()).toBe('contest-40-teams.pdf')
   const sheetRequest = state.writes.find(item => item.path === '/api/admin/contest/teams/sheet')
-  expect(sheetRequest.body.teams[2]).toEqual({ name: '赵孙队', members: ['赵一', '孙二'], username: 'team-aaa2', password: 'Pass2345' })
+  expect(sheetRequest.body.teams[2]).toEqual({ name: '赵孙队', members: ['赵一', '孙二'], username: 'team-aaa2', password: 'Pass2345', star: false })
 })
 
 test('after the contest the link is read only while the normal site keeps practice', async ({ page }) => {
@@ -205,4 +210,42 @@ test('contest admins open the link and stay on /arena/', async ({ page }) => {
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('管理员甲')
   await page.locator('.contest-tabs').getByText(/排名|Rankings/).first().click()
   await expect(page).toHaveURL(/\/arena\/22\/rank$/)
+})
+
+test('star teams take no place on the board and contest admins add teams from the header', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.star = true
+  await page.goto('/contest/22/rank')
+  const starRow = page.locator('tr.rank-star-row')
+  await expect(starRow).toHaveCount(1)
+  await expect(starRow.locator('.rank-team')).toHaveText('打星Team Beta')
+  await expect(starRow.locator('td').first()).toHaveText('*')
+  await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
+
+  // One team by hand: names already in the contest are refused.
+  await page.locator('.contest-team-add').click()
+  const dialog = page.locator('.el-dialog').filter({ hasText: '添加队伍' })
+  await dialog.getByPlaceholder('留空则按队员姓氏取名').fill('Team Alpha')
+  await expect(dialog).toContainText('本场比赛已有同名队伍')
+  await expect(dialog.getByRole('button', { name: /生成/ })).toBeDisabled()
+  await dialog.getByPlaceholder('留空则按队员姓氏取名').fill('Team Gamma')
+  await dialog.getByPlaceholder('队员 1').fill('G1')
+  await dialog.getByText('打星队伍').click()
+  const download = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '生成 1 个账号' }).click()
+  expect((await download).suggestedFilename()).toBe('contest-22-teams-added.csv')
+  const created = state.writes.find(item => item.path === '/api/admin/contest/teams')
+  expect(created.body).toEqual({ contest_id: '22', teams: [{ name: 'Team Gamma', members: ['G1'], star: true }] })
+  await expect(dialog).toContainText('Pass6789')
+  await dialog.getByRole('button', { name: '完成' }).click()
+
+  // A roster file is checked against the contest's teams and its type column.
+  await page.locator('.contest-team-add').click()
+  await dialog.getByText('批量导入').click()
+  await dialog.locator('input[type=file]').setInputFiles({
+    name: 'more.csv', mimeType: 'text/csv', buffer: Buffer.from('Team Beta,B1,,\nTeam Delta,D1,,,正式队伍\nTeam Echo,E1,,,外卡\n')
+  })
+  await expect(dialog.locator('.team-roster-errors')).toContainText('第 1 行队伍「Team Beta」已在本场比赛中')
+  await expect(dialog.locator('.team-roster-errors')).toContainText('第 3 行队伍类型「外卡」应为正式队伍或打星队伍')
+  await expect(dialog.getByRole('button', { name: /生成/ })).toBeDisabled()
 })

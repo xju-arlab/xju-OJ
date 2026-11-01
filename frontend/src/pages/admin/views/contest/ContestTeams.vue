@@ -14,6 +14,7 @@
         <h3>本次生成（密码只在这里给出一次，已自动下载 CSV，可再导出 A4 账号条 PDF）</h3>
         <el-table :data="created" size="small">
           <el-table-column prop="name" label="队伍名" />
+          <el-table-column label="类型" width="70"><template #default="{ row }">{{ row.star ? '打星' : '正式' }}</template></el-table-column>
           <el-table-column label="队员"><template #default="{ row }">{{ row.members.join('、') || '—' }}</template></el-table-column>
           <el-table-column prop="username" label="用户名" width="140" />
           <el-table-column prop="password" label="密码" width="120"><template #default="{ row }"><code>{{ row.password }}</code></template></el-table-column>
@@ -28,6 +29,9 @@
         <h3>已有队伍（{{ teams.length }}）</h3>
         <el-table v-loading="loading" :data="teams" size="small">
           <el-table-column prop="name" label="队伍名" />
+          <el-table-column label="打星" width="80">
+            <template #default="{ row }"><el-switch :model-value="row.star" :loading="row.id === starSaving" :aria-label="`${row.name} 打星`" @change="setStar(row, $event)" /></template>
+          </el-table-column>
           <el-table-column label="队员"><template #default="{ row }">{{ row.members.join('、') || '—' }}</template></el-table-column>
           <el-table-column prop="username" label="用户名" width="140" />
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ $filters.localtime(row.create_time) }}</template></el-table-column>
@@ -51,7 +55,7 @@
     name: 'ContestTeams',
     components: { TeamRosterImport },
     data () {
-      return { contest: {}, teams: [], roster: [], created: [], loading: false, generating: false, sheetLoading: false }
+      return { contest: {}, teams: [], roster: [], created: [], loading: false, generating: false, sheetLoading: false, starSaving: null }
     },
     computed: {
       contestId () { return this.$route.params.contestId },
@@ -83,6 +87,11 @@
           this.$refs.roster.reset()
           this.load()
         }, () => {}).finally(() => { this.generating = false })
+      },
+      setStar (team, star) {
+        this.starSaving = team.id
+        api.setContestTeamStar(this.contestId, team.id, star).then(res => { team.star = res.data.data.star }, () => {})
+          .finally(() => { this.starSaving = null })
       },
       resetPassword (team) {
         this.$confirm(`为「${team.name}」生成新密码？旧密码立即失效。`, '重置密码', { confirmButtonText: '重置', cancelButtonText: '取消', type: 'warning' }).then(() => {

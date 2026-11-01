@@ -53,17 +53,19 @@ def team_real_name(name, members):
 
 
 def team_data(team):
-    return {"id": team.id, "name": team.name, "members": team.members, "username": team.user.username,
-            "user_id": team.user_id, "create_time": datetime2str(team.create_time)}
+    return {"id": team.id, "name": team.name, "members": team.members, "star": team.star,
+            "username": team.user.username, "user_id": team.user_id, "create_time": datetime2str(team.create_time)}
 
 
 def create_teams(contest, roster):
     """Create and register one account per roster row; returns them with their plaintext passwords.
 
-    Call inside a transaction. Plaintext passwords exist only in this result.
+    Call inside a transaction, holding the contest row so team names stay unique.
+    Plaintext passwords exist only in this result.
     """
     roster = [{"name": item["name"].strip(),
-               "members": [member.strip() for member in item["members"] if member.strip()]}
+               "members": [member.strip() for member in item["members"] if member.strip()],
+               "star": bool(item.get("star"))}
               for item in roster]
     names = [item["name"] for item in roster]
     if not all(names):

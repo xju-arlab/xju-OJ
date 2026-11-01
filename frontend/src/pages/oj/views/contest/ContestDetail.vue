@@ -8,6 +8,9 @@
           <router-link v-else :to="{ name: 'contest-list' }">{{$t('m.Contests')}}</router-link>
           <span aria-hidden="true">/</span>
           <span>{{contestID}}</span>
+          <button v-if="canAddTeams" type="button" class="contest-team-add" title="添加队伍" aria-label="添加队伍" @click="teamAddVisible = true">
+            <Icon type="plus" />
+          </button>
           <!-- Without the navbar, the signed-in account shows here. -->
           <span v-if="myTeam" class="contest-team">
             <Icon type="users" /><strong>{{ myTeam.name }}</strong>
@@ -243,6 +246,8 @@
       </template>
     </LegacyDialog>
 
+    <ContestTeamAddDialog v-if="canAddTeams" v-model:visible="teamAddVisible" :contest-id="contestID" />
+
     <LegacyDialog v-if="canManagePrep" title="已发布" width="520px"
                   :visible="Boolean(publishResult)" @update:visible="publishResult = $event ? publishResult : null">
       <template v-if="publishResult">
@@ -316,6 +321,7 @@
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
   import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
   import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
+  import ContestTeamAddDialog from './ContestTeamAddDialog.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
   const PREP_CHANNEL = 'xju-oj-prep'
@@ -325,7 +331,7 @@
 
   export default {
     name: 'ContestDetail',
-    components: { ContestAnnouncementBanner, PrepStatementExportDialog, TeamRosterImport },
+    components: { ContestAnnouncementBanner, ContestTeamAddDialog, PrepStatementExportDialog, TeamRosterImport },
     data () {
       return {
         routeName: '',
@@ -346,6 +352,7 @@
         publishForm: {},
         // The team-account publish: its link and the one-time passwords.
         publishResult: null,
+        teamAddVisible: false,
         // The published copy, shown instead of the publish form once there is one.
         publishedVisible: false,
         publishedInfo: null,
@@ -767,6 +774,10 @@
         if (!this.$route.path.startsWith('/arena/') || !profile.user) return null
         return { username: profile.user.username, realName: profile.real_name }
       },
+      canAddTeams () {
+        // Contest admins add teams to a team contest only; one would turn an open contest into a team contest.
+        return this.isContestAdmin && Boolean(this.contest.team_contest) && !this.isPrepContest && String(this.contest.id) === String(this.contestID)
+      },
       myTeam () {
         const team = this.$store.state.user.profile.team
         return team && String(team.contest_id) === String(this.contestID) ? team : null
@@ -1128,6 +1139,9 @@
 .prep-publish-teams :deep(.el-form-item__content) { display: block; }
 .prep-publish-note { margin: -6px 0 14px; color: var(--color-text-muted); font-size: 12px; }
 .contest-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--color-text); font-size: 13px; cursor: default; }
+.contest-team-add { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; margin-left: auto; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; }
+.contest-team-add:hover, .contest-team-add:focus-visible { border-color: var(--line-strong); color: var(--color-text); }
+.contest-team-add + .contest-team { margin-left: 6px; }
 .contest-team strong { font-weight: 650; }
 .contest-team-members { color: var(--color-text-muted); }
 .contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }

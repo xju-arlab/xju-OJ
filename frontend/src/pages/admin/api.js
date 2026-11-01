@@ -204,6 +204,11 @@ export default {
       data: { contest_id: contestID, id }
     })
   },
+  setContestTeamStar (contestID, id, star) {
+    return ajax('admin/contest/teams', 'patch', {
+      data: { contest_id: contestID, id, star }
+    })
+  },
   deleteContestTeam (contestID, id) {
     return ajax('admin/contest/teams', 'delete', {
       params: { contest_id: contestID, id }

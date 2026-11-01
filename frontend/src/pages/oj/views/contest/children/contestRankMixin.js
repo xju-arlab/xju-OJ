@@ -19,6 +19,21 @@ export default {
     }
   },
   methods: {
+    // The official place; a star team (打星) takes none and shows *.
+    rankPlace (params) {
+      if (params.row.place !== undefined) return params.row.place ?? '*'
+      return params.index + (this.page - 1) * this.limit + 1
+    },
+    rankRowClass ({ row }) {
+      return row.team && row.team.star ? 'rank-star-row' : ''
+    },
+    // A team account shows its team name, with the members on hover.
+    renderTeamName (h, team) {
+      const members = team.members.length ? '队员：' + team.members.join('、') : team.name
+      return h('span', { class: 'rank-team', title: (team.star ? '打星队伍 · ' : '') + members }, [
+        team.star ? h('small', { class: 'rank-star-tag' }, '打星') : null, team.name
+      ])
+    },
     getContestRankData (page = 1, refresh = false) {
       this.page = Number(page) || 1
       let offset = (page - 1) * this.limit
