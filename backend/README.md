@@ -7,7 +7,6 @@
 - PostgreSQL 保存业务数据；Redis DB 1 继续承载 Session/cache/waiting queue，DB 4 继续承载 Dramatiq broker/result。
 - `OJ_DATA_DIR`/`RUNTIME_ROOT` 控制运行时目录；`data/test_case/<test_case_id>` 与 `Problem.test_case_id` 保持绑定，测试数据只供后端/判题服务使用。
 - API、Worker、一次性 bootstrap/migrate/admin 命令由 `deploy/entrypoint.sh` 显式启动；frontend 负责静态资源、`/api` 和 `/public` 网关。
-- `deploy/nginx/` 与 `deploy/supervisord.conf` 仅保留为迁移/回滚参考，不进入 backend 镜像运行路径。
 
 ## 原始模块说明
 
@@ -21,8 +20,6 @@
 [![Build Status](https://travis-ci.org/QingdaoU/OnlineJudge.svg?branch=master)](https://travis-ci.org/QingdaoU/OnlineJudge)
 
 > #### An onlinejudge system based on Python and Vue. [Demo](https://qduoj.com)
-
-[中文文档](README-CN.md)
 
 ## Overview
 

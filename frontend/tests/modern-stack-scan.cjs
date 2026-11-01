@@ -104,7 +104,7 @@ const oidcRegistrationFlowUrl = 'https://auth.icthub.top/if/flow/icthub-xju-oj-r
 const oidcRegistrationContracts = {
   runtime: fs.readFileSync(path.join(root, 'src/utils/runtime.js'), 'utf8'),
   settings: fs.readFileSync(path.join(root, '..', 'backend/oj/settings.py'), 'utf8'),
-  configurator: fs.readFileSync(path.join(root, '..', 'ops/configure-authentik-oidc.py'), 'utf8'),
+  configurator: fs.readFileSync(path.join(root, '..', 'deploy/ops/configure-authentik-oidc.py'), 'utf8'),
   envExample: fs.readFileSync(path.join(root, '..', '.env.example'), 'utf8'),
   deploy
 }

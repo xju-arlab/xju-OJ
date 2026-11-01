@@ -32,5 +32,3 @@ logs/
 .env.*
 config.yaml
 application-prod.yml
-deploy/nginx/
-deploy/supervisord.conf
