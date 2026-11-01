@@ -12,9 +12,9 @@
       <label class="rank-setting"><span>{{$t('m.Chart')}}</span><i-switch v-model="showChart"></i-switch></label>
       <label class="rank-setting"><span>{{$t('m.Auto_Refresh')}} (10s)</span><i-switch v-model="autoRefresh" :disabled="refreshDisabled" @on-change="handleAutoRefresh"></i-switch></label>
       <span v-if="campusBoard" class="rank-campus-setting">
-        <label class="rank-setting"><span>校区区分</span><i-switch v-model="showCampus"></i-switch></label>
+        <label class="rank-setting"><span>{{$t('m.Campus')}}</span><i-switch v-model="showCampus"></i-switch></label>
         <span v-if="showCampus" class="rank-campus-legend" aria-label="校区颜色">
-          <span v-for="(label, code) in CAMPUSES" :key="code" :class="`is-${code}`">{{ label }}</span>
+          <span v-for="code in Object.keys(CAMPUSES)" :key="code" :class="`is-${code}`">{{ $t(`m.Campus_${code}`) }}</span>
         </span>
       </span>
       <template v-if="isContestAdmin">
@@ -22,7 +22,7 @@
         <label class="rank-setting"><span>{{$t('m.Force_Update')}}</span><i-switch v-model="forceUpdate" :disabled="refreshDisabled"></i-switch></label>
       </template>
       <span v-if="awardRanges.length" class="rank-award-legend" aria-label="晋级与奖牌">
-        <span v-for="range in awardRanges" :key="range.key" :class="`is-${range.key}`">{{ range.label }} {{ range.count }}</span>
+        <span v-for="range in awardRanges" :key="range.key" :class="`is-${range.key}`">{{ $t(`m.Award_${range.key}`) }} {{ range.count }}</span>
       </span>
       <button v-if="isContestAdmin" type="button" class="rank-download rank-award-button" @click="awardsVisible = true">晋级 / 奖牌</button>
       <button type="button" class="rank-download" @click="downloadRankCSV">
@@ -105,6 +105,7 @@
           {
             className: 'rank-hover-cell',
             title: this.$t('m.Rank_Solved_Problems'),
+            titleKey: 'm.Rank_Solved_Problems',
             align: 'center',
             width: 88,
             render: (h, params) => {
@@ -115,6 +116,7 @@
           {
             className: 'rank-hover-cell',
             title: this.$t('m.Penalty'),
+            titleKey: 'm.Penalty',
             align: 'center',
             width: 72,
             render: (h, params) => {

@@ -125,7 +125,7 @@ test('the board shows team names, members on hover and pending cells while froze
   await expect(page.locator('td.first-ac')).toHaveCSS('background-color', 'rgb(21, 127, 102)')
   await expect(page.locator('.rank-freeze-banner')).toContainText('封榜')
   // No team on this board has a campus, so there is nothing to tell apart.
-  await expect(page.locator('label.rank-setting').filter({ hasText: '校区区分' })).toHaveCount(0)
+  await expect(page.locator('label.rank-setting').filter({ hasText: '校区' })).toHaveCount(0)
   // Penalty in minutes; a team opens only its own cells.
   await expect(page.locator('.el-table th').nth(3)).toHaveText('罚时')
   await expect(page.locator('.rank-penalty').first()).toHaveText('50')
@@ -368,6 +368,17 @@ test('the live board shows how far each team moved since the freeze', async ({ p
   }
 })
 
+test('visitors without an account language read a team contest in Chinese, others keep theirs', async ({ page }) => {
+  state.ended = true
+  await page.goto('/contest/22/rank')
+  await expect(page.locator('.el-table th').nth(3)).toHaveText('罚时')
+  await expect(page.locator('.el-table th').nth(1)).toHaveText('队伍')
+  state.profile = { language: 'en-US', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  await page.reload()
+  await expect(page.locator('.el-table th').nth(3)).toHaveText('Penalty')
+  await expect(page.locator('.el-table th').nth(1)).toHaveText('Team')
+})
+
 test('opening the frozen board asks for confirmation first', async ({ page }) => {
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
   state.ended = true
@@ -390,7 +401,7 @@ test('the board tells campuses apart up to the penalty column when asked', async
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
   state.campus = true
   await page.goto('/contest/22/rank')
-  const toggle = page.locator('label.rank-setting').filter({ hasText: '校区区分' })
+  const toggle = page.locator('label.rank-setting').filter({ hasText: '校区' })
   await expect(toggle).toHaveCount(1)
   await expect(page.locator('.rank-campus-legend')).toHaveCount(0)
   await toggle.locator('.el-switch').first().click()

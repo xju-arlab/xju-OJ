@@ -1,5 +1,6 @@
 import moment from 'moment'
 import api from '@oj/api'
+import i18n from '@/i18n'
 import { mapGetters, mapState } from '@/store/compat'
 import { types } from '@/store'
 import { CONTEST_STATUS } from '@/utils/constants'
@@ -60,7 +61,7 @@ export default {
       const tier = placeTier(place, this.awardRanges)
       const badge = h('span', {
         class: ['rank-place', tier ? `is-${tier.key}` : (Number.isInteger(place) ? '' : 'is-unranked')],
-        title: tier ? tier.label : undefined
+        title: tier ? this.$t(`m.Award_${tier.key}`) : undefined
       }, place)
       const before = params.row.frozen_place
       const moved = Number.isInteger(place) && Number.isInteger(before) ? before - place : 0
@@ -158,6 +159,7 @@ export default {
           // Shares the row's background with the other info columns.
           className: 'rank-hover-cell',
           title: this.$t('m.RealName'),
+          titleKey: 'm.RealName',
           align: 'center',
           // Wide enough for three three-character names on one line; longer ones end in an ellipsis.
           width: 172,
@@ -178,6 +180,13 @@ export default {
     showCampus (value) {
       updateRankPreferences({ campus: value === true })
     },
+    // Column titles are plain strings; the language can change after the board
+    // is built, say once the profile arrives or a team contest turns it Chinese.
+    uiLocale () {
+      for (const column of this.columns) {
+        if (column.titleKey) column.title = this.$t(column.titleKey)
+      }
+    },
     // A team-account contest ranks teams, not users.
     nameColumnTitle: {
       immediate: true,
@@ -190,10 +199,13 @@ export default {
   computed: {
     ...mapGetters(['isContestAdmin', 'contestRuleType']),
     nameColumnTitle () {
-      return this.contest.team_contest ? '队伍' : this.$t('m.User_User')
+      return this.contest.team_contest ? this.$t('m.Team') : this.$t('m.User_User')
     },
     awardRanges () {
       return awardRanges(this.contest.rank_awards, this.officialCount)
+    },
+    uiLocale () {
+      return i18n.global.locale.value
     },
     ...mapState({
       'contest': state => state.contest.contest,

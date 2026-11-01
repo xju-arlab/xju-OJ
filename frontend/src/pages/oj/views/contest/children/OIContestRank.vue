@@ -5,7 +5,7 @@
       <label class="rank-setting"><span>{{$t('m.Auto_Refresh')}} (10s)</span><i-switch v-model="autoRefresh" :disabled="refreshDisabled" @on-change="handleAutoRefresh"></i-switch></label>
       <label v-if="isContestAdmin" class="rank-setting"><span>{{$t('m.RealName')}}</span><i-switch v-model="showRealName"></i-switch></label>
       <span v-if="awardRanges.length" class="rank-award-legend" aria-label="晋级与奖牌">
-        <span v-for="range in awardRanges" :key="range.key" :class="`is-${range.key}`">{{ range.label }} {{ range.count }}</span>
+        <span v-for="range in awardRanges" :key="range.key" :class="`is-${range.key}`">{{ $t(`m.Award_${range.key}`) }} {{ range.count }}</span>
       </span>
       <button v-if="isContestAdmin" type="button" class="rank-download rank-award-button" @click="awardsVisible = true">晋级 / 奖牌</button>
       <button type="button" class="rank-download" @click="downloadRankCSV">
@@ -79,6 +79,7 @@
           },
           {
             title: this.$t('m.Total_Score'),
+            titleKey: 'm.Total_Score',
             align: 'center',
             render: (h, params) => {
               return h('a', {

@@ -323,6 +323,7 @@
   import { mapState, mapGetters, mapActions } from '@/store/compat'
   import { types } from '@/store'
   import api from '@oj/api'
+  import i18n from '@/i18n'
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS, USER_TYPE } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
@@ -401,6 +402,7 @@
           this.changeDomTitle({ title: data.title })
           this.syncClock()
           if (this.$route.path.startsWith('/arena/') && data.team_contest && data.status !== CONTEST_STATUS.ENDED) this.guardArena(data)
+          if (data.team_contest) this.preferChinese()
           if (data.prep_state) {
             this.enterPrepWorkspace()
             this.loadMyPlan()
@@ -411,6 +413,13 @@
         }).catch(() => {
           // A missing or private contest: the API client already shows the error.
         })
+      },
+      // A team contest is held in Chinese: visitors without an account language,
+      // such as anyone reading the opened board through its link, follow it, as
+      // its team accounts do.
+      async preferChinese () {
+        try { await this.$store.dispatch('getProfile') } catch (_) {}
+        if (!this.$store.state.user.profile.language) i18n.global.locale.value = 'zh-CN'
       },
       async guardArena (data) {
         // A team contest's link, before and during the contest, takes its team
