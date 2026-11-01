@@ -15,8 +15,10 @@ const source = fs.readFileSync(new URL('../src/store/index.js', import.meta.url)
   .replace('export const setStoreRouter', 'const setStoreRouter')
   .replace('export default facade', 'globalThis.store = facade')
   .replace('export { types }', 'globalThis.setStoreRouter = setStoreRouter')
+// The contest opened through its /arena link, if any; tests set it below.
+let arena = null
 const context = vm.createContext({
-  ...constants, types, createPinia, defineStore, moment,
+  ...constants, types, createPinia, defineStore, moment, arenaContest: () => arena,
   api: {}, runtime: {}, storage: { set () {} },
   i18n: { global: { locale: { value: 'en-US' } } },
   MOCK_CONTESTS: [], MOCK_PROBLEMS: [], cloneFixtures: value => value
@@ -37,6 +39,16 @@ assert.equal(store.getters.problemSubmitDisabled, true, 'practice still requires
 store.commit(types.CHANGE_PROFILE, { profile: { user: { id: 42, admin_type: USER_TYPE.REGULAR_USER } } })
 assert.equal(store.getters.contestStatus, CONTEST_STATUS.ENDED)
 assert.equal(store.getters.problemSubmitDisabled, false, 'ended public contests allow practice without registration')
+// Through the contest's team link, or as one of its team accounts, an ended contest is read only.
+// The flag lives in sessionStorage, so a route change is what refreshes the getter.
+arena = '2'
+router.currentRoute.value = { params: { contestID: '2' }, meta: {} }
+assert.equal(store.getters.problemSubmitDisabled, true, 'the arena link is read only after the end')
+arena = null
+router.currentRoute.value = { params: { contestID: '2' }, meta: {} }
+store.commit(types.CHANGE_PROFILE, { profile: { team: { contest_id: 2 }, user: { id: 50, admin_type: USER_TYPE.REGULAR_USER } } })
+assert.equal(store.getters.problemSubmitDisabled, true, 'team accounts cannot practise after the end')
+store.commit(types.CHANGE_PROFILE, { profile: { user: { id: 42, admin_type: USER_TYPE.REGULAR_USER } } })
 
 store.commit(types.NOW, { now: moment(contest.start_time).subtract(1, 'second') })
 assert.equal(store.getters.problemSubmitDisabled, true, 'regular users cannot submit before the start')

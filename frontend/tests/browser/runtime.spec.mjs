@@ -8,12 +8,12 @@ test.beforeEach(async ({ page }) => {
 test('CodeMirror preserves typed source through undo and redo', async ({ page }) => {
   const code = page.locator('.cm-content')
   await code.click()
-  await page.keyboard.press('Control+End')
+  await page.keyboard.press('ControlOrMeta+End')
   await page.keyboard.insertText('\n// draft preserved')
   await expect(code).toContainText('// draft preserved')
-  await page.keyboard.press('Control+z')
+  await page.keyboard.press('ControlOrMeta+z')
   await expect(code).not.toContainText('// draft preserved')
-  await page.keyboard.press('Control+Shift+z')
+  await page.keyboard.press('ControlOrMeta+Shift+z')
   await expect(code).toContainText('// draft preserved')
 })
 

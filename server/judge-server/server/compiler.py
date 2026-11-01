@@ -24,11 +24,12 @@ class Compiler(object):
         max_cpu_time = compile_config["max_cpu_time"]
         max_real_time = compile_config["max_real_time"]
         # A cold Go 1.26 build compiles standard-library cache entries in the
-        # ephemeral /tmp lane and legitimately exceeds legacy Go 1.22 limits.
-        # Normalize execution limits without rewriting customized DB metadata.
+        # ephemeral /tmp lane and legitimately exceeds legacy Go 1.22 limits;
+        # on a shared CI runner it can pass 15 s of CPU. Normalize execution
+        # limits without rewriting customized DB metadata.
         if os.path.basename(_command[0]) == "go":
-            max_cpu_time = max(max_cpu_time, 15000)
-            max_real_time = max(max_real_time, 30000)
+            max_cpu_time = max(max_cpu_time, 30000)
+            max_real_time = max(max_real_time, 60000)
 
         result = _judger.run(max_cpu_time=max_cpu_time,
                              max_real_time=max_real_time,
