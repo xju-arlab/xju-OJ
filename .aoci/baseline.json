@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T05:24:13Z",
+  "updated_at": "2026-11-01T05:42:32Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "52e0184690c11186b625870626b306c2523b91e61fa4eee9ed6391a87f605d91",
-      "size": 235118,
-      "normalized_sha256": "52e0184690c11186b625870626b306c2523b91e61fa4eee9ed6391a87f605d91"
+      "sha256": "e9557806f5b1506210a433445aecaf3ef863ad4823eefc587466ad19d370fdd8",
+      "size": 236064,
+      "normalized_sha256": "e9557806f5b1506210a433445aecaf3ef863ad4823eefc587466ad19d370fdd8"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3102,9 +3102,9 @@
     },
     "frontend/src/pages/oj/App.vue": {
       "role": "index",
-      "sha256": "f8154bbdfe15f803bfdafa455bb868402ce980f34e606e567ca5525de22ba050",
-      "size": 4437,
-      "normalized_sha256": "f8154bbdfe15f803bfdafa455bb868402ce980f34e606e567ca5525de22ba050"
+      "sha256": "978e3c2ed7c0a2be20423fcddcfc8b95aba358fdd956ec9837337da39e7332a6",
+      "size": 4456,
+      "normalized_sha256": "978e3c2ed7c0a2be20423fcddcfc8b95aba358fdd956ec9837337da39e7332a6"
     },
     "frontend/src/pages/oj/api.js": {
       "role": "index",
@@ -3252,9 +3252,9 @@
     },
     "frontend/src/pages/oj/router/routes.js": {
       "role": "index",
-      "sha256": "f8099153d4b2ae35dec854d74f4a4e4a3a49d3e5ac42c111ebd96025eb359e48",
-      "size": 6383,
-      "normalized_sha256": "f8099153d4b2ae35dec854d74f4a4e4a3a49d3e5ac42c111ebd96025eb359e48"
+      "sha256": "edbe7c245afd6a25711975246789c9a977727fd9d4286c639cea43ddc90ab099",
+      "size": 6617,
+      "normalized_sha256": "edbe7c245afd6a25711975246789c9a977727fd9d4286c639cea43ddc90ab099"
     },
     "frontend/src/pages/oj/submissionStatus.js": {
       "role": "index",
@@ -3342,15 +3342,15 @@
     },
     "frontend/src/pages/oj/views/contest/ContestArena.vue": {
       "role": "index",
-      "sha256": "47414c9b936c03b1ded6eb3ff0417a1d20b53d9f71803b271e582961a498dce0",
-      "size": 4714,
-      "normalized_sha256": "47414c9b936c03b1ded6eb3ff0417a1d20b53d9f71803b271e582961a498dce0"
+      "sha256": "1c3d8d459e5ff049d10d52f701ea30346a31178c01c8843ee50c949322e42533",
+      "size": 4943,
+      "normalized_sha256": "1c3d8d459e5ff049d10d52f701ea30346a31178c01c8843ee50c949322e42533"
     },
     "frontend/src/pages/oj/views/contest/ContestDetail.vue": {
       "role": "index",
-      "sha256": "0944fd86dbd02323b037283b3e8301da74602bdd3cb9c9e2247b55a8563078a9",
-      "size": 56423,
-      "normalized_sha256": "0944fd86dbd02323b037283b3e8301da74602bdd3cb9c9e2247b55a8563078a9"
+      "sha256": "39284d3650551bed6234a173e6999c1e50f5cf6f69f314366cb229ca938cce10",
+      "size": 56696,
+      "normalized_sha256": "39284d3650551bed6234a173e6999c1e50f5cf6f69f314366cb229ca938cce10"
     },
     "frontend/src/pages/oj/views/contest/ContestList.vue": {
       "role": "index",
@@ -3363,6 +3363,12 @@
       "sha256": "ad498576183d68836670a9fe46d556de76246cc2e094150e6efd60ec87b614f1",
       "size": 6409,
       "normalized_sha256": "ad498576183d68836670a9fe46d556de76246cc2e094150e6efd60ec87b614f1"
+    },
+    "frontend/src/pages/oj/views/contest/ContestWaiting.vue": {
+      "role": "index",
+      "sha256": "06060fc852eac1e7e9c45b11daacb4c4031a02a3e64be2c7c3943c259f2161e0",
+      "size": 17320,
+      "normalized_sha256": "06060fc852eac1e7e9c45b11daacb4c4031a02a3e64be2c7c3943c259f2161e0"
     },
     "frontend/src/pages/oj/views/contest/PrepContestCreateDialog.vue": {
       "role": "index",
@@ -3480,9 +3486,9 @@
     },
     "frontend/src/pages/oj/views/contest/index.js": {
       "role": "index",
-      "sha256": "21ad4ab0c18ae2cb7e0a03febcdad7a770ee02b6c27877e87597b9ba1114eaee",
-      "size": 1226,
-      "normalized_sha256": "21ad4ab0c18ae2cb7e0a03febcdad7a770ee02b6c27877e87597b9ba1114eaee"
+      "sha256": "5cb2a8e8ccce35afffa87e295239fe798bcd38cf6f55b9c3f97bc8c37e654d7d",
+      "size": 1302,
+      "normalized_sha256": "5cb2a8e8ccce35afffa87e295239fe798bcd38cf6f55b9c3f97bc8c37e654d7d"
     },
     "frontend/src/pages/oj/views/contest/prepInvite.js": {
       "role": "index",
@@ -3918,9 +3924,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "253445b98eb87a21daa98db56d2e970abb2c8a9e1a49531c36ed11480db7a9c3",
-      "size": 19165,
-      "normalized_sha256": "253445b98eb87a21daa98db56d2e970abb2c8a9e1a49531c36ed11480db7a9c3"
+      "sha256": "7c93cc8e6279eff8c40c59982e067d65a9cd7ad26b94604473e6ce1749482d29",
+      "size": 20969,
+      "normalized_sha256": "7c93cc8e6279eff8c40c59982e067d65a9cd7ad26b94604473e6ce1749482d29"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",
