@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T04:02:37Z",
+  "updated_at": "2026-11-01T04:39:03Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "812b87c97033cbc76beb25e66ef8918840603a7a5bda12c110de96b61fc97a93",
-      "size": 234263,
-      "normalized_sha256": "812b87c97033cbc76beb25e66ef8918840603a7a5bda12c110de96b61fc97a93"
+      "sha256": "08b98a320a2f422c8ef5bc10f176a59e993131051abfdeebfc11fa7e23365c00",
+      "size": 234609,
+      "normalized_sha256": "08b98a320a2f422c8ef5bc10f176a59e993131051abfdeebfc11fa7e23365c00"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -996,6 +996,12 @@
       "size": 345,
       "normalized_sha256": "1d0660e514cfa97f45b41b335cae160f72be3b3e12c49a94b2d142b761a42602"
     },
+    "backend/contest/migrations/0022_team_language.py": {
+      "role": "index",
+      "sha256": "5a5e83cd55f015583cc89fa98f35516b283e64367a8cd193f77d20103c5983ce",
+      "size": 669,
+      "normalized_sha256": "5a5e83cd55f015583cc89fa98f35516b283e64367a8cd193f77d20103c5983ce"
+    },
     "backend/contest/migrations/__init__.py": {
       "role": "index",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1045,9 +1051,9 @@
     },
     "backend/contest/teams.py": {
       "role": "index",
-      "sha256": "caa90b3cca411395edcf13fda71e538d9a888f6edcd735c8b1103a85aa3b5266",
-      "size": 3993,
-      "normalized_sha256": "caa90b3cca411395edcf13fda71e538d9a888f6edcd735c8b1103a85aa3b5266"
+      "sha256": "23f8993973842a1016f294ce9995cbe1e4fbef1e05747ca274e944ac58239373",
+      "size": 4157,
+      "normalized_sha256": "23f8993973842a1016f294ce9995cbe1e4fbef1e05747ca274e944ac58239373"
     },
     "backend/contest/tests.py": {
       "role": "index",
@@ -1081,9 +1087,9 @@
     },
     "backend/contest/tests_teams.py": {
       "role": "index",
-      "sha256": "7cbc4fab06efdfdc178d5d35968093ed723669a277ccd5a1063413fbefe57263",
-      "size": 13268,
-      "normalized_sha256": "7cbc4fab06efdfdc178d5d35968093ed723669a277ccd5a1063413fbefe57263"
+      "sha256": "59498c1d83a5d2c2f8f22f369ee275ac96c9b073568d41cc201eee855a7d41d0",
+      "size": 13334,
+      "normalized_sha256": "59498c1d83a5d2c2f8f22f369ee275ac96c9b073568d41cc201eee855a7d41d0"
     },
     "backend/contest/urls/__init__.py": {
       "role": "index",
