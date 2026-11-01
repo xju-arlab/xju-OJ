@@ -338,7 +338,7 @@ test('contest admins set medals as a count or a floored percentage and the place
   const places = page.locator('.el-table__body tr.el-table__row .rank-place')
   await expect(places.nth(0)).toHaveClass(/is-gold/)
   await expect(places.nth(1)).toHaveClass(/is-silver/)
-  await expect(places.nth(0)).toHaveCSS('background-color', 'rgb(246, 214, 112)')
+  await expect(places.nth(0)).toHaveCSS('border-top-color', 'rgb(232, 197, 90)')
 })
 
 test('the live board shows how far each team moved since the freeze', async ({ page }) => {
@@ -351,6 +351,35 @@ test('the live board shows how far each team moved since the freeze', async ({ p
   await expect(rows.nth(1).locator('.rank-move')).toHaveText('↓1')
   await expect(rows.nth(1).locator('.rank-move')).toHaveCSS('color', 'rgb(196, 65, 59)')
   await expect(rows.nth(0).locator('.rank-move')).toHaveAttribute('title', '封榜时第 2 名')
+  // The arrow sits beside the badge: every place stays centred in its column and the arrow stays inside it.
+  const layout = await page.evaluate(() => [...document.querySelectorAll('.el-table__body tr.el-table__row')].map(tr => {
+    const cell = tr.querySelector('td').getBoundingClientRect()
+    const badge = tr.querySelector('.rank-place').getBoundingClientRect()
+    const arrow = tr.querySelector('.rank-move').getBoundingClientRect()
+    return [Math.abs((cell.left + cell.width / 2) - (badge.left + badge.width / 2)), cell.right - arrow.right]
+  }))
+  for (const [offset, room] of layout) {
+    expect(offset).toBeLessThan(1)
+    expect(room).toBeGreaterThan(0)
+  }
+})
+
+test('opening the frozen board asks for confirmation first', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.ended = true
+  await page.goto('/contest/22/rank')
+  const opened = () => state.writes.filter(item => item.path === '/api/admin/contest/rank_freeze')
+  await page.getByRole('button', { name: '开榜', exact: true }).click()
+  const confirm = page.locator('.el-message-box')
+  await expect(confirm).toContainText('确认开榜')
+  await expect(confirm).toContainText('包括未登录的访客')
+  await confirm.getByRole('button', { name: '取消' }).click()
+  await expect(confirm).toBeHidden()
+  expect(opened()).toHaveLength(0)
+  await page.getByRole('button', { name: '开榜', exact: true }).click()
+  await confirm.getByRole('button', { name: '确认开榜' }).click()
+  await expect.poll(() => opened().length).toBe(1)
+  expect(opened()[0].body).toMatchObject({ unfrozen: true })
 })
 
 test('the board tells campuses apart up to the penalty column when asked', async ({ page }) => {

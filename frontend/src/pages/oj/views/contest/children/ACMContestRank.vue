@@ -67,10 +67,10 @@
         unfreezing: false,
         columns: [
           {
-            className: 'rank-hover-cell',
+            className: 'rank-hover-cell rank-place-column',
             align: 'center',
-            // Room for a medal badge and, once the frozen board opens, its movement.
-            width: 72,
+            // Room for a place badge and the movement arrow beside it.
+            width: 80,
             fixed: 'left',
             render: (h, params) => {
               return this.renderPlace(h, params)
@@ -329,7 +329,10 @@
         return rank.team ? rank.team.name : rank.user.username
       },
       unfreeze () {
-        this.$confirm('开榜后所有人都能看到最终排名，确定开榜吗？', '开榜', { confirmButtonText: '开榜', cancelButtonText: '取消', type: 'warning' }).then(() => {
+        // Opening the board shows everyone, signed in or not, what the freeze hid.
+        this.$confirm('开榜后，所有人（包括未登录的访客）都能看到最终排名、封榜以来的名次升降和全部提交。确定开榜吗？', '确认开榜', {
+          confirmButtonText: '确认开榜', cancelButtonText: '取消', type: 'warning', closeOnClickModal: false
+        }).then(() => {
           this.unfreezing = true
           return api.setContestRankFreeze(this.contestID, true).then(() => {
             this.$success('已开榜')

@@ -47,6 +47,7 @@
         contestID: '',
         columns: [
           {
+            className: 'rank-place-column',
             align: 'center',
             width: 60,
             render: (h, params) => {

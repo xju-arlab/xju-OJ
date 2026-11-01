@@ -52,18 +52,21 @@ export default {
       if (this.contest.team_contest) return !row.team || Boolean(row.team.star)
       return Boolean(row.team && row.team.star)
     },
-    // The place, badged when it advances or wins a medal, and once an opened
-    // frozen board shows its final order, how far it moved since the freeze.
+    // The place, badged when it advances or wins a medal, and how far it moved
+    // since the freeze. The arrow hangs off the badge's side, so every place
+    // stays centred in its column.
     renderPlace (h, params) {
       const place = this.rankPlace(params)
       const tier = placeTier(place, this.awardRanges)
-      const badge = h('span', { class: ['rank-place', tier && `is-${tier.key}`], title: tier ? tier.label : undefined }, place)
+      const badge = h('span', {
+        class: ['rank-place', tier ? `is-${tier.key}` : (Number.isInteger(place) ? '' : 'is-unranked')],
+        title: tier ? tier.label : undefined
+      }, place)
       const before = params.row.frozen_place
       const moved = Number.isInteger(place) && Number.isInteger(before) ? before - place : 0
-      if (!moved) return badge
-      return h('span', { class: 'rank-place-cell' }, [badge, h('span', {
+      return h('span', { class: 'rank-place-cell' }, [badge, moved ? h('span', {
         class: ['rank-move', moved > 0 ? 'is-up' : 'is-down'], title: `封榜时第 ${before} 名`
-      }, (moved > 0 ? '↑' : '↓') + Math.abs(moved))])
+      }, (moved > 0 ? '↑' : '↓') + Math.abs(moved)) : null])
     },
     awardsSaved () {
       this.$store.dispatch('getContest')

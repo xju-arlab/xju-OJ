@@ -25,24 +25,44 @@ table {
   font-weight: 650;
 }
 
-// Board places: advancing and medal tiers as badges, and movement since the freeze.
+// Board places: one badge shape for every place, tinted for advancing and
+// medal tiers; movement since the freeze hangs off the badge's right side so
+// the places stay centred in their column.
+.el-table .rank-place-column .cell { padding: 0 4px; overflow: visible; }
+.rank-place-cell { position: relative; display: inline-flex; vertical-align: middle; }
 .rank-place {
   display: inline-flex;
-  min-width: 24px;
-  height: 22px;
+  min-width: 28px;
+  height: 24px;
   align-items: center;
   justify-content: center;
-  padding: 0 5px;
-  border-radius: 6px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
   box-sizing: border-box;
 }
-.rank-place.is-advance { background: #d6e7fb; color: #1d5ba6; font-weight: 700; }
-.rank-place.is-gold { background: #f6d670; color: #5a4200; font-weight: 700; }
-.rank-place.is-silver { background: #dde2e8; color: #3d4855; font-weight: 700; }
-.rank-place.is-bronze { background: #ebc19c; color: #66380f; font-weight: 700; }
-.rank-place-cell { display: inline-flex; align-items: center; gap: 2px; }
-.rank-move { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-place.is-unranked { color: var(--color-text-faint); font-weight: 500; }
+.rank-place.is-advance { border-color: #c3d8f3; background: linear-gradient(180deg, #f2f7fe, #dfebfb); color: #1f5fae; font-weight: 700; }
+.rank-place.is-gold { border-color: #e8c55a; background: linear-gradient(180deg, #fff6d6, #f6dd84); color: #7a5600; font-weight: 700; }
+.rank-place.is-silver { border-color: #c9d0da; background: linear-gradient(180deg, #f7f8fa, #e1e6ec); color: #46505d; font-weight: 700; }
+.rank-place.is-bronze { border-color: #dcae86; background: linear-gradient(180deg, #fcefe4, #efcaa9); color: #7a4214; font-weight: 700; }
+.rank-move {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  margin-left: 3px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
 .rank-move.is-up { color: #18864b; }
 .rank-move.is-down { color: #c4413b; }
 .rank-award-legend {
@@ -57,10 +77,10 @@ table {
 }
 .rank-award-legend > span { padding: 0 10px; }
 .rank-award-legend > span + span { border-left: 1px solid var(--color-border); }
-.rank-award-legend > .is-advance { background: #d6e7fb; color: #1d5ba6; }
-.rank-award-legend > .is-gold { background: #f6d670; color: #5a4200; }
-.rank-award-legend > .is-silver { background: #dde2e8; color: #3d4855; }
-.rank-award-legend > .is-bronze { background: #ebc19c; color: #66380f; }
+.rank-award-legend > .is-advance { background: #e6effc; color: #1f5fae; }
+.rank-award-legend > .is-gold { background: #fbeab0; color: #7a5600; }
+.rank-award-legend > .is-silver { background: #eaedf1; color: #46505d; }
+.rank-award-legend > .is-bronze { background: #f6dcc6; color: #7a4214; }
 .rank-settings-row .rank-award-button + .rank-download { margin-left: 8px; }
 @media (max-width: 760px) {
   .rank-settings-row .rank-award-button + .rank-download { margin-left: 0; }
