@@ -2,6 +2,7 @@ from utils.api import UsernameSerializer, serializers
 
 from utils.constants import Difficulty
 from .statement_pdf import COVERS
+from .teams import CAMPUSES
 from .models import (Contest, ContestAnnouncement, ContestPrepMember, ContestPrepPlanItem, ContestProblemFeedback,
                      ContestRuleType)
 from .models import ACMContestRank, OIContestRank
@@ -45,6 +46,7 @@ class ContestTeamInputSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
     star = serializers.BooleanField(required=False, default=False)
+    campus = serializers.ChoiceField(choices=CAMPUSES, allow_blank=True, required=False, default="")
 
 
 class CreateContestTeamsSerializer(serializers.Serializer):
@@ -72,8 +74,17 @@ class ContestTeamPasswordSerializer(serializers.Serializer):
     id = serializers.IntegerField()
 
 
-class ContestTeamKindSerializer(ContestTeamPasswordSerializer):
-    star = serializers.BooleanField()
+class ContestTeamChangeSerializer(serializers.Serializer):
+    # Only the fields sent change.
+    id = serializers.IntegerField()
+    star = serializers.BooleanField(required=False)
+    members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3, required=False)
+    campus = serializers.ChoiceField(choices=CAMPUSES, allow_blank=True, required=False)
+
+
+class UpdateContestTeamsSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    teams = serializers.ListField(child=ContestTeamChangeSerializer(), min_length=1, max_length=500)
 
 
 class ContestAdminSerializer(serializers.ModelSerializer):

@@ -225,6 +225,8 @@ class ContestTeam(models.Model):
     members = JSONField(default=list)
     # A star team (打星) competes but takes no place on the official ranking.
     star = models.BooleanField(default=False)
+    # The campus the team comes from (contest.teams.CAMPUSES), blank when unknown; the board can tint rows by it.
+    campus = models.CharField(max_length=16, blank=True, default="")
     create_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:

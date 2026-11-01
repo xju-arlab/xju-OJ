@@ -4,6 +4,7 @@ import { mapGetters, mapState } from '@/store/compat'
 import { types } from '@/store'
 import { CONTEST_STATUS } from '@/utils/constants'
 import { cloneFixtures, MOCK_CONTEST_ACM_RANK, MOCK_CONTEST_OI_RANK } from '@oj/mocks/fixtures'
+import { CAMPUSES } from '@/utils/teamRoster'
 import { readRankPreferences, updateRankPreferences } from './rankPreferences'
 
 export default {
@@ -11,6 +12,10 @@ export default {
     const rankPreferences = readRankPreferences()
     return {
       autoRefresh: rankPreferences.autoRefresh,
+      CAMPUSES,
+      // Tints rows by campus; offered once some team on the board has one.
+      showCampus: rankPreferences.campus,
+      campusBoard: false,
       rankPreferences,
       rankRequestSerial: 0,
       // Contest admins see the live board; this shows them the contestants' frozen one.
@@ -42,7 +47,8 @@ export default {
       return Boolean(row.team && row.team.star)
     },
     rankRowClass ({ row }) {
-      return this.unofficial(row) ? 'rank-star-row' : ''
+      const campus = this.showCampus && row.team && CAMPUSES[row.team.campus] ? `rank-campus-${row.team.campus}` : ''
+      return [this.unofficial(row) ? 'rank-star-row' : '', campus].filter(Boolean).join(' ')
     },
     renderUserName (h, row, attrs) {
       return h('a', attrs, [this.unofficial(row) ? h('span', { class: 'rank-star-mark', 'aria-label': '打星' }, '★') : null, row.user.username])
@@ -74,6 +80,7 @@ export default {
         let payload = res.data.data || {}
         const results = Array.isArray(payload.results) ? payload.results : []
         if (teamBoard) {
+          this.campusBoard = results.some(row => row.team && CAMPUSES[row.team.campus])
           let place = 0
           results.forEach(row => { row.place = this.unofficial(row) ? null : ++place })
           payload = { ...payload, results: results.slice(offset, offset + this.limit) }
@@ -140,6 +147,9 @@ export default {
     // The board may load before its contest; a team board then refetches whole.
     'contest.team_contest' (team) {
       if (team) this.getContestRankData(this.page)
+    },
+    showCampus (value) {
+      updateRankPreferences({ campus: value === true })
     },
     // A team-account contest ranks teams, not users.
     nameColumnTitle: {

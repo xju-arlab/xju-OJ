@@ -1,6 +1,6 @@
 // Team rosters for contest team accounts: a CSV of team name, up to three
-// members and an optional team type, and the account sheet handed back once
-// with the passwords.
+// members, an optional team type and campus, and the account sheet handed back
+// once with the passwords.
 import axios from 'axios'
 import papa from 'papaparse'
 
@@ -37,7 +37,38 @@ export function teamIsStar (kind) {
   return null
 }
 
-export function parseRoster (text, skipHeader, existingNames = []) {
+export const CAMPUSES = Object.freeze({ boda: '博达校区', youhao: '友好校区' })
+
+// The sixth column: a campus by its full or short name, '' when blank; null for anything else.
+export function teamCampus (text) {
+  if (!text) return ''
+  const code = Object.keys(CAMPUSES).find(key => text === CAMPUSES[key] || text === CAMPUSES[key].replace('校区', ''))
+  return code || null
+}
+
+// A row is a team the contest already has when it names that team, or, left
+// unnamed, holds all the members of exactly one existing team.
+function existingTeamFor (row, existingTeams) {
+  if (row.name) return existingTeams.find(team => team.name === row.name)
+  const holding = existingTeams.filter(team => team.members.length && team.members.every(member => row.members.includes(member)))
+  return holding.length === 1 ? holding[0] : undefined
+}
+
+// What a row adds to its existing team: members it extends and a campus it lacks.
+// Anything that contradicts the team is left alone and listed as a conflict.
+export function teamSupplement (row, team) {
+  const changes = {}
+  const conflicts = []
+  const extendsMembers = row.members.length > team.members.length && team.members.every(member => row.members.includes(member))
+  if (extendsMembers) changes.members = row.members
+  else if (row.members.some(member => !team.members.includes(member))) conflicts.push('队员')
+  if (row.campus && !team.campus) changes.campus = row.campus
+  else if (row.campus && row.campus !== team.campus) conflicts.push('校区')
+  if (row.kind && row.star !== null && row.star !== Boolean(team.star)) conflicts.push('队伍类型')
+  return { changes, conflicts }
+}
+
+export function parseRoster (text, skipHeader, existingTeams = []) {
   const rows = papa.parse(text, { skipEmptyLines: 'greedy' }).data
     .map(cells => cells.map(cell => String(cell ?? '').trim()))
   const teams = (skipHeader ? rows.slice(1) : rows).map((cells, index) => ({
@@ -45,9 +76,17 @@ export function parseRoster (text, skipHeader, existingNames = []) {
     name: cells[0] || '',
     members: cells.slice(1, 4).filter(Boolean),
     kind: cells[4] || '',
-    star: teamIsStar(cells[4] || '')
+    star: teamIsStar(cells[4] || ''),
+    campusText: cells[5] || '',
+    campus: teamCampus(cells[5] || '')
   })).filter(team => team.name || team.members.length)
-  const taken = new Set([...existingNames, ...teams.map(team => team.name).filter(Boolean)])
+  for (const team of teams) {
+    team.existing = existingTeamFor(team, existingTeams)
+    if (!team.existing) continue
+    team.name = team.existing.name
+    Object.assign(team, teamSupplement(team, team.existing))
+  }
+  const taken = new Set([...existingTeams.map(team => team.name), ...teams.map(team => team.name).filter(Boolean)])
   for (const team of teams) {
     if (team.name) continue
     team.name = surnameTeamName(team.members, taken)
@@ -57,22 +96,31 @@ export function parseRoster (text, skipHeader, existingNames = []) {
   return teams
 }
 
-// Problems the server would also reject, reported per CSV line.
-export function rosterErrors (teams, existingNames = []) {
+// Problems the server would also reject, reported per CSV line. Rows for
+// existing teams are no problem: they only fill those teams in.
+export function rosterErrors (teams) {
   const errors = []
-  const existing = new Set(existingNames)
   const seen = new Set()
   for (const team of teams) {
     if (!team.name) errors.push(`第 ${team.line} 行缺少队伍名`)
     else if (team.name.length > TEAM_NAME_MAX) errors.push(`第 ${team.line} 行队伍名超过 ${TEAM_NAME_MAX} 字`)
-    else if (existing.has(team.name)) errors.push(`第 ${team.line} 行队伍「${team.name}」已在本场比赛中`)
-    else if (seen.has(team.name)) errors.push(`第 ${team.line} 行队伍名「${team.name}」重复`)
+    else if (seen.has(team.name)) errors.push(`第 ${team.line} 行队伍「${team.name}」重复`)
     if (team.members.some(member => member.length > MEMBER_NAME_MAX)) errors.push(`第 ${team.line} 行队员名超过 ${MEMBER_NAME_MAX} 字`)
     if (team.star === null) errors.push(`第 ${team.line} 行队伍类型「${team.kind}」应为正式队伍或打星队伍`)
+    if (team.campus === null) errors.push(`第 ${team.line} 行校区「${team.campusText}」应为博达校区或友好校区`)
     seen.add(team.name)
   }
   if (teams.length > 500) errors.push('一次最多导入 500 支队伍')
   return errors
+}
+
+// The roster split into accounts to create and changes to existing teams.
+export function rosterPlan (teams) {
+  return {
+    create: teams.filter(team => !team.existing).map(({ name, members, star, campus }) => ({ name, members, star, campus })),
+    update: teams.filter(team => team.existing && Object.keys(team.changes).length)
+      .map(team => ({ id: team.existing.id, name: team.name, ...team.changes }))
+  }
 }
 
 function csvCell (value) {
@@ -106,10 +154,11 @@ function saveBlob (filename, blob) {
 }
 
 export function downloadTeamAccounts (filename, teams) {
-  const lines = [['队伍名', '队员1', '队员2', '队员3', '队伍类型', '用户名', '密码']]
+  // The first six columns read back as a roster.
+  const lines = [['队伍名', '队员1', '队员2', '队员3', '队伍类型', '校区', '用户名', '密码']]
   for (const team of teams) {
     const members = [...team.members, '', '', ''].slice(0, 3)
-    lines.push([team.name, ...members, team.star ? '打星队伍' : '正式队伍', team.username, team.password])
+    lines.push([team.name, ...members, team.star ? '打星队伍' : '正式队伍', CAMPUSES[team.campus] || '', team.username, team.password])
   }
   // The BOM lets Excel read the sheet as UTF-8.
   saveBlob(filename, new Blob(['\ufeff' + lines.map(line => line.map(csvCell).join(',')).join('\r\n')],

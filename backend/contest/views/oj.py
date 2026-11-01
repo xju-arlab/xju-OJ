@@ -248,8 +248,9 @@ class ContestRankAPI(APIView):
                 qs = self.get_rank()
                 cache.set(cache_key, qs)
         # Team accounts show as their team name, with members on hover.
-        teams = {user_id: {"name": name, "members": members, "star": star} for user_id, name, members, star in
-                 ContestTeam.objects.filter(contest=self.contest).values_list("user_id", "name", "members", "star")}
+        teams = {user_id: {"name": name, "members": members, "star": star, "campus": campus}
+                 for user_id, name, members, star, campus in ContestTeam.objects.filter(contest=self.contest)
+                 .values_list("user_id", "name", "members", "star", "campus")}
         # Places count official entries only; a star team (打星) has none.
         board = rows if frozen else qs
         places, place = {}, 0

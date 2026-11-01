@@ -21,7 +21,7 @@ from utils.tasks import delete_files
 from ..models import Contest, ContestAnnouncement, ACMContestRank, ContestTeam
 from ..statement_pdf import PDF_TIMEOUT_SECONDS, StatementPDFError
 from ..team_sheet import compile_team_sheet
-from ..teams import create_teams, hash_team_password, team_data, team_password
+from ..teams import create_teams, hash_team_password, team_data, team_password, update_team
 from problem.models import Problem
 from problem.publication import publish_due_contest_problems
 from problem.tasks import schedule_contest_problem_publication
@@ -29,7 +29,7 @@ from ..serializers import (ContestAnnouncementSerializer, ContestAdminSerializer
                            CreateConetestSeriaizer, CreateContestAnnouncementSerializer,
                            EditConetestSeriaizer, EditContestAnnouncementSerializer,
                            ACMContesHelperSerializer, ContestRankFreezeSerializer,
-                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer, ContestTeamKindSerializer,
+                           CreateContestTeamsSerializer, ContestTeamPasswordSerializer, UpdateContestTeamsSerializer,
                            ContestTeamSheetSerializer, )
 
 
@@ -364,17 +364,20 @@ class ContestTeamAPI(APIView):
         forget_frozen_board(contest)
         return self.success(created)
 
-    @validate_serializer(ContestTeamKindSerializer)
+    @validate_serializer(UpdateContestTeamsSerializer)
     def patch(self, request):
-        """Make a team official or a star team (打星)."""
+        """Change existing teams: official or star (打星), campus, or members a later roster fills in."""
         contest = self.load_contest(request, request.data["contest_id"])
-        team = ContestTeam.objects.select_related("user").filter(id=request.data["id"], contest=contest).first()
-        if not team:
-            return self.error("Team does not exist")
-        team.star = request.data["star"]
-        team.save(update_fields=["star"])
+        changes = {item["id"]: item for item in request.data["teams"]}
+        with transaction.atomic():
+            teams = list(ContestTeam.objects.select_for_update().select_related("user")
+                         .filter(contest=contest, id__in=changes))
+            if len(teams) != len(changes):
+                return self.error("Team does not exist")
+            updated = [team_data(update_team(team, changes[team.id])) for team in teams]
+        cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}")
         forget_frozen_board(contest)
-        return self.success(team_data(team))
+        return self.success(updated)
 
     @validate_serializer(ContestTeamPasswordSerializer)
     def put(self, request):

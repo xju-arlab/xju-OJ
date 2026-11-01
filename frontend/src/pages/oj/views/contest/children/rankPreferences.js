@@ -4,6 +4,7 @@ const SESSION_KEY = 'xju-oj:contest-rank-session:v1'
 const defaults = Object.freeze({
   chart: false,
   realName: false,
+  campus: false,
   autoRefresh: false,
   forceUpdate: false
 })
@@ -43,6 +44,7 @@ export const readRankPreferences = () => {
   return {
     chart: booleanValue(local.chart, defaults.chart),
     realName: booleanValue(local.realName, defaults.realName),
+    campus: booleanValue(local.campus, defaults.campus),
     autoRefresh: booleanValue(session.autoRefresh, defaults.autoRefresh),
     forceUpdate: booleanValue(session.forceUpdate, defaults.forceUpdate)
   }
@@ -53,7 +55,8 @@ export const updateRankPreferences = patch => {
   const next = { ...current, ...patch }
   writeObject(browserStorage('localStorage'), LOCAL_KEY, {
     chart: next.chart === true,
-    realName: next.realName === true
+    realName: next.realName === true,
+    campus: next.campus === true
   })
   writeObject(browserStorage('sessionStorage'), SESSION_KEY, {
     autoRefresh: next.autoRefresh === true,

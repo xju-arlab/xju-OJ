@@ -207,9 +207,10 @@ export default {
       data: { contest_id: contestID, id }
     })
   },
-  setContestTeamStar (contestID, id, star) {
+  // Each item is { id, ...fields }: star, campus or members; only those change.
+  updateContestTeams (contestID, teams) {
     return ajax('admin/contest/teams', 'patch', {
-      data: { contest_id: contestID, id, star }
+      data: { contest_id: contestID, teams }
     })
   },
   deleteContestTeam (contestID, id) {

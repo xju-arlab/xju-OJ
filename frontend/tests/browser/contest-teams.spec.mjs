@@ -38,7 +38,7 @@ test.beforeEach(async ({ page }) => {
     const req = route.request(); const url = new URL(req.url()); const path = url.pathname.replace(/\/$/, '')
     const body = req.method() === 'GET' ? {} : req.postDataJSON()
     let data = {}; let error = null
-    if (req.method() !== 'GET') state.writes.push({ path, body })
+    if (req.method() !== 'GET') state.writes.push({ path, method: req.method(), body })
     if (path === '/api/profile') data = state.profile
     if (path.includes('providers')) data = { authentik: { enabled: true }, local: { login_enabled: false, register_enabled: false } }
     if (path.includes('website')) data = { website_name: 'XJU-OJ', allow_register: false }
@@ -63,6 +63,9 @@ test.beforeEach(async ({ page }) => {
       data = { ...rank, frozen: false, total: 3, results: [{ id: 3, user: { id: 1, username: 'root' }, team: null, accepted_number: 1, total_time: 600, submission_number: 1,
         submission_info: { 5: { is_ac: true, ac_time: 600, error_number: 0, is_first_ac: false } } }, ...rank.results] }
     }
+    if (path === '/api/contest_rank' && state.campus) {
+      data = { ...rank, frozen: false, results: rank.results.map((row, index) => ({ ...row, team: { ...row.team, campus: index ? 'youhao' : 'boda' } })) }
+    }
     if (path === '/api/contest_rank' && state.star) {
       data = { ...rank, frozen: false, results: rank.results.map((row, index) => index ? { ...row, team: { ...row.team, star: true }, place: null } : { ...row, place: 1 }) }
     }
@@ -77,7 +80,10 @@ test.beforeEach(async ({ page }) => {
       ] }
     }
     if (path === '/api/admin/contest' && req.method() === 'GET') data = { id: 40, title: '新生赛正式', description: '<p>说明</p>', visible: true, password: null, allowed_ip_ranges: [], rule_type: 'ACM' }
-    if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1, name: 'Team Alpha' }, { id: 2, name: 'Team Beta' }]
+    if (path === '/api/admin/contest/teams' && req.method() === 'GET') {
+      data = [{ id: 1, name: 'Team Alpha', members: ['A1', 'A2'], star: false, campus: '' }, { id: 2, name: 'Team Beta', members: [], star: true, campus: '' }]
+    }
+    if (path === '/api/admin/contest/teams' && req.method() === 'PATCH') data = body.teams.map(item => ({ members: [], star: false, campus: '', ...item }))
     if (path === '/api/admin/contest/teams' && req.method() === 'POST') data = body.teams.map((item, index) => ({ ...item, id: index + 3, username: `team-new${index}`, password: 'Pass6789' }))
     if (path === '/api/admin/contest/teams/sheet') return route.fulfill({ body: '%PDF-1.7', contentType: 'application/pdf' })
     await route.fulfill({ json: { error, data } })
@@ -113,6 +119,8 @@ test('the board shows team names, members on hover and pending cells while froze
   await expect(page.locator('.rank-problem-pending')).toHaveText('?+2')
   await expect(page.locator('td.first-ac')).toHaveCSS('background-color', 'rgb(21, 127, 102)')
   await expect(page.locator('.rank-freeze-banner')).toContainText('封榜')
+  // No team on this board has a campus, so there is nothing to tell apart.
+  await expect(page.locator('label.rank-setting').filter({ hasText: '校区区分' })).toHaveCount(0)
   // Penalty in minutes; a team opens only its own cells.
   await expect(page.locator('.el-table th').nth(3)).toHaveText('罚时')
   await expect(page.locator('.rank-penalty').first()).toHaveText('50')
@@ -166,8 +174,8 @@ test('publishing for team accounts takes a roster instead of a password and hand
   await dialog.getByRole('button', { name: '发布比赛' }).click()
   expect((await download).suggestedFilename()).toBe('contest-40-teams.csv')
   const publish = state.writes.find(item => item.path === '/api/contest/prep/publish')
-  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'], star: false },
-    { name: 'Team Beta', members: ['B1'], star: true }, { name: '赵孙队', members: ['赵一', '孙二'], star: false }])
+  expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'], star: false, campus: '' },
+    { name: 'Team Beta', members: ['B1'], star: true, campus: '' }, { name: '赵孙队', members: ['赵一', '孙二'], star: false, campus: '' }])
   expect(publish.body.password).toBe('')
   // Ranks are live and an ACM board freezes for the last hour.
   expect(publish.body.real_time_rank).toBe(true)
@@ -294,6 +302,35 @@ test('contest admins open the link and stay on /arena/', async ({ page }) => {
   await expect(page).toHaveURL(/\/arena\/22\/rank$/)
 })
 
+test('the board tells campuses apart up to the penalty column when asked', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.campus = true
+  await page.goto('/contest/22/rank')
+  const toggle = page.locator('label.rank-setting').filter({ hasText: '校区区分' })
+  await expect(toggle).toHaveCount(1)
+  await expect(page.locator('.rank-campus-legend')).toHaveCount(0)
+  await toggle.locator('.el-switch').first().click()
+  // The legend sits right after the switch.
+  const legend = page.locator('.rank-campus-legend')
+  await expect(legend).toHaveText('博达校区友好校区')
+  const switchBox = await toggle.locator('.el-switch').first().boundingBox()
+  const legendBox = await legend.boundingBox()
+  expect(legendBox.x - (switchBox.x + switchBox.width)).toBeLessThan(16)
+  const rows = page.locator('.el-table__body tr.el-table__row')
+  await expect(rows.nth(0)).toHaveClass(/rank-campus-boda/)
+  await expect(rows.nth(0).locator('td').first()).toHaveCSS('background-color', 'rgb(241, 236, 251)')
+  await expect(rows.nth(0).locator('td').nth(3)).toHaveCSS('background-color', 'rgb(241, 236, 251)')
+  await expect(rows.nth(0).locator('td.first-ac')).toHaveCSS('background-color', 'rgb(21, 127, 102)')
+  await expect(rows.nth(1).locator('td').nth(1)).toHaveCSS('background-color', 'rgb(253, 240, 226)')
+  await expect(rows.nth(1).locator('td.frozen')).toHaveCSS('background-color', 'rgb(227, 238, 250)')
+  // The choice is remembered.
+  await page.reload()
+  await expect(page.locator('.rank-campus-legend')).toHaveCount(1)
+  await toggle.locator('.el-switch').first().click()
+  await expect(rows.nth(0)).not.toHaveClass(/rank-campus/)
+  await expect(page.locator('.rank-campus-legend')).toHaveCount(0)
+})
+
 test('star teams take no place on the board and contest admins add teams from the header', async ({ page }) => {
   state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
   state.star = true
@@ -336,30 +373,51 @@ test('star teams take no place on the board and contest admins add teams from th
   await dialog.getByPlaceholder('留空则按队员姓氏取名').fill('Team Gamma')
   await dialog.getByPlaceholder('队员 1').fill('G1')
   await dialog.getByText('打星队伍').click()
+  await dialog.getByText('友好校区').click()
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '生成 1 个账号' }).click()
   expect((await download).suggestedFilename()).toBe('contest-22-teams-added.csv')
   const created = state.writes.find(item => item.path === '/api/admin/contest/teams')
-  expect(created.body).toEqual({ contest_id: '22', teams: [{ name: 'Team Gamma', members: ['G1'], star: true }] })
+  expect(created.body).toEqual({ contest_id: '22', teams: [{ name: 'Team Gamma', members: ['G1'], star: true, campus: 'youhao' }] })
   await expect(dialog).toContainText('Pass6789')
   await dialog.getByRole('button', { name: '完成' }).click()
 
-  // A roster file is checked against the contest's teams and its type column.
+  // A roster file is checked for its type and campus columns.
   await page.locator('.contest-team-add').click()
   await dialog.getByText('批量导入').click()
   await dialog.locator('input[type=file]').setInputFiles({
-    name: 'more.csv', mimeType: 'text/csv', buffer: Buffer.from('Team Beta,B1,,\nTeam Delta,D1,,,正式队伍\nTeam Echo,E1,,,外卡\n')
+    name: 'more.csv', mimeType: 'text/csv', buffer: Buffer.from('Team Delta,D1,,,正式队伍\nTeam Echo,E1,,,外卡\nTeam Fox,F1,,,,主校区\nTeam Delta,D2\n')
   })
-  await expect(dialog.locator('.team-roster-errors')).toContainText('第 1 行队伍「Team Beta」已在本场比赛中')
-  await expect(dialog.locator('.team-roster-errors')).toContainText('第 3 行队伍类型「外卡」应为正式队伍或打星队伍')
+  await expect(dialog.locator('.team-roster-errors')).toContainText('第 2 行队伍类型「外卡」应为正式队伍或打星队伍')
+  await expect(dialog.locator('.team-roster-errors')).toContainText('第 3 行校区「主校区」应为博达校区或友好校区')
+  await expect(dialog.locator('.team-roster-errors')).toContainText('第 4 行队伍「Team Delta」重复')
   await expect(dialog.getByRole('button', { name: /生成/ })).toBeDisabled()
-  await dialog.getByRole('button', { name: /取消|Cancel/ }).click()
+  // Teams already in the contest, by name or, unnamed, by all their members, get
+  // only what they lack: no second account, and contradictions are left alone.
+  await dialog.locator('input[type=file]').setInputFiles({
+    name: 'more.csv', mimeType: 'text/csv', buffer: Buffer.from('Team Beta,B1,,,,博达\n,A1,A2,A3,打星队伍,友好\nTeam Delta,D1,,,正式队伍,友好校区\n')
+  })
+  const preview = dialog.locator('.team-roster-preview')
+  await expect(preview).toContainText('新建 1 支，补充 2 支已有队伍')
+  await expect(preview.locator('tbody tr').nth(0)).toContainText('补充队员、校区')
+  await expect(preview.locator('tbody tr').nth(1)).toContainText('Team Alpha')
+  await expect(preview.locator('tbody tr').nth(1)).toContainText('补充队员、校区；队伍类型不一致，未改')
+  await expect(preview.locator('tbody tr').nth(2)).toContainText('新建')
+  const added = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '生成 1 个账号，补充 2 支队伍' }).click()
+  await added
+  const teamWrites = state.writes.filter(item => item.path === '/api/admin/contest/teams').slice(1)
+  expect(teamWrites.map(item => [item.method, item.body])).toEqual([
+    ['PATCH', { contest_id: '22', teams: [{ id: 2, members: ['B1'], campus: 'boda' }, { id: 1, members: ['A1', 'A2', 'A3'], campus: 'youhao' }] }],
+    ['POST', { contest_id: '22', teams: [{ name: 'Team Delta', members: ['D1'], star: false, campus: 'youhao' }] }]
+  ])
+  await dialog.getByRole('button', { name: '完成' }).click()
   await page.locator('tr.rank-star-row .rank-problem-link').click()
   await expect(page).toHaveURL(/\/contest\/22\/submissions\?.*username=team-wxyz/)
   // Submissions name the team; other accounts keep their username.
   await expect(page.locator('.submission-team')).toHaveText('Team Alpha')
-  await expect(page.locator('.el-table th').filter({ hasText: '队伍' })).toHaveCount(1)
-  await expect(page.locator('tbody')).toContainText('root')
+  await expect(page.locator('.el-table th').filter({ hasText: /^队伍$/ })).toHaveCount(1)
+  await expect(page.locator('.el-table__body').filter({ hasText: 'Team Alpha' })).toContainText('root')
   // The author box searches by team: the cell's account shows as its team, and a
   // team name picked from the suggestions asks for that team's account.
   const search = page.getByPlaceholder('搜索队伍')

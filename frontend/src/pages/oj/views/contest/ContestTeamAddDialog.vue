@@ -12,6 +12,12 @@
             <el-radio :value="true">打星队伍</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="校区">
+          <el-radio-group v-model="form.campus">
+            <el-radio value="">未设置</el-radio>
+            <el-radio v-for="(label, code) in CAMPUSES" :key="code" :value="code">{{ label }}</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="队名" :error="nameError">
           <el-input v-model="form.name" :maxlength="TEAM_NAME_MAX" placeholder="留空则按队员姓氏取名" />
         </el-form-item>
@@ -21,7 +27,7 @@
           </div>
         </el-form-item>
       </el-form>
-      <TeamRosterImport v-else ref="roster" :existing-names="existingNames" @update:teams="roster = $event" />
+      <TeamRosterImport v-else ref="roster" :existing-teams="existingTeams" @update:teams="roster = $event" @update:updates="updates = $event" />
     </template>
     <template v-else>
       <p class="team-add-copy is-warning">密码只在这里给出一次，已自动下载 CSV；可导出 A4 账号条 PDF。登录链接 <a :href="link" target="_blank" rel="noopener">{{ link }}</a></p>
@@ -36,7 +42,7 @@
     <template #footer>
       <template v-if="!created.length">
         <el-button @click="$emit('update:visible', false)">{{ $t('m.Cancel') }}</el-button>
-        <el-button type="primary" :loading="saving" :disabled="!pending.length" @click="save">生成 {{ pending.length || '' }} 个账号</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!pending.length && !pendingUpdates.length" @click="save">{{ saveLabel }}</el-button>
       </template>
       <template v-else>
         <el-button @click="downloadAccounts">再次下载账号密码</el-button>
@@ -49,9 +55,9 @@
 <script>
   import api from '@oj/api'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
-  import { MEMBER_NAME_MAX, TEAM_NAME_MAX, downloadTeamAccounts, downloadTeamSheet, surnameTeamName } from '@/utils/teamRoster'
+  import { CAMPUSES, MEMBER_NAME_MAX, TEAM_NAME_MAX, downloadTeamAccounts, downloadTeamSheet, surnameTeamName } from '@/utils/teamRoster'
 
-  const emptyForm = () => ({ star: false, name: '', members: ['', '', ''] })
+  const emptyForm = () => ({ star: false, campus: '', name: '', members: ['', '', ''] })
 
   export default {
     name: 'ContestTeamAddDialog',
@@ -60,12 +66,13 @@
       visible: { type: Boolean, default: false },
       contestId: { type: [String, Number], required: true }
     },
-    // created carries the new accounts, so the board can refresh.
+    // created carries the new accounts (none when the roster only filled in existing teams), so the board can refresh.
     emits: ['update:visible', 'created'],
     data () {
-      return { TEAM_NAME_MAX, MEMBER_NAME_MAX, mode: 'one', form: emptyForm(), roster: [], existingNames: [], created: [], saving: false, sheetLoading: false }
+      return { CAMPUSES, TEAM_NAME_MAX, MEMBER_NAME_MAX, mode: 'one', form: emptyForm(), roster: [], updates: [], existingTeams: [], created: [], saving: false, sheetLoading: false }
     },
     computed: {
+      existingNames () { return this.existingTeams.map(team => team.name) },
       link () { return `${window.location.origin}/arena/${this.contestId}` },
       members () { return this.form.members.map(member => member.trim()).filter(Boolean) },
       // Names are unique within a contest; a blank one comes from the surnames.
@@ -79,26 +86,38 @@
       pending () {
         if (this.mode === 'csv') return this.roster
         if (!this.oneName || this.nameError) return []
-        return [{ name: this.oneName, members: this.members, star: this.form.star }]
+        return [{ name: this.oneName, members: this.members, star: this.form.star, campus: this.form.campus }]
+      },
+      // A roster may also fill in teams the contest already has.
+      pendingUpdates () { return this.mode === 'csv' ? this.updates : [] },
+      saveLabel () {
+        const parts = [this.pending.length && `生成 ${this.pending.length} 个账号`, this.pendingUpdates.length && `补充 ${this.pendingUpdates.length} 支队伍`]
+        return parts.filter(Boolean).join('，') || '生成账号'
       }
     },
     watch: {
       visible (open) {
         if (!open) return
-        Object.assign(this, { mode: 'one', form: emptyForm(), roster: [], created: [] })
+        Object.assign(this, { mode: 'one', form: emptyForm(), roster: [], updates: [], created: [] })
         this.loadNames()
       }
     },
     methods: {
       loadNames () {
-        api.getContestTeams(this.contestId).then(res => { this.existingNames = res.data.data.map(team => team.name) }, () => {})
+        api.getContestTeams(this.contestId).then(res => { this.existingTeams = res.data.data }, () => {})
       },
       async save () {
         this.saving = true
         try {
-          this.created = (await api.createContestTeams(this.contestId, this.pending)).data.data
+          const updates = this.pendingUpdates
+          // Existing teams are filled in first; their accounts and passwords stay as they are.
+          if (updates.length) await api.updateContestTeams(this.contestId, updates.map(({ name, ...change }) => change))
+          const created = this.pending.length ? (await api.createContestTeams(this.contestId, this.pending)).data.data : []
+          if (updates.length) this.$success(`已补充 ${updates.length} 支队伍的信息`)
+          this.$emit('created', created)
+          if (!created.length) return this.$emit('update:visible', false)
+          this.created = created
           this.downloadAccounts()
-          this.$emit('created', this.created)
         } catch (_) {
           // The API client already shows the error; a name taken meanwhile shows up on reload.
           this.loadNames()

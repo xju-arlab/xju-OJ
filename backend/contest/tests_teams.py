@@ -66,7 +66,7 @@ class ContestTeamTest(APITestCase):
         access = self.client.get(self.reverse("contest_access_api"), data={"contest_id": self.contest.id})
         self.assertTrue(access.data["data"]["access"])
         rank = self.client.get(self.reverse("contest_rank_api"), data={"contest_id": self.contest.id, "limit": 10})
-        self.assertEqual(rank.data["data"]["results"][0]["team"], {"name": "Team A", "members": [], "star": False})
+        self.assertEqual(rank.data["data"]["results"][0]["team"], {"name": "Team A", "members": [], "star": False, "campus": ""})
         profile = self.client.get(self.reverse("user_profile_api")).data["data"]
         self.assertEqual(profile["team"]["contest_id"], self.contest.id)
 
@@ -98,11 +98,40 @@ class ContestTeamTest(APITestCase):
         page = self.client.get(self.reverse("contest_rank_api"), data={
             "contest_id": self.contest.id, "limit": 1, "offset": 2}).data["data"]["results"]
         self.assertEqual(page[0]["place"], 2)
-        toggled = self.client.patch(self.url, data={"contest_id": self.contest.id, "id": star["id"], "star": False},
+        toggled = self.client.patch(self.url, data={"contest_id": self.contest.id, "teams": [{"id": star["id"], "star": False}]},
                                     format="json")
         self.assertSuccess(toggled)
-        self.assertFalse(toggled.data["data"]["star"])
+        self.assertFalse(toggled.data["data"][0]["star"])
         self.assertEqual(places(), [("Star", 1), ("Team A", 2), ("Team B", 3)])
+
+    def test_campus_is_kept_and_a_later_roster_fills_in_existing_teams(self):
+        response = self.client.post(self.url, data={"contest_id": self.contest.id, "teams": [
+            {"name": "Team A", "members": ["张三"], "campus": "boda"}, {"name": "Team B", "members": []}]}, format="json")
+        self.assertSuccess(response)
+        first, second = response.data["data"]
+        self.assertEqual((first["campus"], second["campus"]), ("boda", ""))
+        bad = self.client.post(self.url, data={"contest_id": self.contest.id, "teams": [
+            {"name": "Team C", "members": [], "campus": "main"}]}, format="json")
+        self.assertFailed(bad)
+        password = User.objects.get(id=first["user_id"]).password
+        filled = self.client.patch(self.url, data={"contest_id": self.contest.id, "teams": [
+            {"id": first["id"], "members": ["张三", "李四"]}, {"id": second["id"], "campus": "youhao"}]}, format="json")
+        self.assertSuccess(filled)
+        team = ContestTeam.objects.get(id=first["id"])
+        self.assertEqual((team.members, team.campus, team.star), (["张三", "李四"], "boda", False))
+        self.assertEqual(team.user.userprofile.real_name, "张三,李四")
+        # The printed password still works.
+        self.assertEqual(team.user.password, password)
+        self.assertEqual(ContestTeam.objects.get(id=second["id"]).campus, "youhao")
+        rank = self.client.get(self.reverse("contest_rank_api"), data={"contest_id": self.contest.id, "limit": 10})
+        self.assertEqual({row["team"]["name"]: row["team"]["campus"] for row in rank.data["data"]["results"]},
+                         {"Team A": "boda", "Team B": "youhao"})
+        other = Contest.objects.create(title="Other", description="", real_time_rank=True, rule_type="ACM",
+                                       created_by=self.root, start_time=timezone.now(), end_time=timezone.now())
+        stray = self.client.patch(self.url, data={"contest_id": other.id, "teams": [{"id": first["id"], "campus": ""}]},
+                                  format="json")
+        self.assertFailed(stray, "Team does not exist")
+        self.assertEqual(ContestTeam.objects.get(id=first["id"]).campus, "boda")
 
     def test_only_contest_admins_manage_team_accounts(self):
         self.create_admin()

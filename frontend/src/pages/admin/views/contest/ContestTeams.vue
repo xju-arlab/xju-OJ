@@ -3,9 +3,9 @@
     <Panel :title="`队伍账号 · ${contest.title || $route.params.contestId}`">
       <section class="team-section">
         <h3>导入队伍</h3>
-        <TeamRosterImport ref="roster" :existing-names="teams.map(team => team.name)" @update:teams="roster = $event" />
+        <TeamRosterImport ref="roster" :existing-teams="teams" @update:teams="roster = $event" @update:updates="updates = $event" />
         <div class="team-actions">
-          <el-button type="primary" :loading="generating" :disabled="!roster.length" @click="generate">生成 {{ roster.length || '' }} 个账号</el-button>
+          <el-button type="primary" :loading="generating" :disabled="!roster.length && !updates.length" @click="generate">{{ generateLabel }}</el-button>
           <span class="team-link">比赛链接：<a :href="arenaLink" target="_blank" rel="noopener">{{ arenaLink }}</a></span>
         </div>
       </section>
@@ -32,6 +32,14 @@
           <el-table-column label="打星" width="80">
             <template #default="{ row }"><el-switch :model-value="row.star" :loading="row.id === starSaving" :aria-label="`${row.name} 打星`" @change="setStar(row, $event)" /></template>
           </el-table-column>
+          <el-table-column label="校区" width="132">
+            <template #default="{ row }">
+              <el-select :model-value="row.campus || ''" size="small" :loading="row.id === campusSaving" :aria-label="`${row.name} 校区`" @change="setCampus(row, $event)">
+                <el-option label="未设置" value="" />
+                <el-option v-for="(label, code) in CAMPUSES" :key="code" :label="label" :value="code" />
+              </el-select>
+            </template>
+          </el-table-column>
           <el-table-column label="队员"><template #default="{ row }">{{ row.members.join('、') || '—' }}</template></el-table-column>
           <el-table-column prop="username" label="用户名" width="140" />
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ $filters.localtime(row.create_time) }}</template></el-table-column>
@@ -49,16 +57,20 @@
 <script>
   import api from '../../api.js'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
-  import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
+  import { CAMPUSES, downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
 
   export default {
     name: 'ContestTeams',
     components: { TeamRosterImport },
     data () {
-      return { contest: {}, teams: [], roster: [], created: [], loading: false, generating: false, sheetLoading: false, starSaving: null }
+      return { CAMPUSES, contest: {}, teams: [], roster: [], updates: [], created: [], loading: false, generating: false, sheetLoading: false, starSaving: null, campusSaving: null }
     },
     computed: {
       contestId () { return this.$route.params.contestId },
+      generateLabel () {
+        const parts = [this.roster.length && `生成 ${this.roster.length} 个账号`, this.updates.length && `补充 ${this.updates.length} 支队伍`]
+        return parts.filter(Boolean).join('，') || '生成账号'
+      },
       arenaLink () { return `${window.location.origin}/arena/${this.contestId}` }
     },
     mounted () {
@@ -79,19 +91,33 @@
       download (teams) {
         downloadTeamAccounts(`contest-${this.contestId}-teams.csv`, teams)
       },
-      generate () {
+      async generate () {
         this.generating = true
-        api.createContestTeams(this.contestId, this.roster).then(res => {
-          this.created = res.data.data
-          this.download(this.created)
+        try {
+          // Existing teams are filled in first; their accounts and passwords stay as they are.
+          if (this.updates.length) await api.updateContestTeams(this.contestId, this.updates.map(({ name, ...change }) => change))
+          if (this.roster.length) {
+            this.created = (await api.createContestTeams(this.contestId, this.roster)).data.data
+            this.download(this.created)
+          }
+          if (this.updates.length) this.$success(`已补充 ${this.updates.length} 支队伍的信息`)
           this.$refs.roster.reset()
+        } catch (_) {
+          // The API client already shows the error.
+        } finally {
+          this.generating = false
           this.load()
-        }, () => {}).finally(() => { this.generating = false })
+        }
       },
       setStar (team, star) {
         this.starSaving = team.id
-        api.setContestTeamStar(this.contestId, team.id, star).then(res => { team.star = res.data.data.star }, () => {})
+        api.updateContestTeams(this.contestId, [{ id: team.id, star }]).then(res => { team.star = res.data.data[0].star }, () => {})
           .finally(() => { this.starSaving = null })
+      },
+      setCampus (team, campus) {
+        this.campusSaving = team.id
+        api.updateContestTeams(this.contestId, [{ id: team.id, campus }]).then(res => { team.campus = res.data.data[0].campus }, () => {})
+          .finally(() => { this.campusSaving = null })
       },
       resetPassword (team) {
         this.$confirm(`为「${team.name}」生成新密码？旧密码立即失效。`, '重置密码', { confirmButtonText: '重置', cancelButtonText: '取消', type: 'warning' }).then(() => {

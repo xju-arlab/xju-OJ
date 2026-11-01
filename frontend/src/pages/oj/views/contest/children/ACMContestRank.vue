@@ -11,6 +11,12 @@
     <div class="rank-settings-row" aria-label="Ranking settings">
       <label class="rank-setting"><span>{{$t('m.Chart')}}</span><i-switch v-model="showChart"></i-switch></label>
       <label class="rank-setting"><span>{{$t('m.Auto_Refresh')}} (10s)</span><i-switch v-model="autoRefresh" :disabled="refreshDisabled" @on-change="handleAutoRefresh"></i-switch></label>
+      <span v-if="campusBoard" class="rank-campus-setting">
+        <label class="rank-setting"><span>校区区分</span><i-switch v-model="showCampus"></i-switch></label>
+        <span v-if="showCampus" class="rank-campus-legend" aria-label="校区颜色">
+          <span v-for="(label, code) in CAMPUSES" :key="code" :class="`is-${code}`">{{ label }}</span>
+        </span>
+      </span>
       <template v-if="isContestAdmin">
         <label class="rank-setting"><span>{{$t('m.RealName')}}</span><i-switch v-model="showRealName"></i-switch></label>
         <label class="rank-setting"><span>{{$t('m.Force_Update')}}</span><i-switch v-model="forceUpdate" :disabled="refreshDisabled"></i-switch></label>
@@ -378,6 +384,14 @@
   :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }
   :deep(.el-table__body tr.rank-star-row > td.el-table__cell.rank-hover-cell) { background-color: #fcf9f2; }
   :deep(.rank-star-row .rank-team), :deep(.rank-star-row a) { color: var(--color-text-muted); }
+  // Campus tints cover the info columns only, up to 罚时; the legend uses the same colours.
+  :deep(.el-table__body tr.rank-campus-boda > td.el-table__cell.rank-hover-cell) { background-color: #f1ecfb; }
+  :deep(.el-table__body tr.rank-campus-youhao > td.el-table__cell.rank-hover-cell) { background-color: #fdf0e2; }
+  .rank-campus-setting { display: inline-flex; align-items: center; gap: 8px; }
+  .rank-campus-legend { display: inline-flex; overflow: hidden; border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 22px; }
+  .rank-campus-legend span { padding: 0 10px; }
+  .rank-campus-legend .is-boda { background: #f1ecfb; color: #6748b8; }
+  .rank-campus-legend .is-youhao { border-left: 1px solid var(--color-border); background: #fdf0e2; color: #a8581b; }
   .rank-freeze-banner { display: flex; min-height: 44px; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--color-border); background: #eef4fb; color: #2873be; font-size: 13px; }
   .rank-freeze-banner.is-live { background: var(--color-bg-subtle); color: var(--color-text-muted); }
   .rank-freeze-banner .rank-setting { margin-left: auto; }

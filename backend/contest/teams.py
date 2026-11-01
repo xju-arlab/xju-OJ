@@ -24,6 +24,8 @@ TEAM_LANGUAGE = "zh-CN"
 # Generated passwords carry about 46 random bits, so a light hash keeps a
 # roster of hundreds fast; Django rehashes with its default cost on first login.
 PASSWORD_ITERATIONS = 20000
+# Campus codes a team may carry: 博达校区 and 友好校区.
+CAMPUSES = ("boda", "youhao")
 
 
 def team_password():
@@ -55,7 +57,7 @@ def team_real_name(name, members):
 
 
 def team_data(team):
-    return {"id": team.id, "name": team.name, "members": team.members, "star": team.star,
+    return {"id": team.id, "name": team.name, "members": team.members, "star": team.star, "campus": team.campus,
             "username": team.user.username, "user_id": team.user_id, "create_time": datetime2str(team.create_time)}
 
 
@@ -67,7 +69,8 @@ def create_teams(contest, roster):
     """
     roster = [{"name": item["name"].strip(),
                "members": [member.strip() for member in item["members"] if member.strip()],
-               "star": bool(item.get("star"))}
+               "star": bool(item.get("star")),
+               "campus": item.get("campus") or ""}
               for item in roster]
     names = [item["name"] for item in roster]
     if not all(names):
@@ -92,3 +95,21 @@ def create_teams(contest, roster):
             OIContestRank.objects.create(contest=contest, user=user)
         created.append(dict(team_data(team), password=password))
     return created
+
+
+def update_team(team, changes):
+    """Apply an admin's changes to an existing team; its account and password stay as they are."""
+    fields = []
+    if "star" in changes:
+        team.star = bool(changes["star"])
+        fields.append("star")
+    if "campus" in changes:
+        team.campus = changes["campus"] or ""
+        fields.append("campus")
+    if "members" in changes:
+        team.members = [member.strip() for member in changes["members"] if member.strip()]
+        fields.append("members")
+        UserProfile.objects.filter(user_id=team.user_id).update(real_name=team_real_name(team.name, team.members))
+    if fields:
+        team.save(update_fields=fields)
+    return team
