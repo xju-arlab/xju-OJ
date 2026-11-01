@@ -9,10 +9,10 @@
       <el-checkbox v-if="cells" v-model="skipHeader" @change="parse">首行是表头</el-checkbox>
     </div>
     <ul class="team-roster-hint">
-      <li>每行一支队伍：<code>队伍名,队员1,队员2,队员3</code></li>
-      <li>队员不足三人时后面留空，逗号照写：<code>xx队,tom,,</code> 或 <code>xx队,tom,jerry,</code></li>
-      <li>队伍名留空时按队员姓氏取名：<code>,赵一,孙二,</code> 记为赵孙队</li>
-      <li>第 5 列可写队伍类型 <code>正式队伍</code> 或 <code>打星队伍</code>，不写即正式：<code>xx队,tom,,,打星队伍</code></li>
+      <li>每行一支队伍，依次为 <code>队伍名,队员1,队员2,队员3,队伍类型</code></li>
+      <li>队伍类型填 <code>正式队伍</code> 或 <code>打星队伍</code>；留空或整列不写，都算正式队伍</li>
+      <li>队员不足三人时留空，逗号照写：<code>xx队,tom,jerry,,</code> 为两人正式队，<code>xx队,tom,,,打星队伍</code> 为一人打星队</li>
+      <li>队伍名留空时按队员姓氏取名：<code>,赵一,孙二,,</code> 记为赵孙队</li>
       <li>每支队伍生成一个 team-xxxx 账号和 8 位密码</li>
     </ul>
     <ul v-if="errors.length" class="team-roster-errors" role="alert">

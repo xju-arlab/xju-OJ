@@ -8,19 +8,23 @@
           <router-link v-else :to="{ name: 'contest-list' }">{{$t('m.Contests')}}</router-link>
           <span aria-hidden="true">/</span>
           <span>{{contestID}}</span>
-          <button v-if="canAddTeams" type="button" class="contest-team-add" title="添加队伍" aria-label="添加队伍" @click="teamAddVisible = true">
-            <Icon type="plus" />
-          </button>
-          <!-- Without the navbar, the signed-in account shows here. -->
-          <span v-if="myTeam" class="contest-team">
-            <Icon type="users" /><strong>{{ myTeam.name }}</strong>
-            <span v-if="myTeam.members.length" class="contest-team-members">{{ myTeam.members.join('、') }}</span>
-            <button type="button" @click="teamLogout">退出</button>
-          </span>
-          <span v-else-if="arenaAccount" class="contest-team">
-            <Icon type="user-circle" /><strong>{{ arenaAccount.username }}</strong>
-            <span v-if="arenaAccount.realName" class="contest-team-members">{{ arenaAccount.realName }}</span>
-          </span>
+          <div v-if="canAddTeams || myTeam || arenaAccount" class="contest-account-bar">
+            <button v-if="canAddTeams" type="button" class="contest-team-add" title="添加队伍" aria-label="添加队伍" @click="teamAddVisible = true">
+              <Icon type="plus" :size="15" />
+            </button>
+            <!-- Without the navbar, the signed-in account shows here. -->
+            <span v-if="myTeam" class="contest-team">
+              <span class="contest-team-badge" aria-hidden="true"><Icon type="users" :size="13" /></span>
+              <strong>{{ myTeam.name }}</strong>
+              <span v-if="myTeam.members.length" class="contest-team-members">{{ myTeam.members.join('、') }}</span>
+              <button type="button" class="contest-team-exit" @click="teamLogout">退出</button>
+            </span>
+            <span v-else-if="arenaAccount" class="contest-team">
+              <UserAvatar :src="arenaAccount.avatar" :username="arenaAccount.username" :size="22" />
+              <strong>{{ arenaAccount.username }}</strong>
+              <span v-if="arenaAccount.realName" class="contest-team-members">{{ arenaAccount.realName }}</span>
+            </span>
+          </div>
         </div>
 
         <div class="contest-hero-main">
@@ -322,6 +326,7 @@
   import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
   import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
   import ContestTeamAddDialog from './ContestTeamAddDialog.vue'
+  import UserAvatar from '@/shared/ui/UserAvatar.vue'
 
   // The workspace tabs; every other contest route of a preparation contest is its review view.
   const PREP_CHANNEL = 'xju-oj-prep'
@@ -331,7 +336,7 @@
 
   export default {
     name: 'ContestDetail',
-    components: { ContestAnnouncementBanner, ContestTeamAddDialog, PrepStatementExportDialog, TeamRosterImport },
+    components: { ContestAnnouncementBanner, ContestTeamAddDialog, PrepStatementExportDialog, TeamRosterImport, UserAvatar },
     data () {
       return {
         routeName: '',
@@ -772,7 +777,7 @@
       arenaAccount () {
         const profile = this.$store.state.user.profile
         if (!this.$route.path.startsWith('/arena/') || !profile.user) return null
-        return { username: profile.user.username, realName: profile.real_name }
+        return { username: profile.user.username, realName: profile.real_name, avatar: profile.avatar || '' }
       },
       canAddTeams () {
         // Contest admins add teams to a team contest only; one would turn an open contest into a team contest.
@@ -1138,14 +1143,19 @@
 .prep-publish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 .prep-publish-teams :deep(.el-form-item__content) { display: block; }
 .prep-publish-note { margin: -6px 0 14px; color: var(--color-text-muted); font-size: 12px; }
-.contest-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--color-text); font-size: 13px; cursor: default; }
-.contest-team-add { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; margin-left: auto; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; }
-.contest-team-add:hover, .contest-team-add:focus-visible { border-color: var(--line-strong); color: var(--color-text); }
-.contest-team-add + .contest-team { margin-left: 6px; }
-.contest-team strong { font-weight: 650; }
-.contest-team-members { color: var(--color-text-muted); }
-.contest-team button { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
-.contest-team button:hover { color: var(--color-text); }
+// The add button and the account chip share one height and the pill shape;
+// negative margins keep the breadcrumb row at its text height.
+.contest-account-bar { display: inline-flex; min-width: 0; max-width: 72%; align-items: center; gap: 8px; margin: -5px 0 -5px auto; }
+.contest-team-add { display: inline-grid; flex: none; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; transition: color var(--transition), border-color var(--transition), background-color var(--transition); }
+.contest-team-add:hover, .contest-team-add:focus-visible { border-color: var(--line-strong); background: var(--color-bg-subtle); color: var(--color-text); }
+.contest-team-add .legacy-icon, .contest-team-badge .legacy-icon { display: inline-flex; line-height: 0; }
+.contest-team { display: inline-flex; min-width: 0; height: 28px; align-items: center; gap: 7px; padding: 0 12px 0 3px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg); color: var(--color-text); font-size: 12px; line-height: 1; box-sizing: border-box; cursor: default; }
+.contest-team-badge { display: inline-grid; flex: none; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--color-bg-subtle); color: var(--color-text-muted); }
+.contest-team strong { flex: none; font-weight: 650; white-space: nowrap; }
+.contest-team-members { min-width: 0; overflow: hidden; color: var(--color-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.contest-team-members::before { content: ""; display: inline-block; width: 1px; height: 11px; margin-right: 7px; background: var(--color-border); vertical-align: -1px; }
+.contest-team-exit { flex: none; margin-left: 3px; padding: 0 0 0 10px; border: 0; border-left: 1px solid var(--color-border); background: none; color: var(--color-text-muted); font: inherit; cursor: pointer; }
+.contest-team-exit:hover, .contest-team-exit:focus-visible { color: var(--color-text); }
 .prep-published-info { display: grid; gap: 10px; margin: 0; }
 .prep-published-info > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: center; }
 .prep-published-info dt { color: var(--color-text-muted); font-size: 12px; }
@@ -1157,5 +1167,6 @@
 .prep-publish-grid :deep(.el-date-editor.el-input) { width: 100%; }
 @media (max-width: 560px) {
   .prep-publish-grid { grid-template-columns: 1fr; }
+  .contest-team-members { display: none; }
 }
 </style>
