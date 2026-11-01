@@ -163,7 +163,7 @@ export default {
   tbody tr:hover td:not(.problem-column) { background: var(--color-bg-subtle); }
   tr.is-me td:not(.problem-column) { background: rgba(35, 131, 226, .06); }
   td.is-ac { background: var(--tag-tools-bg); color: var(--cat-tools); }
-  td.is-first-ac { background: rgba(15, 123, 108, .24); color: var(--cat-tools); font-weight: 650; }
+  td.is-first-ac { background: #157f66; color: #fff; font-weight: 650; }
   td.is-wa { background: var(--tag-research-bg); color: var(--cat-research); }
   td.is-partial { background: var(--tag-course-bg); color: var(--cat-course); }
 }

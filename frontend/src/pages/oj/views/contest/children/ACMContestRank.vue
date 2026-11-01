@@ -365,7 +365,7 @@
   :deep(.rank-problem-link:hover), :deep(.rank-problem-link:focus-visible) { outline: none; text-decoration: underline; }
   :deep(.el-table__body tr:hover > td.el-table__cell) { background-color: var(--color-bg) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.rank-hover-cell) { background-color: var(--color-bg-subtle) !important; }
-  :deep(.el-table__body tr:hover > td.el-table__cell.first-ac),
+  :deep(.el-table__body tr:hover > td.el-table__cell.first-ac) { background-color: #157f66 !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.ac) { background-color: var(--tag-tools-bg) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.wa) { background-color: var(--tag-research-bg) !important; }
   :deep(.el-table__body td.el-table__cell.frozen), :deep(.el-table__body tr:hover > td.el-table__cell.frozen) { background-color: #e3eefa !important; }

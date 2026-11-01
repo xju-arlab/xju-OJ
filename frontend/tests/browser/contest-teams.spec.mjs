@@ -107,6 +107,7 @@ test('the board shows team names, members on hover and pending cells while froze
   await expect(page.locator('.rank-team').first()).toHaveAttribute('title', '队员：A1、A2')
   await expect(page.locator('body')).not.toContainText('team-abcd')
   await expect(page.locator('.rank-problem-pending')).toHaveText('?+2')
+  await expect(page.locator('td.first-ac')).toHaveCSS('background-color', 'rgb(21, 127, 102)')
   await expect(page.locator('.rank-freeze-banner')).toContainText('封榜')
   // Penalty in minutes; a team opens only its own cells.
   await expect(page.locator('.el-table th').nth(3)).toHaveText('罚时')
