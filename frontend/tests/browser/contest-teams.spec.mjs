@@ -270,6 +270,10 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
   // Contest admins open any team's submissions from its cells.
   await expect(page.locator('.rank-problem-link')).toHaveCount(2)
+  // The real name column takes the star row's tint like the other info columns.
+  await page.locator('.rank-setting').filter({ hasText: /真名|Real/ }).locator('.el-switch').click()
+  await expect(starRow.locator('td').nth(2)).toHaveCSS('background-color', 'rgb(252, 249, 242)')
+  await page.locator('.rank-setting').filter({ hasText: /真名|Real/ }).locator('.el-switch').click()
   // A team contest ranks teams, thirty to a page.
   await expect(page.locator('.el-table th').nth(1)).toHaveText('队伍')
   expect(state.rankLimits).toContain('30')

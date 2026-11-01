@@ -105,6 +105,8 @@ export default {
       if (value && existingIndex === -1) {
         this.columns.splice(2, 0, {
           isRealNameColumn: true,
+          // Shares the row's background with the other info columns.
+          className: 'rank-hover-cell',
           title: this.$t('m.RealName'),
           align: 'center',
           width: 150,
