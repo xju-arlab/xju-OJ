@@ -16,7 +16,7 @@ const prep = {
 }
 const rank = {
   frozen: true, total: 2, results: [
-    { id: 1, user: { id: 50, username: 'team-abcd' }, team, accepted_number: 1, total_time: 3000, submission_number: 3,
+    { id: 1, user: { id: 50, username: 'team-abcd', real_name: '刘龙羽,陈胤良,杨昱泽' }, team, accepted_number: 1, total_time: 3000, submission_number: 3,
       submission_info: { 5: { is_ac: true, ac_time: 1800, error_number: 1, is_first_ac: true } } },
     { id: 2, user: { id: 51, username: 'team-wxyz' }, team: { name: 'Team Beta', members: [] }, accepted_number: 0, total_time: 0,
       submission_number: 2, submission_info: { 5: { is_ac: false, ac_time: 0, error_number: 0, is_first_ac: false, frozen_number: 2 } } }
@@ -59,6 +59,10 @@ test.beforeEach(async ({ page }) => {
     }
     if (path === '/api/languages') data = { languages: [{ name: 'C++', description: 'G++', content_type: 'text/x-c++src', config: { template: '' } }], spj_languages: [] }
     if (path === '/api/contest_rank') { data = state.admin ? { ...rank, frozen: false } : rank; (state.rankLimits ||= []).push(url.searchParams.get('limit')) }
+    if (path === '/api/contest_rank' && state.adminRow) {
+      data = { ...rank, frozen: false, total: 3, results: [{ id: 3, user: { id: 1, username: 'root' }, team: null, accepted_number: 1, total_time: 600, submission_number: 1,
+        submission_info: { 5: { is_ac: true, ac_time: 600, error_number: 0, is_first_ac: false } } }, ...rank.results] }
+    }
     if (path === '/api/contest_rank' && state.star) {
       data = { ...rank, frozen: false, results: rank.results.map((row, index) => index ? { ...row, team: { ...row.team, star: true }, place: null } : { ...row, place: 1 }) }
     }
@@ -189,6 +193,18 @@ test('before the start the link says so instead of loading forever', async ({ pa
   await expect(page.getByText('Loading')).toHaveCount(0)
 })
 
+test('an admin on a team board takes no place and looks like a star team', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.adminRow = true
+  await page.goto('/contest/22/rank')
+  const adminRow = page.locator('tbody tr').first()
+  await expect(adminRow).toHaveClass(/rank-star-row/)
+  await expect(adminRow.locator('td').nth(1)).toHaveText('★root')
+  await expect(adminRow.locator('td').first()).toHaveText('*')
+  await expect(page.locator('tbody tr').nth(1).locator('td').first()).toHaveText('1')
+  await expect(page.locator('tbody tr').nth(2).locator('td').first()).toHaveText('2')
+})
+
 test('a team that signs in before the start waits on the poster carousel until it begins', async ({ page }) => {
   state.upcoming = true
   await page.goto('/arena/22')
@@ -270,13 +286,26 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
   // Contest admins open any team's submissions from its cells.
   await expect(page.locator('.rank-problem-link')).toHaveCount(2)
-  // The real name column takes the star row's tint like the other info columns.
+  // The real name column takes the star row's tint like the other info columns,
+  // keeps three names on one line, and every header sits over its column.
   await page.locator('.rank-setting').filter({ hasText: /真名|Real/ }).locator('.el-switch').click()
   await expect(starRow.locator('td').nth(2)).toHaveCSS('background-color', 'rgb(252, 249, 242)')
+  await expect(page.locator('.rank-real-name').first()).toHaveText('刘龙羽,陈胤良,杨昱泽')
+  expect((await page.locator('.rank-real-name').first().boundingBox()).height).toBeLessThan(26)
+  const offsets = await page.evaluate(() => {
+    const heads = [...document.querySelectorAll('.el-table__header-wrapper th')]
+    const cells = [...document.querySelectorAll('.el-table__body-wrapper tbody tr:first-child td')]
+    return heads.map((th, i) => {
+      const a = th.getBoundingClientRect(); const b = cells[i].getBoundingClientRect()
+      return Math.abs((a.left + a.width / 2) - (b.left + b.width / 2))
+    })
+  })
+  expect(Math.max(...offsets)).toBeLessThan(1)
   await page.locator('.rank-setting').filter({ hasText: /真名|Real/ }).locator('.el-switch').click()
-  // A team contest ranks teams, thirty to a page.
+  // A team contest ranks teams, thirty to a page, numbering the whole board itself.
   await expect(page.locator('.el-table th').nth(1)).toHaveText('队伍')
-  expect(state.rankLimits).toContain('30')
+  await expect(page.locator('.el-pagination')).toContainText('30')
+  expect(state.rankLimits).toContain('250')
 
   // One team by hand: names already in the contest are refused.
   await page.locator('.contest-team-add').click()
@@ -311,4 +340,12 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(page.locator('.submission-team')).toHaveText('Team Alpha')
   await expect(page.locator('.el-table th').filter({ hasText: '队伍' })).toHaveCount(1)
   await expect(page.locator('tbody')).toContainText('root')
+  // The author box searches by team: the cell's account shows as its team, and a
+  // team name picked from the suggestions asks for that team's account.
+  const search = page.getByPlaceholder('搜索队伍')
+  await expect(search).toHaveValue('Team Beta')
+  await search.fill('alp')
+  const request = page.waitForRequest(req => req.url().includes('/api/contest_submissions') && req.url().includes('username=team-abcd'))
+  await page.locator('.el-autocomplete-suggestion li').filter({ hasText: 'Team Alpha' }).click()
+  await request
 })

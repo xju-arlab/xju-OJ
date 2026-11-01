@@ -23,7 +23,7 @@
     <div v-if="showChart" class="echarts">
       <ECharts :options="options" ref="chart" auto-resize></ECharts>
     </div>
-    <Table ref="tableRank" class="auto-resize" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
+    <Table ref="tableRank" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
     <Pagination :total="total"
                 :page-size="limit" @update:page-size="limit = $event"
                 :current="page" @update:current="page = $event"
@@ -72,7 +72,7 @@
             width: 150,
             render: (h, params) => {
               if (params.row.team) return this.renderTeamName(h, params.row.team)
-              return h('a', {
+              return this.renderUserName(h, params.row, {
                 style: {
                   display: 'inline-block',
                   'max-width': '150px'
@@ -86,14 +86,14 @@
                       })
                   }
                 }
-              }, params.row.user.username)
+              })
             }
           },
           {
             className: 'rank-hover-cell',
             title: this.$t('m.Rank_Solved_Problems'),
             align: 'center',
-            width: 100,
+            width: 88,
             render: (h, params) => {
               // Problems solved out of the contest's problems.
               return h('span', { class: 'rank-solved' }, `${params.row.accepted_number} / ${this.contestProblems.length}`)
@@ -103,7 +103,7 @@
             className: 'rank-hover-cell',
             title: this.$t('m.Penalty'),
             align: 'center',
-            width: 100,
+            width: 72,
             render: (h, params) => {
               return h('span', { class: 'rank-penalty' }, this.penaltyMinutes(params.row.total_time))
             }
@@ -361,6 +361,7 @@
   :deep(.rank-problem-result) { max-width: 100%; overflow: hidden; white-space: nowrap; font-size: clamp(9px, 0.75vw, 11px); line-height: 1.1; font-variant-numeric: tabular-nums; }
   :deep(.rank-problem-time), :deep(.rank-problem-errors) { display: block; margin: 0; }
   :deep(.rank-penalty) { font-variant-numeric: tabular-nums; }
+  :deep(.rank-real-name) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   :deep(.rank-problem-link) { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: center; cursor: pointer; }
   :deep(.rank-problem-link:hover), :deep(.rank-problem-link:focus-visible) { outline: none; text-decoration: underline; }
   :deep(.el-table__body tr:hover > td.el-table__cell) { background-color: var(--color-bg) !important; }
@@ -373,7 +374,7 @@
   :deep(.rank-team) { display: inline-block; max-width: 150px; overflow: hidden; color: var(--color-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; cursor: default; vertical-align: middle; }
   :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }
   :deep(.el-table__body tr.rank-star-row > td.el-table__cell.rank-hover-cell) { background-color: #fcf9f2; }
-  :deep(.rank-star-row .rank-team) { color: var(--color-text-muted); }
+  :deep(.rank-star-row .rank-team), :deep(.rank-star-row a) { color: var(--color-text-muted); }
   .rank-freeze-banner { display: flex; min-height: 44px; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--color-border); background: #eef4fb; color: #2873be; font-size: 13px; }
   .rank-freeze-banner.is-live { background: var(--color-bg-subtle); color: var(--color-text-muted); }
   .rank-freeze-banner .rank-setting { margin-left: auto; }

@@ -21,7 +21,12 @@
             <Icon type="user"></Icon>
             <span>{{formFilter.myself ? $t('m.Mine') : $t('m.All')}}</span>
           </button>
-          <Input v-model="formFilter.username" class="keyword-filter" :placeholder="$t('m.Search_Author')" @on-enter="handleQueryChange"/>
+          <div v-if="teamContest" class="keyword-filter">
+            <el-autocomplete v-model="formFilter.username" placeholder="搜索队伍" :fetch-suggestions="suggestTeams"
+                             :trigger-on-focus="false" clearable
+                             @select="handleQueryChange" @clear="handleQueryChange" @keyup.enter="handleQueryChange"/>
+          </div>
+          <Input v-else v-model="formFilter.username" class="keyword-filter" :placeholder="$t('m.Search_Author')" @on-enter="handleQueryChange"/>
           <button type="button" class="filter-control reset-filter" @click="onReset">
             <Icon type="refresh"></Icon>
             <span>{{$t('m.Reset')}}</span>
@@ -233,7 +238,26 @@
         } catch (_) {
           return
         }
-        if (!this.disposed && contestID === this.contestID) this.teamNames = names
+        if (this.disposed || contestID !== this.contestID) return
+        this.teamNames = names
+        // A board cell links here by account; show its team, and search again in
+        // case the box held a team name before the names arrived.
+        if (names[this.formFilter.username]) this.formFilter.username = names[this.formFilter.username]
+        if (this.formFilter.username) this.getSubmissions()
+      },
+      suggestTeams (query, callback) {
+        const text = query.trim().toLowerCase()
+        callback(Object.values(this.teamNames).filter(name => name.toLowerCase().includes(text)).slice(0, 10).map(value => ({ value })))
+      },
+      // In a team contest the box takes a team name; the server searches accounts.
+      authorParam (keyword) {
+        const text = (keyword || '').trim()
+        if (!text || !this.teamContest) return text
+        const teams = Object.entries(this.teamNames)
+        const exact = teams.find(([, name]) => name === text)
+        if (exact) return exact[0]
+        const partial = teams.filter(([, name]) => name.toLowerCase().includes(text.toLowerCase()))
+        return partial.length === 1 ? partial[0][0] : text
       },
       buildQuery () {
         return {
@@ -260,6 +284,7 @@
         const generation = ++this.requestGeneration
         this.clearStatusRefresh()
         let params = this.buildQuery()
+        params.username = this.authorParam(params.username)
         params.contest_id = this.contestID
         params.problem_id = this.problemID
         let offset = (this.page - 1) * this.limit
@@ -414,6 +439,7 @@
       .filter-control.is-active { border-color: color-mix(in srgb, var(--cat-kaggle) 28%, var(--color-border)); background: var(--tag-kaggle-bg); color: var(--cat-kaggle); }
       .status-filter { justify-content: space-between; }
       .keyword-filter { width: 210px; }
+      .keyword-filter :deep(.el-autocomplete) { width: 100%; }
       .reset-filter { color: var(--color-text); background: var(--color-bg-subtle); }
       .reset-filter:hover { background: var(--bg-hover); }
       .refresh-control { min-width: 34px; width: 34px; padding: 0; }

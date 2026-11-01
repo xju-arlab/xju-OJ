@@ -35,8 +35,17 @@ export default {
         : { problemID: problem._id, username: row.user.username }
       this.$router.push({ name: 'contest-submission-list', params: { contestID: this.contestID }, query })
     },
+    // Star teams hold no place; on a team-account contest neither does any other
+    // account on the board, such as an admin trying a problem.
+    unofficial (row) {
+      if (this.contest.team_contest) return !row.team || Boolean(row.team.star)
+      return Boolean(row.team && row.team.star)
+    },
     rankRowClass ({ row }) {
-      return row.team && row.team.star ? 'rank-star-row' : ''
+      return this.unofficial(row) ? 'rank-star-row' : ''
+    },
+    renderUserName (h, row, attrs) {
+      return h('a', attrs, [this.unofficial(row) ? h('span', { class: 'rank-star-mark', 'aria-label': '打星' }, '★') : null, row.user.username])
     },
     // A team account shows its team name, with the members on hover.
     renderTeamName (h, team) {
@@ -51,17 +60,24 @@ export default {
       const requestSerial = ++this.rankRequestSerial
       const chart = this.showChart ? this.$refs.chart : null
       if (chart && !refresh) chart.showLoading({maskColor: 'rgba(255, 255, 255, 0.82)'})
+      // A team board is small: fetch it whole and number its official teams here.
+      const teamBoard = Boolean(this.contest.team_contest)
       let params = {
-        offset,
-        limit: this.limit,
+        offset: teamBoard ? 0 : offset,
+        limit: teamBoard ? 250 : this.limit,
         contest_id: this.$route.params.contestID,
         force_refresh: this.forceUpdate ? '1' : '0'
       }
       if (this.previewFrozen) params.frozen = '1'
       api.getContestRank(params).then(res => {
         if (requestSerial !== this.rankRequestSerial) return
-        const payload = res.data.data || {}
+        let payload = res.data.data || {}
         const results = Array.isArray(payload.results) ? payload.results : []
+        if (teamBoard) {
+          let place = 0
+          results.forEach(row => { row.place = this.unofficial(row) ? null : ++place })
+          payload = { ...payload, results: results.slice(offset, offset + this.limit) }
+        }
         if (results.length || this.getMockRank().length === 0) this.applyRankPayload(payload, this.page)
         else this.applyRankPayload(this.getMockRankPayload(), this.page)
       }).catch(() => {
@@ -109,9 +125,10 @@ export default {
           className: 'rank-hover-cell',
           title: this.$t('m.RealName'),
           align: 'center',
-          width: 150,
+          // Wide enough for three three-character names on one line; longer ones end in an ellipsis.
+          width: 172,
           render: (h, {row}) => {
-            return h('span', row.user.real_name)
+            return h('span', { class: 'rank-real-name', title: row.user.real_name || '' }, row.user.real_name)
           }
         })
       } else if (!value && existingIndex !== -1) {
@@ -120,6 +137,10 @@ export default {
     }
   },
   watch: {
+    // The board may load before its contest; a team board then refetches whole.
+    'contest.team_contest' (team) {
+      if (team) this.getContestRankData(this.page)
+    },
     // A team-account contest ranks teams, not users.
     nameColumnTitle: {
       immediate: true,

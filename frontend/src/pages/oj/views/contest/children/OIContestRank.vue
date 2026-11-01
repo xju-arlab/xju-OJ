@@ -12,7 +12,7 @@
     <div v-if="showChart" class="echarts">
       <ECharts :options="options" ref="chart" auto-resize></ECharts>
     </div>
-    <Table ref="tableRank" class="auto-resize" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
+    <Table ref="tableRank" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
     <Pagination :total="total"
                 :page-size="limit" @update:page-size="limit = $event"
                 :current="page" @update:current="page = $event"
@@ -53,7 +53,7 @@
             align: 'center',
             render: (h, params) => {
               if (params.row.team) return this.renderTeamName(h, params.row.team)
-              return h('a', {
+              return this.renderUserName(h, params.row, {
                 style: {
                   display: 'inline-block',
                   'max-width': '150px'
@@ -67,7 +67,7 @@
                       })
                   }
                 }
-              }, params.row.user.username)
+              })
             }
           },
           {
@@ -225,9 +225,10 @@
 </script>
 <style scoped lang="less">
   :deep(.rank-team) { color: var(--color-text); font-weight: 600; cursor: default; }
+  :deep(.rank-real-name) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   :deep(.rank-star-mark) { margin-right: 4px; color: #d29b16; font-size: 13px; }
   :deep(.el-table__body tr.rank-star-row > td.el-table__cell) { background-color: #fcf9f2; }
-  :deep(.rank-star-row .rank-team) { color: var(--color-text-muted); }
+  :deep(.rank-star-row .rank-team), :deep(.rank-star-row a) { color: var(--color-text-muted); }
   .echarts {
     height: 320px;
     width: 100%;
