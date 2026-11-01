@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T06:33:18Z",
+  "updated_at": "2026-11-01T06:48:27Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "14a13584f024d47e2db4fdb59be949182514d868c310fb7bcfb9716b070a6aa0",
-      "size": 236127,
-      "normalized_sha256": "14a13584f024d47e2db4fdb59be949182514d868c310fb7bcfb9716b070a6aa0"
+      "sha256": "5e965fe253f6b6318262a34e43aa12e59c0211bcb8a90676eb537d51002b66d2",
+      "size": 236315,
+      "normalized_sha256": "5e965fe253f6b6318262a34e43aa12e59c0211bcb8a90676eb537d51002b66d2"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3390,9 +3390,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/ACMContestRank.vue": {
       "role": "index",
-      "sha256": "1aecbe3ece2f71ee8da8a896e442af49783b1ecc458a7e05c325b6f343f00717",
-      "size": 17082,
-      "normalized_sha256": "1aecbe3ece2f71ee8da8a896e442af49783b1ecc458a7e05c325b6f343f00717"
+      "sha256": "0c6501117852cd0e398072e0d9645eec8d5b063638c4664d965245e7c2b01b2e",
+      "size": 17196,
+      "normalized_sha256": "0c6501117852cd0e398072e0d9645eec8d5b063638c4664d965245e7c2b01b2e"
     },
     "frontend/src/pages/oj/views/contest/children/ACMHelper.vue": {
       "role": "index",
@@ -3456,9 +3456,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/OIContestRank.vue": {
       "role": "index",
-      "sha256": "912eda295bcd075dc2711d53e3c59dd946886fd3075ce8ade9abc9eba20b51cb",
-      "size": 9312,
-      "normalized_sha256": "912eda295bcd075dc2711d53e3c59dd946886fd3075ce8ade9abc9eba20b51cb"
+      "sha256": "d51f28cd6f638ce81519dd62932713a7cfeac15b88079c42117b575c14135af1",
+      "size": 9428,
+      "normalized_sha256": "d51f28cd6f638ce81519dd62932713a7cfeac15b88079c42117b575c14135af1"
     },
     "frontend/src/pages/oj/views/contest/children/PrepFeedbackThread.vue": {
       "role": "index",
@@ -3468,9 +3468,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/contestRankMixin.js": {
       "role": "index",
-      "sha256": "e6e732470c4aab0a1f99579136200777cae9a45acf6fa3bee462fe758f3c614f",
-      "size": 8318,
-      "normalized_sha256": "e6e732470c4aab0a1f99579136200777cae9a45acf6fa3bee462fe758f3c614f"
+      "sha256": "e9396434e6de01f930b54bd409820f582f417ceb123386d79cf7cfa388babc7b",
+      "size": 9566,
+      "normalized_sha256": "e9396434e6de01f930b54bd409820f582f417ceb123386d79cf7cfa388babc7b"
     },
     "frontend/src/pages/oj/views/contest/children/prepProblemService.js": {
       "role": "index",
@@ -3606,9 +3606,9 @@
     },
     "frontend/src/pages/oj/views/submission/SubmissionList.vue": {
       "role": "index",
-      "sha256": "0b955578aedc0752545e08bd3c3827a1b263c9f785af1a892e81f84821827a62",
-      "size": 18365,
-      "normalized_sha256": "0b955578aedc0752545e08bd3c3827a1b263c9f785af1a892e81f84821827a62"
+      "sha256": "0ea4b18de60ee4b4bb54e05f816290cae2d62e30c55396e5c2013e558c8e2de8",
+      "size": 19962,
+      "normalized_sha256": "0ea4b18de60ee4b4bb54e05f816290cae2d62e30c55396e5c2013e558c8e2de8"
     },
     "frontend/src/pages/oj/views/user/ApplyResetPassword.vue": {
       "role": "index",
@@ -3924,9 +3924,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "a938fc8503dfbc9c41bf37c3e28a803fd1e78cbddb63fbb165e0b496ebafc482",
-      "size": 21353,
-      "normalized_sha256": "a938fc8503dfbc9c41bf37c3e28a803fd1e78cbddb63fbb165e0b496ebafc482"
+      "sha256": "b4ded0b100304324dbc5fe957aef24edb2ec788080272d8a9a97553ab13e7cf0",
+      "size": 23816,
+      "normalized_sha256": "b4ded0b100304324dbc5fe957aef24edb2ec788080272d8a9a97553ab13e7cf0"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",
