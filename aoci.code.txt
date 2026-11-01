@@ -689,7 +689,7 @@ xju-oj-remote-bridge.user.js[IN8L]: F:通过浏览器会话向三类远程OJ提�
 .dockerignore[FV4T]: F:排除旧server上下文中的构建产物和运行目录 | R:code:server/Dockerfile | A:Docker忽略规则 | S:当前根上下文构建实际采用仓库根.dockerignore
 Dockerfile[OV9S]: F:构建固定语言工具链、Seccomp沙箱和Python判题服务运行镜像 | R:code:server/judger/CMakeLists.txt,code:server/judge-server/server/entrypoint.sh,code:docker-bake.hcl | A:judge-toolchain；judge-server；镜像版本参数 | S:使用仓库根作为context；编译和运行用户身份分离；最终镜像保留判题必需编译器但移除沙箱构建工具；基础镜像绑定digest，不能靠放开容器权限修复判题
 LICENSES.md[SG4T]: F:说明JudgeServer与Judger两份上游许可证的保留边界 | R:code:server/judge-server/LICENSE,code:server/judger/LICENSE | A:许可证归属说明 | S:本文件不替代或改写原SATA文本
-README.md[SG6T]: F:说明判题HTTP服务、原生沙箱、统一构建及支持的绑定边界 | R:code:server/Dockerfile,code:docs/contracts/judge-server-protocol.md | A:判题模块构建与检查说明 | S:构建上下文必须是仓库根；健康只证明本机存活；只支持Python绑定，Node、Lua绑定和客户端示例已移除
+README.md[SG6T]: F:说明判题HTTP服务、原生沙箱、统一构建及支持的绑定边界 | R:code:server/Dockerfile,code:docs/contracts/judge-server-protocol.md | A:判题模块构建与检查说明 | S:构建上下文必须是仓库根；健康只证明本机存活；只支持Python绑定；Node、Lua绑定与PHP、Go客户端已移除，Python客户端供协议测试保留
 
 ===/home/winbeau/xju-arlab/xju-oj/server/judge-server/===
 .gitignore[FV3T]: F:排除JudgeServer临时测试、日志和Python产物 | R:- | A:Git忽略规则 | S:-
@@ -869,3 +869,7 @@ testdata-10plus10.md[SQ6T]: F:规定每题20组数据的分层造法、题包文
 
 ===/home/winbeau/xju-arlab/xju-oj/docs/plans/===
 ai-judging-rework.md[SB6S]: F:记录AI019判题口径重做与赛中重判的分层方案、试算数据和执行结果 | R:code:docs/operations/ai-problem-packages.md | A:分层判分（接口行为60+端到端40）、重判流程、AI019试算表与执行记录 | S:通过线保持100；禁用API仍整题归零；只改AI019，其余6道代码题口径未变；分层只影响分数与OI得分，不改变“通过”语义
+
+===/home/winbeau/xju-arlab/xju-oj/server/judge-server/client/Python/===
+client.py[LN5S]: F:提供Python判题客户端及多语言和动态测试用例调用示例 | R:code:server/judge-server/client/Python/languages.py,code:server/judge-server/tests/test_protocol_contract.py | A:JudgeServerClient；judge；compile_spj；ping | S:协议契约测试以client.Python包导入它，删除会使CI失败；test_case与test_case_id互斥；摘要认证保持协议；requests调用没有超时
+languages.py[FC4S]: F:为Python示例客户端定义编译运行与SPJ模板 | R:code:server/judge-server/client/Python/client.py | A:各语言配置字典 | S:Python3字节码路径固定3.6且仍含Python2，不等于当前生产语言集合

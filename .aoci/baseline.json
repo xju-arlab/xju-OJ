@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T07:17:37Z",
+  "updated_at": "2026-11-01T07:23:35Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "69497c06c5ba1fb5032141eb4939928908bef677b74816ee2d3f9a6d3d1ff75d",
-      "size": 225820,
-      "normalized_sha256": "69497c06c5ba1fb5032141eb4939928908bef677b74816ee2d3f9a6d3d1ff75d"
+      "sha256": "18b25fde3c931735cc8238d2490a1ee939242c9e265b8487e94bf74e0708a565",
+      "size": 226597,
+      "normalized_sha256": "18b25fde3c931735cc8238d2490a1ee939242c9e265b8487e94bf74e0708a565"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -4049,9 +4049,9 @@
     },
     "server/README.md": {
       "role": "index",
-      "sha256": "0320560e01d3c6bd4fd9240f4fe1e670ca4d00a97b928e41507c4ecd16bfb8f3",
-      "size": 1985,
-      "normalized_sha256": "0320560e01d3c6bd4fd9240f4fe1e670ca4d00a97b928e41507c4ecd16bfb8f3"
+      "sha256": "ebac80f60dbf77b93c8a060d86e98be9db838c6d6a1db04017698a6e2610e3d2",
+      "size": 2071,
+      "normalized_sha256": "ebac80f60dbf77b93c8a060d86e98be9db838c6d6a1db04017698a6e2610e3d2"
     },
     "server/judge-server/.github/workflows/release.yml": {
       "role": "index",
