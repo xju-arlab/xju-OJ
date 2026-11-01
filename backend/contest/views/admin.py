@@ -28,7 +28,7 @@ from problem.tasks import schedule_contest_problem_publication
 from ..serializers import (ContestAnnouncementSerializer, ContestAdminSerializer,
                            CreateConetestSeriaizer, CreateContestAnnouncementSerializer,
                            EditConetestSeriaizer, EditContestAnnouncementSerializer,
-                           ACMContesHelperSerializer, ContestRankFreezeSerializer,
+                           ACMContesHelperSerializer, ContestRankFreezeSerializer, ContestRankAwardsSerializer,
                            CreateContestTeamsSerializer, ContestTeamPasswordSerializer, UpdateContestTeamsSerializer,
                            ContestTeamSheetSerializer, )
 
@@ -47,7 +47,8 @@ def freeze_time_error(data, rule_type, preparation):
 
 
 def forget_frozen_board(contest):
-    cache.delete(f"{CacheKey.contest_rank_cache}:{contest.id}:frozen")
+    cache.delete_many([f"{CacheKey.contest_rank_cache}:{contest.id}:frozen",
+                       f"{CacheKey.contest_rank_cache}:{contest.id}:frozen_places"])
 
 
 class ContestAPI(APIView):
@@ -334,6 +335,20 @@ class ContestRankFreezeAPI(APIView):
         contest.save(update_fields=["rank_unfrozen"])
         forget_frozen_board(contest)
         return self.success({"rank_unfrozen": contest.rank_unfrozen})
+
+
+class ContestRankAwardsAPI(APIView):
+    @validate_serializer(ContestRankAwardsSerializer)
+    def post(self, request):
+        """Change which places advance or win medals on the board."""
+        try:
+            contest = Contest.objects.get(id=request.data["contest_id"])
+        except Contest.DoesNotExist:
+            return self.error("Contest does not exist")
+        ensure_created_by(contest, request.user)
+        contest.rank_awards = {"mode": request.data["mode"], "tiers": request.data["tiers"]}
+        contest.save(update_fields=["rank_awards"])
+        return self.success(contest.rank_awards)
 
 
 class ContestTeamAPI(APIView):

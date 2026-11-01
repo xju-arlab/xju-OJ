@@ -25,6 +25,47 @@ table {
   font-weight: 650;
 }
 
+// Board places: advancing and medal tiers as badges, and movement since the freeze.
+.rank-place {
+  display: inline-flex;
+  min-width: 24px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.rank-place.is-advance { background: #d6e7fb; color: #1d5ba6; font-weight: 700; }
+.rank-place.is-gold { background: #f6d670; color: #5a4200; font-weight: 700; }
+.rank-place.is-silver { background: #dde2e8; color: #3d4855; font-weight: 700; }
+.rank-place.is-bronze { background: #ebc19c; color: #66380f; font-weight: 700; }
+.rank-place-cell { display: inline-flex; align-items: center; gap: 2px; }
+.rank-move { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-move.is-up { color: #18864b; }
+.rank-move.is-down { color: #c4413b; }
+.rank-award-legend {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.rank-award-legend > span { padding: 0 10px; }
+.rank-award-legend > span + span { border-left: 1px solid var(--color-border); }
+.rank-award-legend > .is-advance { background: #d6e7fb; color: #1d5ba6; }
+.rank-award-legend > .is-gold { background: #f6d670; color: #5a4200; }
+.rank-award-legend > .is-silver { background: #dde2e8; color: #3d4855; }
+.rank-award-legend > .is-bronze { background: #ebc19c; color: #66380f; }
+.rank-settings-row .rank-award-button + .rank-download { margin-left: 8px; }
+@media (max-width: 760px) {
+  .rank-settings-row .rank-award-button + .rank-download { margin-left: 0; }
+}
+
 .el-table .ac {
   background-color: var(--tag-tools-bg);
   color: var(--cat-tools);

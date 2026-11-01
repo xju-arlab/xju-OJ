@@ -70,6 +70,10 @@ class RankFreezeTest(APITestCase):
         live = self.rank()
         self.assertFalse(live["frozen"])
         self.assertEqual(sorted(row["accepted_number"] for row in live["results"]), [1, 1])
+        # Admins follow movement against the contestants' frozen board as it happens.
+        self.assertEqual({row["user"]["username"]: row["frozen_place"] for row in live["results"]},
+                         {"alice": 1, "bob": 2})
+        self.assertNotIn("frozen_place", self.rank(frozen="1")["results"][0])
         preview = self.rank(frozen="1")
         self.assertTrue(preview["frozen"])
         self.assertEqual([row["accepted_number"] for row in preview["results"]], [1, 0])
@@ -84,6 +88,8 @@ class RankFreezeTest(APITestCase):
         board = self.rank()
         self.assertFalse(board["frozen"])
         self.assertEqual(sorted(row["accepted_number"] for row in board["results"]), [1, 1])
+        self.assertEqual({row["user"]["username"]: (row["place"], row["frozen_place"]) for row in board["results"]},
+                         {"alice": (1, 1), "bob": (2, 2)})
 
     def test_nothing_is_hidden_before_the_freeze_time(self):
         Contest.objects.filter(pk=self.contest.pk).update(rank_freeze_time=timezone.now() + timedelta(hours=1),

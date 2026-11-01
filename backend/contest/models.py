@@ -49,6 +49,10 @@ class Contest(models.Model):
     # it stood, with later attempts pending, until an admin unfreezes it.
     rank_freeze_time = models.DateTimeField(null=True, blank=True)
     rank_unfrozen = models.BooleanField(default=False)
+    # Board highlights set by contest admins, {} when off: {"mode": "advance" | "medal",
+    # "tiers": {tier: {"kind": "count" | "percent", "value": n}}}. A percentage counts
+    # official places and floors; the board works the places out.
+    rank_awards = JSONField(default=dict, blank=True)
 
     objects = ContestQuerySet.as_manager()
 

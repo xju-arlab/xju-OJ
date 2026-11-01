@@ -42,6 +42,42 @@ class ContestRankFreezeSerializer(serializers.Serializer):
     unfrozen = serializers.BooleanField()
 
 
+# Advancing places, or gold, silver and bronze medals.
+RANK_AWARD_TIERS = {"advance": ("advance",), "medal": ("gold", "silver", "bronze")}
+
+
+class RankAwardTierSerializer(serializers.Serializer):
+    # Admins give a count or a percentage; the other follows on the board.
+    kind = serializers.ChoiceField(choices=("count", "percent"))
+    value = serializers.FloatField(min_value=0, max_value=10000)
+
+    def validate(self, data):
+        if data["kind"] == "count" and data["value"] != int(data["value"]):
+            raise serializers.ValidationError("A count must be a whole number")
+        if data["kind"] == "percent" and data["value"] > 100:
+            raise serializers.ValidationError("A percentage cannot exceed 100")
+        if data["kind"] == "count":
+            data["value"] = int(data["value"])
+        return data
+
+
+class RankAwardsSerializer(serializers.Serializer):
+    # Every published contest marks advancing places or medals; there is no "none".
+    mode = serializers.ChoiceField(choices=tuple(RANK_AWARD_TIERS))
+    tiers = serializers.DictField(child=RankAwardTierSerializer())
+
+    def validate(self, data):
+        if set(data["tiers"]) - set(RANK_AWARD_TIERS[data["mode"]]):
+            raise serializers.ValidationError("Unknown tier for this mode")
+        if not data["tiers"]:
+            raise serializers.ValidationError("Set at least one tier")
+        return data
+
+
+class ContestRankAwardsSerializer(RankAwardsSerializer):
+    contest_id = serializers.IntegerField()
+
+
 class ContestTeamInputSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=64)
     members = serializers.ListField(child=serializers.CharField(max_length=32, allow_blank=True), max_length=3)
@@ -251,6 +287,8 @@ class ContestPrepPublishSerializer(serializers.Serializer):
     rank_freeze_time = serializers.DateTimeField(required=False, allow_null=True)
     # Publish for generated team accounts instead of the contestants' own accounts.
     teams = serializers.ListField(child=ContestTeamInputSerializer(), required=False, min_length=1, max_length=500)
+    # Advancing places or medals, decided before the contest goes out.
+    rank_awards = RankAwardsSerializer()
 
 
 class ContestProblemFeedbackSerializer(serializers.ModelSerializer):

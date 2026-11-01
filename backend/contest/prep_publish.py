@@ -62,6 +62,7 @@ def publish_prep_contest(prep_contest, overrides):
         allowed_ip_ranges=list(prep.allowed_ip_ranges),
         published_from=prep,
         rank_freeze_time=freeze_time,
+        rank_awards=overrides.get("rank_awards") or {},
     )
     # Plaintext passwords of the new team accounts, handed back once.
     contest.generated_teams = create_teams(contest, teams) if teams else []

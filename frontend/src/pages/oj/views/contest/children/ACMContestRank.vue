@@ -21,6 +21,10 @@
         <label class="rank-setting"><span>{{$t('m.RealName')}}</span><i-switch v-model="showRealName"></i-switch></label>
         <label class="rank-setting"><span>{{$t('m.Force_Update')}}</span><i-switch v-model="forceUpdate" :disabled="refreshDisabled"></i-switch></label>
       </template>
+      <span v-if="awardRanges.length" class="rank-award-legend" aria-label="晋级与奖牌">
+        <span v-for="range in awardRanges" :key="range.key" :class="`is-${range.key}`">{{ range.label }} {{ range.count }}</span>
+      </span>
+      <button v-if="isContestAdmin" type="button" class="rank-download rank-award-button" @click="awardsVisible = true">晋级 / 奖牌</button>
       <button type="button" class="rank-download" @click="downloadRankCSV">
         <Icon type="download" />
         <span>{{$t('m.download_csv')}}</span>
@@ -29,6 +33,8 @@
     <div v-if="showChart" class="echarts">
       <ECharts :options="options" ref="chart" auto-resize></ECharts>
     </div>
+    <RankAwardsDialog v-if="isContestAdmin" v-model:visible="awardsVisible" :contest-id="$route.params.contestID" :awards="contest.rank_awards"
+                      :official="officialCount" :unit="contest.team_contest ? '支' : '人'" @saved="awardsSaved" />
     <Table ref="tableRank" :columns="columns" :data="dataRank" :row-class-name="rankRowClass" disabled-hover></Table>
     <Pagination :total="total"
                 :page-size="limit" @update:page-size="limit = $event"
@@ -63,10 +69,11 @@
           {
             className: 'rank-hover-cell',
             align: 'center',
-            width: 50,
+            // Room for a medal badge and, once the frozen board opens, its movement.
+            width: 72,
             fixed: 'left',
             render: (h, params) => {
-              return h('span', {}, this.rankPlace(params))
+              return this.renderPlace(h, params)
             }
           },
           {

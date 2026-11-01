@@ -208,6 +208,27 @@ class ContestRankAPI(APIView):
                                                 user__is_disabled=False). \
                 select_related("user").order_by("-total_score")
 
+    def frozen_places(self, serializer, teams):
+        """Official places on the board as it stood at the freeze, as contestants see it.
+
+        On a team-account contest only teams hold places, as on the live board.
+        """
+        key = f"{CacheKey.contest_rank_cache}:{self.contest.id}:frozen_places"
+        places = cache.get(key)
+        if places is None:
+            rows = freeze_rows(self.contest, list(serializer(self.get_rank(), many=True, is_contest_admin=False).data))
+            team_contest = self.contest.is_team_contest
+            places, place = {}, 0
+            for row in rows:
+                team = teams.get(row["user"]["id"])
+                if (team["star"] if team else team_contest):
+                    continue
+                place += 1
+                places[row["user"]["id"]] = place
+            # Results of attempts made before the freeze may still arrive.
+            cache.set(key, places, 30)
+        return places
+
     def column_string(self, n):
         string = ""
         while n > 0:
@@ -316,8 +337,15 @@ class ContestRankAPI(APIView):
         else:
             page_qs = self.paginate_data(request, qs)
             page_qs["results"] = serializer(page_qs["results"], many=True, is_contest_admin=is_contest_admin).data
+        # The live board also says where each entry stands on the frozen one: to
+        # everyone once it is opened, and to contest admins all through the freeze.
+        moved = not frozen and self.contest.rule_type == ContestRuleType.ACM and bool(self.contest.rank_freeze_time) \
+            and (self.contest.rank_unfrozen or (is_contest_admin and now() >= self.contest.rank_freeze_time))
+        frozen_places = self.frozen_places(serializer, teams) if moved else {}
         for row in page_qs["results"]:
             row["team"] = teams.get(row["user"]["id"])
             row["place"] = places.get(row["user"]["id"])
+            if moved:
+                row["frozen_place"] = frozen_places.get(row["user"]["id"])
         page_qs["frozen"] = frozen
         return self.success(page_qs)

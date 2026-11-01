@@ -29,7 +29,15 @@ PREP_CONTEST_DATA = {"title": "Regional prep", "description": "<p>prep</p>", "ru
                      "password": "secret", "real_time_rank": True, "allowed_ip_ranges": ["10.0.0.0/8"]}
 
 
+# Every publish decides advancing places or medals.
+PUBLISH_AWARDS = {"mode": "medal", "tiers": {"gold": {"kind": "percent", "value": 10}}}
+
+
 class ContestPrepTestBase(APITestCase):
+    def publish(self, **data):
+        return self.client.post(self.reverse("contest_prep_publish_api"),
+                                data={"contest_id": self.contest.id, "rank_awards": PUBLISH_AWARDS, **data}, format="json")
+
     def setUp(self):
         self.creator = self.create_admin("creator", "creator-pass", login=False)
         self.organizer = self.create_user("organizer", "organizer-pass", login=False)
@@ -477,26 +485,26 @@ class ContestPrepPublishTest(ContestPrepTestBase):
 
     def test_only_the_creator_publishes(self):
         self.login(self.organizer)
-        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
+        self.assertFailed(self.publish(),
                           "Only the contest creator can do this")
         self.login(self.creator)
-        self.assertSuccess(self.client.post(self.url, data={"contest_id": self.contest.id}))
+        self.assertSuccess(self.publish())
 
     def test_a_contest_is_published_once_unless_the_copy_is_removed(self):
         self.login(self.creator)
-        first = self.client.post(self.url, data={"contest_id": self.contest.id})
+        first = self.publish()
         self.assertSuccess(first)
-        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
+        self.assertFailed(self.publish(),
                           "This contest has already been published")
         Contest.objects.filter(id=first.data["data"]["id"]).update(visible=False)
-        self.assertSuccess(self.client.post(self.url, data={"contest_id": self.contest.id}))
+        self.assertSuccess(self.publish())
 
     def test_publish_without_times_starts_a_fresh_default_window(self):
         # The preparation window is only a placeholder, so a publish that leaves
         # the times out gets the usual default length starting now.
         self.login(self.creator)
         before = timezone.now()
-        response = self.client.post(self.url, data={"contest_id": self.contest.id})
+        response = self.publish()
         self.assertSuccess(response)
         published = Contest.objects.get(id=response.data["data"]["id"])
         self.assertGreaterEqual(published.start_time, before)
@@ -507,12 +515,12 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.contest.prep_problem_count = 3
         self.contest.save()
         self.login(self.creator)
-        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
+        self.assertFailed(self.publish(),
                           "This contest takes 3 problems, but 2 are uploaded")
         Problem.objects.filter(contest=self.contest).delete()
         self.contest.prep_problem_count = None
         self.contest.save()
-        self.assertFailed(self.client.post(self.url, data={"contest_id": self.contest.id}),
+        self.assertFailed(self.publish(),
                           "Upload the contest problems before publishing")
 
     @mock.patch("contest.prep_publish.schedule_contest_problem_publication")
@@ -524,8 +532,8 @@ class ContestPrepPublishTest(ContestPrepTestBase):
 
         start = timezone.now() + timedelta(days=7)
         with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.post(self.url, data={
-                "contest_id": self.contest.id, "title": "Regional final", "start_time": start.isoformat(),
+            response = self.publish(**{
+                "title": "Regional final", "start_time": start.isoformat(),
                 "end_time": (start + timedelta(hours=5)).isoformat()})
         self.assertSuccess(response)
         published = Contest.objects.get(id=response.data["data"]["id"])
@@ -557,8 +565,7 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.login(self.creator)
         # Only one live copy at a time; remove this one to check the window rules.
         Contest.objects.filter(id=published.id).update(visible=False)
-        bad = self.client.post(self.url, data={"contest_id": self.contest.id, "start_time": start.isoformat(),
-                                               "end_time": start.isoformat()})
+        bad = self.publish(start_time=start.isoformat(), end_time=start.isoformat())
         self.assertFailed(bad, "Start time must occur earlier than end time")
 
     def test_published_problems_join_the_library_after_the_contest(self):
@@ -567,8 +574,8 @@ class ContestPrepPublishTest(ContestPrepTestBase):
         self.login(self.creator)
         start = timezone.now() - timedelta(hours=6)
         with self.captureOnCommitCallbacks(execute=False):
-            response = self.client.post(self.url, data={
-                "contest_id": self.contest.id, "start_time": start.isoformat(),
+            response = self.publish(**{
+                "start_time": start.isoformat(),
                 "end_time": (start + timedelta(hours=5)).isoformat()})
         self.assertSuccess(response)
         published = Contest.objects.get(id=response.data["data"]["id"])
@@ -902,25 +909,27 @@ class ContestPrepTeamPublishTest(ContestPrepTestBase):
     def test_team_publish_creates_registered_accounts_and_drops_the_password(self):
         self.login(self.creator)
         start = timezone.now() + timedelta(days=1)
-        response = self.client.post(self.url, data={
-            "contest_id": self.contest.id, "password": "ignored", "start_time": start.isoformat(),
+        response = self.publish(**{
+            "password": "ignored", "start_time": start.isoformat(),
             "end_time": (start + timedelta(hours=5)).isoformat(),
             "rank_freeze_time": (start + timedelta(hours=4)).isoformat(),
-            "teams": [{"name": "Alpha", "members": ["A1", "A2"]}, {"name": "Beta", "members": []}]}, format="json")
+            "teams": [{"name": "Alpha", "members": ["A1", "A2"]}, {"name": "Beta", "members": []}]})
         self.assertSuccess(response)
         published = Contest.objects.get(id=response.data["data"]["id"])
         self.assertIsNone(published.password)
         self.assertEqual(published.rank_freeze_time, start + timedelta(hours=4))
+        self.assertEqual(published.rank_awards, {"mode": "medal", "tiers": {"gold": {"kind": "percent", "value": 10.0}}})
         teams = response.data["data"]["teams"]
         self.assertEqual([team["name"] for team in teams], ["Alpha", "Beta"])
         self.assertTrue(all(team["password"] for team in teams))
         self.assertEqual(ContestParticipation.objects.filter(contest=published).count(), 2)
 
-    def test_a_bad_roster_publishes_nothing(self):
+    def test_a_bad_roster_or_no_awards_publishes_nothing(self):
         self.login(self.creator)
         before = Contest.objects.count()
-        response = self.client.post(self.url, data={
-            "contest_id": self.contest.id,
-            "teams": [{"name": "Alpha", "members": []}, {"name": "Alpha", "members": []}]}, format="json")
+        self.assertFailed(self.publish(rank_awards=None))
+        self.assertFailed(self.publish(rank_awards={"mode": "advance", "tiers": {}}))
+        response = self.publish(
+            teams=[{"name": "Alpha", "members": []}, {"name": "Alpha", "members": []}])
         self.assertFailed(response)
         self.assertEqual(Contest.objects.count(), before)

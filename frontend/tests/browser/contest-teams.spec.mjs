@@ -54,6 +54,8 @@ test.beforeEach(async ({ page }) => {
         : state.ended ? { ...contest, status: '-1', start_time: iso(-6), end_time: iso(-1), now: iso(0) }
           : state.upcoming ? { ...contest, status: '1', start_time: iso(2), end_time: iso(7), rank_freeze_time: iso(6) } : contest
     }
+    if (path === '/api/contest' && data && data.id === 22 && state.awards) data = { ...data, rank_awards: state.awards }
+    if (path === '/api/admin/contest/rank_awards') data = state.awards = { mode: body.mode, tiers: body.tiers }
     if (path === '/api/contest/problem') {
       data = url.searchParams.get('problem_id') ? problem : [{ id: 5, _id: 'A', title: 'A+B', submission_number: 3, accepted_number: 1, my_status: null }]
     }
@@ -65,6 +67,9 @@ test.beforeEach(async ({ page }) => {
     }
     if (path === '/api/contest_rank' && state.campus) {
       data = { ...rank, frozen: false, results: rank.results.map((row, index) => ({ ...row, team: { ...row.team, campus: index ? 'youhao' : 'boda' } })) }
+    }
+    if (path === '/api/contest_rank' && state.moved) {
+      data = { ...rank, frozen: false, results: rank.results.map((row, index) => ({ ...row, frozen_place: index ? 1 : 2 })) }
     }
     if (path === '/api/contest_rank' && state.star) {
       data = { ...rank, frozen: false, results: rank.results.map((row, index) => index ? { ...row, team: { ...row.team, star: true }, place: null } : { ...row, place: 1 }) }
@@ -170,6 +175,13 @@ test('publishing for team accounts takes a roster instead of a password and hand
   })
   await expect(dialog.locator('.team-roster-preview')).toContainText('共 3 支队伍，其中打星 1 支')
   await expect(dialog.locator('.team-roster-preview')).toContainText('赵孙队')
+  // Advancing places or medals must be set; a percentage of the two official teams floors.
+  await expect(dialog.getByRole('button', { name: '发布比赛' })).toBeDisabled()
+  await expect(dialog.locator('.rank-awards')).toContainText('正式参赛 2 支（不含打星）')
+  const percent = dialog.getByRole('spinbutton', { name: '晋级百分比' })
+  await percent.fill('70')
+  await percent.press('Enter')
+  await expect(dialog.getByRole('spinbutton', { name: '晋级个数' })).toHaveValue('1')
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '发布比赛' }).click()
   expect((await download).suggestedFilename()).toBe('contest-40-teams.csv')
@@ -177,6 +189,7 @@ test('publishing for team accounts takes a roster instead of a password and hand
   expect(publish.body.teams).toEqual([{ name: 'Team Alpha', members: ['A1', 'A2'], star: false, campus: '' },
     { name: 'Team Beta', members: ['B1'], star: true, campus: '' }, { name: '赵孙队', members: ['赵一', '孙二'], star: false, campus: '' }])
   expect(publish.body.password).toBe('')
+  expect(publish.body.rank_awards).toEqual({ mode: 'advance', tiers: { advance: { kind: 'percent', value: 70 } } })
   // Ranks are live and an ACM board freezes for the last hour.
   expect(publish.body.real_time_rank).toBe(true)
   expect(Date.parse(publish.body.end_time) - Date.parse(publish.body.start_time)).toBe(5 * 3600e3)
@@ -300,6 +313,44 @@ test('contest admins open the link and stay on /arena/', async ({ page }) => {
   await expect(page.locator('.contest-breadcrumb .contest-team')).toContainText('管理员甲')
   await page.locator('.contest-tabs').getByText(/排名|Rankings/).first().click()
   await expect(page).toHaveURL(/\/arena\/22\/rank$/)
+})
+
+test('contest admins set medals as a count or a floored percentage and the places show them', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  await page.goto('/contest/22/rank')
+  await expect(page.locator('.rank-award-legend')).toHaveCount(0)
+  await page.getByRole('button', { name: '晋级 / 奖牌' }).click()
+  const dialog = page.locator('.el-dialog').filter({ hasText: '晋级 / 奖牌' })
+  await dialog.getByText('奖牌', { exact: true }).click()
+  await expect(dialog).toContainText('正式参赛 2 支')
+  const gold = dialog.getByRole('spinbutton', { name: '金牌个数' })
+  await gold.fill('1')
+  await gold.press('Enter')
+  await expect(dialog.getByRole('spinbutton', { name: '金牌百分比' })).toHaveValue('50.00')
+  const silver = dialog.getByRole('spinbutton', { name: '银牌百分比' })
+  await silver.fill('70')
+  await silver.press('Enter')
+  await expect(dialog.getByRole('spinbutton', { name: '银牌个数' })).toHaveValue('1')
+  await dialog.getByRole('button', { name: '保存' }).click()
+  const saved = state.writes.find(item => item.path === '/api/admin/contest/rank_awards')
+  expect(saved.body).toEqual({ contest_id: '22', mode: 'medal', tiers: { gold: { kind: 'count', value: 1 }, silver: { kind: 'percent', value: 70 } } })
+  await expect(page.locator('.rank-award-legend')).toHaveText('金牌 1银牌 1')
+  const places = page.locator('.el-table__body tr.el-table__row .rank-place')
+  await expect(places.nth(0)).toHaveClass(/is-gold/)
+  await expect(places.nth(1)).toHaveClass(/is-silver/)
+  await expect(places.nth(0)).toHaveCSS('background-color', 'rgb(246, 214, 112)')
+})
+
+test('the live board shows how far each team moved since the freeze', async ({ page }) => {
+  state.profile = { language: 'zh-CN', user: { id: 1, username: 'root', admin_type: 'Super Admin' } }
+  state.moved = true
+  await page.goto('/contest/22/rank')
+  const rows = page.locator('.el-table__body tr.el-table__row')
+  await expect(rows.nth(0).locator('.rank-move')).toHaveText('↑1')
+  await expect(rows.nth(0).locator('.rank-move')).toHaveCSS('color', 'rgb(24, 134, 75)')
+  await expect(rows.nth(1).locator('.rank-move')).toHaveText('↓1')
+  await expect(rows.nth(1).locator('.rank-move')).toHaveCSS('color', 'rgb(196, 65, 59)')
+  await expect(rows.nth(0).locator('.rank-move')).toHaveAttribute('title', '封榜时第 2 名')
 })
 
 test('the board tells campuses apart up to the penalty column when asked', async ({ page }) => {

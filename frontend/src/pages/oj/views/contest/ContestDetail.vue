@@ -243,10 +243,13 @@
         <el-form-item v-if="publishForm.team_mode" label="队伍信息" class="prep-publish-teams">
           <TeamRosterImport @update:teams="publishForm.teams = $event" />
         </el-form-item>
+        <el-form-item label="晋级 / 奖牌" class="prep-publish-awards">
+          <RankAwardsEditor v-if="publishVisible" :official="publishOfficial" :unit="publishForm.team_mode ? '支' : '人'" @change="publishForm.rank_awards = $event" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="publishVisible = false">{{ $t('m.Cancel') }}</el-button>
-        <el-button type="primary" :loading="publishing" :disabled="publishBlocked || (publishForm.team_mode && !publishForm.teams.length)" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
+        <el-button type="primary" :loading="publishing" :disabled="publishBlocked || (publishForm.team_mode && !publishForm.teams.length) || !publishForm.rank_awards" @click="publish">{{ $t('m.Prep_Publish_Confirm') }}</el-button>
       </template>
     </LegacyDialog>
 
@@ -323,6 +326,7 @@
   import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, PREP_PLAN_CHANGED_EVENT, PUBLISH_DEFAULT_HOURS, USER_TYPE } from '@/utils/constants'
   import ContestAnnouncementBanner from '@oj/components/ContestAnnouncementBanner.vue'
   import TeamRosterImport from '@/shared/ui/TeamRosterImport.vue'
+  import RankAwardsEditor from './RankAwardsEditor.vue'
   import { downloadTeamAccounts, downloadTeamSheet } from '@/utils/teamRoster'
   import PrepStatementExportDialog from './PrepStatementExportDialog.vue'
   import ContestTeamAddDialog from './ContestTeamAddDialog.vue'
@@ -336,7 +340,7 @@
 
   export default {
     name: 'ContestDetail',
-    components: { ContestAnnouncementBanner, ContestTeamAddDialog, PrepStatementExportDialog, TeamRosterImport, UserAvatar },
+    components: { ContestAnnouncementBanner, ContestTeamAddDialog, PrepStatementExportDialog, RankAwardsEditor, TeamRosterImport, UserAvatar },
     data () {
       return {
         routeName: '',
@@ -618,7 +622,9 @@
           // The published contest's password is chosen here; the review password is not carried over.
           password: '',
           team_mode: false,
-          teams: []
+          teams: [],
+          // Required: advancing places or medals for the board.
+          rank_awards: null
         }
         this.publishVisible = true
         this.loadSelection()
@@ -728,6 +734,7 @@
             password: form.team_mode ? '' : form.password,
             real_time_rank: true,
             rank_freeze_time: freezes ? freeze.toISOString() : null,
+            rank_awards: form.rank_awards,
             ...(form.team_mode ? { teams: form.teams } : {})
           })
           this.publishVisible = false
@@ -754,6 +761,10 @@
       }
     },
     computed: {
+      // Percentages count these places; a team roster knows them, otherwise the board does later.
+      publishOfficial () {
+        return this.publishForm.team_mode ? (this.publishForm.teams || []).filter(team => !team.star).length : 0
+      },
       ...mapState({
         contest: state => state.contest.contest,
         contestAccess: state => state.contest.access,
@@ -1145,7 +1156,7 @@
   .prep-live::after { animation: none; }
 }
 .prep-publish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
-.prep-publish-teams :deep(.el-form-item__content) { display: block; }
+.prep-publish-teams :deep(.el-form-item__content), .prep-publish-awards :deep(.el-form-item__content) { display: block; }
 .prep-publish-note { margin: -6px 0 14px; color: var(--color-text-muted); font-size: 12px; }
 // The add button and the account chip share one height and the pill shape;
 // negative margins keep the breadcrumb row at its text height.

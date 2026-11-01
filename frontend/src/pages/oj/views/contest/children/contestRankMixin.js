@@ -5,9 +5,12 @@ import { types } from '@/store'
 import { CONTEST_STATUS } from '@/utils/constants'
 import { cloneFixtures, MOCK_CONTEST_ACM_RANK, MOCK_CONTEST_OI_RANK } from '@oj/mocks/fixtures'
 import { CAMPUSES } from '@/utils/teamRoster'
+import { awardRanges, placeTier } from '@/utils/rankAwards'
 import { readRankPreferences, updateRankPreferences } from './rankPreferences'
+import RankAwardsDialog from './RankAwardsDialog.vue'
 
 export default {
+  components: { RankAwardsDialog },
   data () {
     const rankPreferences = readRankPreferences()
     return {
@@ -16,6 +19,9 @@ export default {
       // Tints rows by campus; offered once some team on the board has one.
       showCampus: rankPreferences.campus,
       campusBoard: false,
+      // Official places on the whole board, which award percentages count.
+      officialCount: 0,
+      awardsVisible: false,
       rankPreferences,
       rankRequestSerial: 0,
       // Contest admins see the live board; this shows them the contestants' frozen one.
@@ -45,6 +51,22 @@ export default {
     unofficial (row) {
       if (this.contest.team_contest) return !row.team || Boolean(row.team.star)
       return Boolean(row.team && row.team.star)
+    },
+    // The place, badged when it advances or wins a medal, and once an opened
+    // frozen board shows its final order, how far it moved since the freeze.
+    renderPlace (h, params) {
+      const place = this.rankPlace(params)
+      const tier = placeTier(place, this.awardRanges)
+      const badge = h('span', { class: ['rank-place', tier && `is-${tier.key}`], title: tier ? tier.label : undefined }, place)
+      const before = params.row.frozen_place
+      const moved = Number.isInteger(place) && Number.isInteger(before) ? before - place : 0
+      if (!moved) return badge
+      return h('span', { class: 'rank-place-cell' }, [badge, h('span', {
+        class: ['rank-move', moved > 0 ? 'is-up' : 'is-down'], title: `封榜时第 ${before} 名`
+      }, (moved > 0 ? '↑' : '↓') + Math.abs(moved))])
+    },
+    awardsSaved () {
+      this.$store.dispatch('getContest')
     },
     rankRowClass ({ row }) {
       const campus = this.showCampus && row.team && CAMPUSES[row.team.campus] ? `rank-campus-${row.team.campus}` : ''
@@ -79,6 +101,7 @@ export default {
         if (requestSerial !== this.rankRequestSerial) return
         let payload = res.data.data || {}
         const results = Array.isArray(payload.results) ? payload.results : []
+        this.officialCount = teamBoard ? results.filter(row => !this.unofficial(row)).length : Number(payload.total) || results.length
         if (teamBoard) {
           this.campusBoard = results.some(row => row.team && CAMPUSES[row.team.campus])
           let place = 0
@@ -164,6 +187,9 @@ export default {
     ...mapGetters(['isContestAdmin', 'contestRuleType']),
     nameColumnTitle () {
       return this.contest.team_contest ? '队伍' : this.$t('m.User_User')
+    },
+    awardRanges () {
+      return awardRanges(this.contest.rank_awards, this.officialCount)
     },
     ...mapState({
       'contest': state => state.contest.contest,

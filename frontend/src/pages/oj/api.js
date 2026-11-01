@@ -436,6 +436,10 @@ export default {
   createContestTeams (contestID, teams) {
     return ajax('admin/contest/teams', 'post', { data: { contest_id: contestID, teams } })
   },
+  // awards is { mode, tiers }, as RankAwardsEditor gives it.
+  setContestRankAwards (contestID, awards) {
+    return ajax('admin/contest/rank_awards', 'post', { data: { contest_id: contestID, ...awards } })
+  },
   setContestRankFreeze (contestID, unfrozen) {
     return ajax('admin/contest/rank_freeze', 'post', {
       data: { contest_id: contestID, unfrozen }

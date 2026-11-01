@@ -241,3 +241,40 @@ class ContestTeamSheetTest(APITestCase):
     @unittest.skipUnless(shutil.which("xelatex"), "XeLaTeX is not installed")
     def test_the_sheet_typesets(self):
         self.assertTrue(compile_team_sheet("Team contest", self.teams * 7).startswith(b"%PDF"))
+
+
+class ContestRankAwardsTest(APITestCase):
+    def setUp(self):
+        self.root = self.create_super_admin()
+        self.contest = Contest.objects.create(
+            title="Board", description="", real_time_rank=True, rule_type="ACM", created_by=self.root,
+            start_time=timezone.now() - timedelta(hours=1), end_time=timezone.now() + timedelta(hours=4))
+        self.url = self.reverse("contest_rank_awards_api")
+
+    def post(self, **data):
+        return self.client.post(self.url, data={"contest_id": self.contest.id, **data}, format="json")
+
+    def test_admins_set_medals_or_advancing_places_and_everyone_sees_them(self):
+        medals = {"gold": {"kind": "percent", "value": 10}, "silver": {"kind": "count", "value": 6}}
+        response = self.post(mode="medal", tiers=medals)
+        self.assertSuccess(response)
+        self.assertEqual(response.data["data"], {"mode": "medal", "tiers": {
+            "gold": {"kind": "percent", "value": 10.0}, "silver": {"kind": "count", "value": 6}}})
+        self.client.logout()
+        detail = self.client.get(self.reverse("contest_api"), data={"id": self.contest.id}).data["data"]
+        self.assertEqual(detail["rank_awards"]["mode"], "medal")
+        self.client.force_login(self.root)
+        self.assertSuccess(self.post(mode="advance", tiers={"advance": {"kind": "count", "value": 12}}))
+        self.contest.refresh_from_db()
+        self.assertEqual(self.contest.rank_awards, {"mode": "advance", "tiers": {"advance": {"kind": "count", "value": 12}}})
+
+    def test_bad_settings_and_other_users_are_refused(self):
+        for data in ({"mode": "medal", "tiers": {"advance": {"kind": "count", "value": 3}}},
+                     {"mode": "medal", "tiers": {"gold": {"kind": "count", "value": 2.5}}},
+                     {"mode": "advance", "tiers": {"advance": {"kind": "percent", "value": 120}}},
+                     {"mode": "medal", "tiers": {}}, {"mode": "", "tiers": {}}):
+            self.assertFailed(self.post(**data))
+        self.create_user("student", "student123")
+        self.assertFailed(self.post(mode="advance", tiers={"advance": {"kind": "count", "value": 3}}))
+        self.contest.refresh_from_db()
+        self.assertEqual(self.contest.rank_awards, {})
