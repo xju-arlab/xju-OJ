@@ -847,7 +847,7 @@ tests_quiz.py[TA6M]: F:回归模型理解题包格式、判分、直接发布、
 0004_problem_packages.py[PD7T]: F:追加AI导入队列表及题目归档关联和独立编辑修订号 | R:code:backend/ai_studio/models.py | A:ai_studio迁移0004 | S:既有题目revision初始化1且归档关联为空，不改判分版本；导入按上传者与内容摘要唯一；关联归档受保护删除
 0005_aiproblem_quiz_category.py[PD5T]: F:为AI题目题型选项增加模型理解quiz | R:code:backend/ai_studio/models.py | A:ai_studio迁移0005 | S:仅改变choices迁移状态，不执行数据库DDL
 0006_aicontestconfig_ranking.py[PD5T]: F:为AI比赛配置增加排名规则字段 | R:code:backend/ai_studio/models.py | A:ai_studio迁移0006 | S:存量比赛默认score，继续按加权总分排名
-0007_aicontestconfig_oi_ranking.py[PD5S]: F:把AI比赛排名规则字段的选项扩展出OI | R:code:backend/ai_studio/models.py,code:backend/ai_studio/migrations/0006_aicontestconfig_ranking.py | A:aicontestconfig.ranking | S:只追加选项，既有行仍默认score，不需要回填
+0007_aicontestconfig_oi_ranking.py[PD5T]: F:把AI比赛排名规则字段的选项扩展出OI | R:code:backend/ai_studio/models.py,code:backend/ai_studio/migrations/0006_aicontestconfig_ranking.py | A:aicontestconfig.ranking | S:只追加选项，既有行仍默认score，不需要回填
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/admin/views/ai/===
 ContestSettings.vue[EU7T]: F:编辑AI比赛题序权重、排名规则（总分、ACM或OI）、最后或最高分策略及私榜和补题开关 | R:code:frontend/src/pages/admin/views/contest/Contest.vue,code:frontend/src/pages/oj/views/ai/api.js | A:contestId；save；validate | S:合并可管理和公开题目各最多100项；父表单创建比赛后单独保存设置；ACM隐藏计分策略；OI固定取每题最高分，选择策略交后端忽略；赛中冻结和赛后公布由后端核验
