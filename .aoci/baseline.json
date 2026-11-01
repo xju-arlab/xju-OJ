@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T08:29:02Z",
+  "updated_at": "2026-11-01T09:46:16Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ae03dbb3dee86f2a7dd2a5caa5bcca15356dcc940caff47659546e22967b1cac",
-      "size": 226595,
-      "normalized_sha256": "ae03dbb3dee86f2a7dd2a5caa5bcca15356dcc940caff47659546e22967b1cac"
+      "sha256": "a9899427d6c3a861b5390804f0ab2ac7305eef712a3afd73a2d3a66cc6668477",
+      "size": 228971,
+      "normalized_sha256": "a9899427d6c3a861b5390804f0ab2ac7305eef712a3afd73a2d3a66cc6668477"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1002,6 +1002,18 @@
       "size": 669,
       "normalized_sha256": "5a5e83cd55f015583cc89fa98f35516b283e64367a8cd193f77d20103c5983ce"
     },
+    "backend/contest/migrations/0023_contestteam_campus.py": {
+      "role": "index",
+      "sha256": "7196de7f67a11fa8e6c981ae89432dc784a2c623620c542d8623557b746bf754",
+      "size": 359,
+      "normalized_sha256": "7196de7f67a11fa8e6c981ae89432dc784a2c623620c542d8623557b746bf754"
+    },
+    "backend/contest/migrations/0024_contest_rank_awards.py": {
+      "role": "index",
+      "sha256": "f202b8b16d646eaf0d19247f8842a2a56f9161de4ccfcb612bc245bef4953f1b",
+      "size": 352,
+      "normalized_sha256": "f202b8b16d646eaf0d19247f8842a2a56f9161de4ccfcb612bc245bef4953f1b"
+    },
     "backend/contest/migrations/__init__.py": {
       "role": "index",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1009,15 +1021,15 @@
     },
     "backend/contest/models.py": {
       "role": "index",
-      "sha256": "cbf87d21e103febb652993a1edbaf256296cf9ac5453c2fa5432afda79526913",
-      "size": 11660,
-      "normalized_sha256": "cbf87d21e103febb652993a1edbaf256296cf9ac5453c2fa5432afda79526913"
+      "sha256": "e8d9ee12e35b5ebd8985b139856ee65c0b54364ad2dcce81e95d51c05c63123d",
+      "size": 12139,
+      "normalized_sha256": "e8d9ee12e35b5ebd8985b139856ee65c0b54364ad2dcce81e95d51c05c63123d"
     },
     "backend/contest/prep_publish.py": {
       "role": "index",
-      "sha256": "6d8bd93ee5dd3d099ee9410d1650bbf9ff9a0aab3e4890e2f78f2bfd7f652fa1",
-      "size": 4646,
-      "normalized_sha256": "6d8bd93ee5dd3d099ee9410d1650bbf9ff9a0aab3e4890e2f78f2bfd7f652fa1"
+      "sha256": "f0f7824c106a5b6395c0d49eb6275e5cc92ac00e7e4daeeed2fe48b7eb88c6c1",
+      "size": 4702,
+      "normalized_sha256": "f0f7824c106a5b6395c0d49eb6275e5cc92ac00e7e4daeeed2fe48b7eb88c6c1"
     },
     "backend/contest/prep_rank.py": {
       "role": "index",
@@ -1027,9 +1039,9 @@
     },
     "backend/contest/serializers.py": {
       "role": "index",
-      "sha256": "87633155a923c4f341ba51bc6adf1c8874c2b46c8966199d6dba44a5e523d3b3",
-      "size": 11371,
-      "normalized_sha256": "87633155a923c4f341ba51bc6adf1c8874c2b46c8966199d6dba44a5e523d3b3"
+      "sha256": "102bfaa4ef90e8ca6c2d048f92e4c6c6066d828632f1838d02828a85af9fe4a4",
+      "size": 13624,
+      "normalized_sha256": "102bfaa4ef90e8ca6c2d048f92e4c6c6066d828632f1838d02828a85af9fe4a4"
     },
     "backend/contest/statement_pdf.py": {
       "role": "index",
@@ -1051,9 +1063,9 @@
     },
     "backend/contest/teams.py": {
       "role": "index",
-      "sha256": "23f8993973842a1016f294ce9995cbe1e4fbef1e05747ca274e944ac58239373",
-      "size": 4157,
-      "normalized_sha256": "23f8993973842a1016f294ce9995cbe1e4fbef1e05747ca274e944ac58239373"
+      "sha256": "3bb5163c899f0b40387f7d5b38b8e2d20e9058494a4e075512eceaf727147ec9",
+      "size": 5017,
+      "normalized_sha256": "3bb5163c899f0b40387f7d5b38b8e2d20e9058494a4e075512eceaf727147ec9"
     },
     "backend/contest/tests.py": {
       "role": "index",
@@ -1063,15 +1075,15 @@
     },
     "backend/contest/tests_freeze.py": {
       "role": "index",
-      "sha256": "2964e31cff5d2f5cb6033f43f4d8e3e3da1993654840e8c8e73085826b8ee7cf",
-      "size": 7440,
-      "normalized_sha256": "2964e31cff5d2f5cb6033f43f4d8e3e3da1993654840e8c8e73085826b8ee7cf"
+      "sha256": "1ab1d554707baa6e3407454cf716f9c0a1847c9b6b7df72125ef6c3b50736f02",
+      "size": 7929,
+      "normalized_sha256": "1ab1d554707baa6e3407454cf716f9c0a1847c9b6b7df72125ef6c3b50736f02"
     },
     "backend/contest/tests_prep.py": {
       "role": "index",
-      "sha256": "8f2e0b87aaa470fd6c9bb7b830a87bab0bc1bdff92bab2a742d551279bae95dc",
-      "size": 55340,
-      "normalized_sha256": "8f2e0b87aaa470fd6c9bb7b830a87bab0bc1bdff92bab2a742d551279bae95dc"
+      "sha256": "8da136b3b0848a0b7c5d61003b3f97f0040f487df15a53bf3af7c85029ba5b88",
+      "size": 55245,
+      "normalized_sha256": "8da136b3b0848a0b7c5d61003b3f97f0040f487df15a53bf3af7c85029ba5b88"
     },
     "backend/contest/tests_safety.py": {
       "role": "index",
@@ -1087,9 +1099,9 @@
     },
     "backend/contest/tests_teams.py": {
       "role": "index",
-      "sha256": "59498c1d83a5d2c2f8f22f369ee275ac96c9b073568d41cc201eee855a7d41d0",
-      "size": 13334,
-      "normalized_sha256": "59498c1d83a5d2c2f8f22f369ee275ac96c9b073568d41cc201eee855a7d41d0"
+      "sha256": "cae943a1a161ca252bd91ea70ef5fe05286342cd1520eca700df218b9481143e",
+      "size": 17825,
+      "normalized_sha256": "cae943a1a161ca252bd91ea70ef5fe05286342cd1520eca700df218b9481143e"
     },
     "backend/contest/urls/__init__.py": {
       "role": "index",
@@ -1098,9 +1110,9 @@
     },
     "backend/contest/urls/admin.py": {
       "role": "index",
-      "sha256": "aca2361e9473f8fca1c75caa6a7c6755764e1399289134f81dcbccfae9e835f3",
-      "size": 1075,
-      "normalized_sha256": "aca2361e9473f8fca1c75caa6a7c6755764e1399289134f81dcbccfae9e835f3"
+      "sha256": "5b1288fff6830cdd173e5ed64fc1c56c342ee5398d0fb84ce9f599e459c458ef",
+      "size": 1202,
+      "normalized_sha256": "5b1288fff6830cdd173e5ed64fc1c56c342ee5398d0fb84ce9f599e459c458ef"
     },
     "backend/contest/urls/oj.py": {
       "role": "index",
@@ -1115,15 +1127,15 @@
     },
     "backend/contest/views/admin.py": {
       "role": "index",
-      "sha256": "4e81953ee6ceaff8246ebec08c24fd44d18f197d3816f1c467a652fbd04999cd",
-      "size": 20994,
-      "normalized_sha256": "4e81953ee6ceaff8246ebec08c24fd44d18f197d3816f1c467a652fbd04999cd"
+      "sha256": "76d1767070e9e4a01e1946cbbf27e520dfcbf961fa56debc9833429b51190d1b",
+      "size": 22035,
+      "normalized_sha256": "76d1767070e9e4a01e1946cbbf27e520dfcbf961fa56debc9833429b51190d1b"
     },
     "backend/contest/views/oj.py": {
       "role": "index",
-      "sha256": "38694fc11389591c3ce3ae4471d2f4dcc22e711208cd4a6fe534e61dffb67fd7",
-      "size": 16094,
-      "normalized_sha256": "38694fc11389591c3ce3ae4471d2f4dcc22e711208cd4a6fe534e61dffb67fd7"
+      "sha256": "540cdb3bc5f3bc48e4dbf2b32bbca8a99f4468bf83cf03f8566bdbf1316de29c",
+      "size": 17682,
+      "normalized_sha256": "540cdb3bc5f3bc48e4dbf2b32bbca8a99f4468bf83cf03f8566bdbf1316de29c"
     },
     "backend/contest/views/prep.py": {
       "role": "index",
@@ -2874,9 +2886,9 @@
     },
     "frontend/src/pages/admin/api.js": {
       "role": "index",
-      "sha256": "4e33f495fd118c0b137d73510305908528762d7f204c6784097422bb91e129d1",
-      "size": 8273,
-      "normalized_sha256": "4e33f495fd118c0b137d73510305908528762d7f204c6784097422bb91e129d1"
+      "sha256": "01945b3a4fc2c35dc75168e516225ebc2fc148c3fce408f08cef6bf3b46fbff2",
+      "size": 8348,
+      "normalized_sha256": "01945b3a4fc2c35dc75168e516225ebc2fc148c3fce408f08cef6bf3b46fbff2"
     },
     "frontend/src/pages/admin/components/Accordion.vue": {
       "role": "index",
@@ -3030,9 +3042,9 @@
     },
     "frontend/src/pages/admin/views/contest/ContestTeams.vue": {
       "role": "index",
-      "sha256": "f30b726516f03a72f79b98ede7c926d7b5af355833cc9473100a822395879eca",
-      "size": 6613,
-      "normalized_sha256": "f30b726516f03a72f79b98ede7c926d7b5af355833cc9473100a822395879eca"
+      "sha256": "24316675c267ca39d1702499581208776092d310dd71f7f7bf1f676567677ff3",
+      "size": 8186,
+      "normalized_sha256": "24316675c267ca39d1702499581208776092d310dd71f7f7bf1f676567677ff3"
     },
     "frontend/src/pages/admin/views/general/Announcement.vue": {
       "role": "index",
@@ -3114,9 +3126,9 @@
     },
     "frontend/src/pages/oj/api.js": {
       "role": "index",
-      "sha256": "cfff61f5634c67dd0b69dcdda0d0be7bf8c56a8c138625bff009798d894632b4",
-      "size": 13815,
-      "normalized_sha256": "cfff61f5634c67dd0b69dcdda0d0be7bf8c56a8c138625bff009798d894632b4"
+      "sha256": "84fb7630d7e2f9a2e636c593fa4c4c7df1fe1c630357e078465b7eb404dcda89",
+      "size": 14167,
+      "normalized_sha256": "84fb7630d7e2f9a2e636c593fa4c4c7df1fe1c630357e078465b7eb404dcda89"
     },
     "frontend/src/pages/oj/authError.js": {
       "role": "index",
@@ -3354,9 +3366,9 @@
     },
     "frontend/src/pages/oj/views/contest/ContestDetail.vue": {
       "role": "index",
-      "sha256": "39284d3650551bed6234a173e6999c1e50f5cf6f69f314366cb229ca938cce10",
-      "size": 56696,
-      "normalized_sha256": "39284d3650551bed6234a173e6999c1e50f5cf6f69f314366cb229ca938cce10"
+      "sha256": "2c1442467f13c6319d58f4aee625f17315951ef0ec57e5ffef8b5c76a400c48a",
+      "size": 57504,
+      "normalized_sha256": "2c1442467f13c6319d58f4aee625f17315951ef0ec57e5ffef8b5c76a400c48a"
     },
     "frontend/src/pages/oj/views/contest/ContestList.vue": {
       "role": "index",
@@ -3366,9 +3378,9 @@
     },
     "frontend/src/pages/oj/views/contest/ContestTeamAddDialog.vue": {
       "role": "index",
-      "sha256": "ad498576183d68836670a9fe46d556de76246cc2e094150e6efd60ec87b614f1",
-      "size": 6409,
-      "normalized_sha256": "ad498576183d68836670a9fe46d556de76246cc2e094150e6efd60ec87b614f1"
+      "sha256": "90f4905c44f63af03d603f7da6aeb492589615f1c256a53bbad310e47dc82539",
+      "size": 7824,
+      "normalized_sha256": "90f4905c44f63af03d603f7da6aeb492589615f1c256a53bbad310e47dc82539"
     },
     "frontend/src/pages/oj/views/contest/ContestWaiting.vue": {
       "role": "index",
@@ -3394,11 +3406,17 @@
       "size": 13149,
       "normalized_sha256": "b4a2b012e73bb671bee0af96131efc29e07ca20ca96b83604181818e84da3352"
     },
+    "frontend/src/pages/oj/views/contest/RankAwardsEditor.vue": {
+      "role": "index",
+      "sha256": "7cf3b624f315cb55abaae7923e5840f3294ba271dce75d47e14abb0427df404c",
+      "size": 5651,
+      "normalized_sha256": "7cf3b624f315cb55abaae7923e5840f3294ba271dce75d47e14abb0427df404c"
+    },
     "frontend/src/pages/oj/views/contest/children/ACMContestRank.vue": {
       "role": "index",
-      "sha256": "725bdf4202429da21b444da5ddf49b4e58214b7157cb1cef3a328186e797094c",
-      "size": 17381,
-      "normalized_sha256": "725bdf4202429da21b444da5ddf49b4e58214b7157cb1cef3a328186e797094c"
+      "sha256": "d77774ae0604676cddcf65cd3cef3ef57e3bf15e26f2ce1c40db560b21acce29",
+      "size": 19312,
+      "normalized_sha256": "d77774ae0604676cddcf65cd3cef3ef57e3bf15e26f2ce1c40db560b21acce29"
     },
     "frontend/src/pages/oj/views/contest/children/ACMHelper.vue": {
       "role": "index",
@@ -3462,9 +3480,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/OIContestRank.vue": {
       "role": "index",
-      "sha256": "d51f28cd6f638ce81519dd62932713a7cfeac15b88079c42117b575c14135af1",
-      "size": 9428,
-      "normalized_sha256": "d51f28cd6f638ce81519dd62932713a7cfeac15b88079c42117b575c14135af1"
+      "sha256": "2bf8105d1b6ffc37aa0a0adedd682b281a8c0ed9ffa35e3c576ba101e752048c",
+      "size": 10062,
+      "normalized_sha256": "2bf8105d1b6ffc37aa0a0adedd682b281a8c0ed9ffa35e3c576ba101e752048c"
     },
     "frontend/src/pages/oj/views/contest/children/PrepFeedbackThread.vue": {
       "role": "index",
@@ -3472,11 +3490,17 @@
       "size": 10030,
       "normalized_sha256": "ddc927d788a55b1500e13bd597ca5764f8a113314735e8de9ed442256c4ec676"
     },
+    "frontend/src/pages/oj/views/contest/children/RankAwardsDialog.vue": {
+      "role": "index",
+      "sha256": "ba1d300e42adc7d6826cd267d84c1f3d115b91a3c3648f9f8807e9cf65dda9a0",
+      "size": 1468,
+      "normalized_sha256": "ba1d300e42adc7d6826cd267d84c1f3d115b91a3c3648f9f8807e9cf65dda9a0"
+    },
     "frontend/src/pages/oj/views/contest/children/contestRankMixin.js": {
       "role": "index",
-      "sha256": "e9396434e6de01f930b54bd409820f582f417ceb123386d79cf7cfa388babc7b",
-      "size": 9566,
-      "normalized_sha256": "e9396434e6de01f930b54bd409820f582f417ceb123386d79cf7cfa388babc7b"
+      "sha256": "eb5aa93685455619732c5db35a68b50eca3efa9032c4275ec244077654555f46",
+      "size": 11500,
+      "normalized_sha256": "eb5aa93685455619732c5db35a68b50eca3efa9032c4275ec244077654555f46"
     },
     "frontend/src/pages/oj/views/contest/children/prepProblemService.js": {
       "role": "index",
@@ -3486,9 +3510,9 @@
     },
     "frontend/src/pages/oj/views/contest/children/rankPreferences.js": {
       "role": "index",
-      "sha256": "7bb7fe7d7369bf9d9049884d3f0fc2c408bd5a75e059f4e6e86e2e46211a78f5",
-      "size": 1802,
-      "normalized_sha256": "7bb7fe7d7369bf9d9049884d3f0fc2c408bd5a75e059f4e6e86e2e46211a78f5"
+      "sha256": "70667b790e8750d3ced83647a960b2c2e603c24ab7e374aa3abd2be4114d0b81",
+      "size": 1910,
+      "normalized_sha256": "70667b790e8750d3ced83647a960b2c2e603c24ab7e374aa3abd2be4114d0b81"
     },
     "frontend/src/pages/oj/views/contest/index.js": {
       "role": "index",
@@ -3708,9 +3732,9 @@
     },
     "frontend/src/shared/ui/TeamRosterImport.vue": {
       "role": "index",
-      "sha256": "110e1637669be12c086b5691eade5b4053d796ae5318e42f963ce229a27e948a",
-      "size": 5822,
-      "normalized_sha256": "110e1637669be12c086b5691eade5b4053d796ae5318e42f963ce229a27e948a"
+      "sha256": "af5286036123a8cdbc1680f31f80ba1cf9f02f488eab9999cac53f1f1c45aa61",
+      "size": 7933,
+      "normalized_sha256": "af5286036123a8cdbc1680f31f80ba1cf9f02f488eab9999cac53f1f1c45aa61"
     },
     "frontend/src/shared/ui/UserAvatar.vue": {
       "role": "index",
@@ -3792,9 +3816,9 @@
     },
     "frontend/src/styles/iview-custom.less": {
       "role": "index",
-      "sha256": "0b01390777b1add45fedc3af31ffcb6e074d3d5029a7e7bf8a76c99eac87d2d1",
-      "size": 729,
-      "normalized_sha256": "0b01390777b1add45fedc3af31ffcb6e074d3d5029a7e7bf8a76c99eac87d2d1"
+      "sha256": "3b84ca02ff6794ec777a36bc3a1ac0ecd6d6f2a76c22c5112b12f7676e3df243",
+      "size": 2421,
+      "normalized_sha256": "3b84ca02ff6794ec777a36bc3a1ac0ecd6d6f2a76c22c5112b12f7676e3df243"
     },
     "frontend/src/styles/judge-status.less": {
       "role": "index",
@@ -3862,6 +3886,12 @@
       "size": 1608,
       "normalized_sha256": "093a06faa93b4369fb5c975c8424261e6633dc91dc6451fbf3c37361e9eae622"
     },
+    "frontend/src/utils/rankAwards.js": {
+      "role": "index",
+      "sha256": "a6b5e51782c5c61b55477e322c643fdbd83e322d20acf3cbd0f0f3e2192a6b2d",
+      "size": 1745,
+      "normalized_sha256": "a6b5e51782c5c61b55477e322c643fdbd83e322d20acf3cbd0f0f3e2192a6b2d"
+    },
     "frontend/src/utils/runtime.js": {
       "role": "index",
       "sha256": "1d946472daf82ab3a8677ee1207a66ec06fd4664611b3f998af149a083d25388",
@@ -3876,9 +3906,9 @@
     },
     "frontend/src/utils/teamRoster.js": {
       "role": "index",
-      "sha256": "82cbd1a950bd8585b2ff0625aebb62118c8fcccf8f0080b61df60827630adc17",
-      "size": 5023,
-      "normalized_sha256": "82cbd1a950bd8585b2ff0625aebb62118c8fcccf8f0080b61df60827630adc17"
+      "sha256": "03745f1cb18adc37341027c6642ec7ca61eaa3bbff3c49465efd4dda29317476",
+      "size": 7520,
+      "normalized_sha256": "03745f1cb18adc37341027c6642ec7ca61eaa3bbff3c49465efd4dda29317476"
     },
     "frontend/src/utils/time.js": {
       "role": "index",
@@ -3930,9 +3960,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "5edc4607db9b2e62978fadc5b60929c0876924fa224dd0027addf976eabcae04",
-      "size": 25261,
-      "normalized_sha256": "5edc4607db9b2e62978fadc5b60929c0876924fa224dd0027addf976eabcae04"
+      "sha256": "cf36c0e74c3eccdfd7d49d3792335958daee458764467ae5f92dfe7a519ea060",
+      "size": 32961,
+      "normalized_sha256": "cf36c0e74c3eccdfd7d49d3792335958daee458764467ae5f92dfe7a519ea060"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",
