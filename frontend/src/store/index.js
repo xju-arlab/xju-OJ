@@ -44,7 +44,7 @@ const useApplicationStore = defineStore('application', {
     modalStatus: { mode: 'login', visible: false },
     user: { profile: {} },
     contest: {
-      now: moment(), access: false, rankLimit: 10, forceUpdate: false,
+      now: moment(), access: false, rankLimit: 30, forceUpdate: false,
       contest: { created_by: {}, contest_type: CONTEST_TYPE.PUBLIC },
       contestProblems: [], itemVisible: { menu: true, chart: false, realName: false }
     }

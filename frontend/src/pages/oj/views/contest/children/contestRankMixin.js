@@ -106,8 +106,21 @@ export default {
       }
     }
   },
+  watch: {
+    // A team-account contest ranks teams, not users.
+    nameColumnTitle: {
+      immediate: true,
+      handler (title) {
+        const column = this.columns.find(item => item.isNameColumn)
+        if (column) column.title = title
+      }
+    }
+  },
   computed: {
     ...mapGetters(['isContestAdmin', 'contestRuleType']),
+    nameColumnTitle () {
+      return this.contest.team_contest ? '队伍' : this.$t('m.User_User')
+    },
     ...mapState({
       'contest': state => state.contest.contest,
       'contestProblems': state => state.contest.contestProblems

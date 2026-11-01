@@ -48,6 +48,7 @@
             }
           },
           {
+            isNameColumn: true,
             title: this.$t('m.User_User'),
             align: 'center',
             render: (h, params) => {

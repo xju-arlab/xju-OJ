@@ -65,6 +65,7 @@
           },
           {
             className: 'rank-hover-cell',
+            isNameColumn: true,
             title: this.$t('m.User_User'),
             align: 'center',
             fixed: 'left',

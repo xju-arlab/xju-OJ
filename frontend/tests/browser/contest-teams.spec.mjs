@@ -58,7 +58,7 @@ test.beforeEach(async ({ page }) => {
       data = url.searchParams.get('problem_id') ? problem : [{ id: 5, _id: 'A', title: 'A+B', submission_number: 3, accepted_number: 1, my_status: null }]
     }
     if (path === '/api/languages') data = { languages: [{ name: 'C++', description: 'G++', content_type: 'text/x-c++src', config: { template: '' } }], spj_languages: [] }
-    if (path === '/api/contest_rank') data = state.admin ? { ...rank, frozen: false } : rank
+    if (path === '/api/contest_rank') { data = state.admin ? { ...rank, frozen: false } : rank; (state.rankLimits ||= []).push(url.searchParams.get('limit')) }
     if (path === '/api/contest_rank' && state.star) {
       data = { ...rank, frozen: false, results: rank.results.map((row, index) => index ? { ...row, team: { ...row.team, star: true }, place: null } : { ...row, place: 1 }) }
     }
@@ -222,6 +222,9 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(starRow.locator('.rank-star-mark')).toHaveCount(1)
   await expect(starRow.locator('td').first()).toHaveText('*')
   await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
+  // A team contest ranks teams, thirty to a page.
+  await expect(page.locator('.el-table th').nth(1)).toHaveText('队伍')
+  expect(state.rankLimits).toContain('30')
 
   // One team by hand: names already in the contest are refused.
   await page.locator('.contest-team-add').click()
