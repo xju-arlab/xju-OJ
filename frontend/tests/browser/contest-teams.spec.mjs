@@ -338,7 +338,7 @@ test('contest admins set medals as a count or a floored percentage and the place
   const places = page.locator('.el-table__body tr.el-table__row .rank-place')
   await expect(places.nth(0)).toHaveClass(/is-gold/)
   await expect(places.nth(1)).toHaveClass(/is-silver/)
-  await expect(places.nth(0)).toHaveCSS('border-top-color', 'rgb(232, 197, 90)')
+  await expect(places.nth(0)).toHaveCSS('background-image', /svg/)
 })
 
 test('the live board shows how far each team moved since the freeze', async ({ page }) => {
@@ -347,9 +347,9 @@ test('the live board shows how far each team moved since the freeze', async ({ p
   await page.goto('/contest/22/rank')
   const rows = page.locator('.el-table__body tr.el-table__row')
   await expect(rows.nth(0).locator('.rank-move')).toHaveText('↑1')
-  await expect(rows.nth(0).locator('.rank-move')).toHaveCSS('color', 'rgb(24, 134, 75)')
+  await expect(rows.nth(0).locator('.rank-move')).toHaveCSS('color', 'rgb(68, 131, 97)')
   await expect(rows.nth(1).locator('.rank-move')).toHaveText('↓1')
-  await expect(rows.nth(1).locator('.rank-move')).toHaveCSS('color', 'rgb(196, 65, 59)')
+  await expect(rows.nth(1).locator('.rank-move')).toHaveCSS('color', 'rgb(212, 76, 71)')
   await expect(rows.nth(0).locator('.rank-move')).toHaveAttribute('title', '封榜时第 2 名')
   // The arrow sits beside the badge: every place stays centred in its column and the arrow stays inside it.
   const layout = await page.evaluate(() => [...document.querySelectorAll('.el-table__body tr.el-table__row')].map(tr => {

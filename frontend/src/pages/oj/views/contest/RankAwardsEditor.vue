@@ -11,7 +11,7 @@
       <thead><tr><th></th><th>个数</th><th>百分比</th></tr></thead>
       <tbody>
         <tr v-for="[key, label] in tiers" :key="key">
-          <th><span :class="['rank-place', `is-${key}`]">{{ label }}</span></th>
+          <th><span class="rank-awards-tier"><i :class="['rank-tier-icon', `is-${key}`]"></i>{{ label }}</span></th>
           <td :class="{ 'is-auto': rows[key].kind === 'percent' }">
             <el-input-number v-model="rows[key].count" :aria-label="`${label}个数`" :min="0" :max="official || Infinity" :step="1" :precision="0"
                              size="small" controls-position="right" @change="setCount(key, $event)" />
@@ -112,4 +112,5 @@
   // The figure worked out from the other one.
   .rank-awards-table td.is-auto :deep(.el-input__inner) { color: var(--color-text-faint); }
   .rank-awards-unit { margin-left: 6px; color: var(--color-text-muted); font-size: 12px; }
+  .rank-awards-tier { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); font-weight: 500; }
 </style>
