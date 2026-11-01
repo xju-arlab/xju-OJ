@@ -2,7 +2,7 @@
 
 `server/` 是判题服务主模块，内部保留两个不可混淆的边界：
 
-- `judge-server/`：Flask/Gunicorn HTTP 服务和协议测试；对外保持 `POST /judge`、`POST /compile_spj`、`POST /ping` 以及心跳调用。
+- `judge-server/`：Flask/Gunicorn HTTP 服务、协议测试所用的 Python 客户端和测试；对外保持 `POST /judge`、`POST /compile_spj`、`POST /ping` 以及心跳调用。
 - `judger/`：C/Seccomp 核心和 Python 绑定；负责资源限制、系统调用规则和结果码。
 
 ## 运行约束
@@ -26,4 +26,4 @@ python3 -m unittest server/judge-server/tests/test_protocol_contract.py
 
 `judge-server/LICENSE` 与 `judger/LICENSE` 保留各自的 SATA 文本和上游归属。边界说明见 [LICENSES.md](LICENSES.md)。
 
-生产只使用 Python 绑定。上游的 NodeJS、Lua 绑定和 JudgeServer 各语言客户端示例未适配现行 ABI，已从仓库移除，需要时可从上游历史中取回。
+生产只使用 Python 绑定。上游的 NodeJS、Lua 绑定和 PHP、Go 客户端示例未适配现行 ABI，已从仓库移除，需要时可从上游历史中取回；`judge-server/client/Python/` 保留，供协议测试使用。
