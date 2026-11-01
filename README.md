@@ -3,12 +3,22 @@
   <p><strong>面向机试、ACM、OI 与 AI 的现代在线评测平台</strong></p>
   <p>400+ 题库、本地沙箱判题与牛客 / 洛谷 / Codeforces 远程判题，统一管理比赛、提交和个人做题记录。</p>
   <p>
-    <a href="https://oj.icthub.top"><img alt="OJ status" src="https://img.shields.io/website?url=https%3A%2F%2Foj.icthub.top&up_message=online&down_message=offline&label=OJ"></a>
-    <a href="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml"><img alt="Release images" src="https://github.com/xju-arlab/xju-OJ/actions/workflows/publish-release-images.yml/badge.svg"></a>
-    <a href="https://github.com/xju-arlab/xju-OJ/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/xju-arlab/xju-OJ?logo=github"></a>
-    <img alt="Vue 3.5.41" src="https://img.shields.io/badge/Vue-3.5.41-42b883?logo=vuedotjs&logoColor=white">
-    <img alt="Django 5.2.17" src="https://img.shields.io/badge/Django-5.2.17-092E20?logo=django&logoColor=white">
+    <img alt="Vue 3.5" src="https://img.shields.io/badge/Vue-3.5-42b883?logo=vuedotjs&logoColor=white">
+    <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white">
+    <img alt="Element Plus 2.14" src="https://img.shields.io/badge/Element_Plus-2.14-409EFF?logo=element&logoColor=white">
+    <img alt="Pinia 4" src="https://img.shields.io/badge/Pinia-4-F7D336?logo=pinia&logoColor=black">
+    <img alt="Django 5.2" src="https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white">
+    <img alt="Python 3.10" src="https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white">
+    <img alt="Dramatiq 2.2" src="https://img.shields.io/badge/Dramatiq-2.2-4B5563">
+    <img alt="PostgreSQL 18" src="https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white">
+    <img alt="Redis 8" src="https://img.shields.io/badge/Redis-8-FF4438?logo=redis&logoColor=white">
+    <img alt="Seccomp + Landlock" src="https://img.shields.io/badge/Sandbox-Seccomp%20%2B%20Landlock-FCC624?logo=linux&logoColor=black">
+    <img alt="Jupyter + PyTorch" src="https://img.shields.io/badge/AI-Jupyter%20%2B%20PyTorch-EE4C2C?logo=pytorch&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
+  </p>
+  <p>
+    <a href="https://oj.icthub.top"><img alt="OJ status" src="https://img.shields.io/website?url=https%3A%2F%2Foj.icthub.top&up_message=online&down_message=offline&label=OJ"></a>
+    <a href="https://github.com/xju-arlab/xju-OJ/actions/workflows/regression.yml"><img alt="Regression checks" src="https://github.com/xju-arlab/xju-OJ/actions/workflows/regression.yml/badge.svg"></a>
   </p>
   <p>
     <a href="https://oj.icthub.top">在线体验</a> ·
@@ -22,7 +32,9 @@
 
 - **丰富题库**：现有 400+ 道题目，覆盖机试、ACM 与 OI 日常练习。
 - **双重判题能力**：内置 JudgeServer/Judger 沙箱，并通过 ScriptCat 支持牛客、洛谷和 Codeforces 浏览器远程判题。
-- **完整竞赛体验**：支持 ACM/OI 赛制、比赛报名、题目编排、实时提交状态和排名。
+- **完整竞赛体验**：支持 ACM/OI 赛制、比赛报名、题目编排、实时提交状态和排名，ACM 最后一小时封榜、赛后由管理员开榜。
+- **队伍账号比赛**：上传队伍 CSV 批量生成 `team-xxxx` 账号与 A4 账号条，区分正式与打星队伍；队伍经独立的 `/arena` 比赛链接登录，赛前看海报轮播等待页，开赛自动进入，排行榜只为正式队伍编名次。
+- **比赛筹备工作区**：邀请组织者分配题目、跟踪出题进度、不限时验题，导出 olymp 风格题面 PDF，一次发布为正式比赛。
 - **AI 工作台**：Jupyter Notebook 作答、Codabench 自动评测、逻辑实现/模型定义/数据挑战，支持 AI 比赛、公私榜与赛后补题。部署与能力边界见 [AI Studio 文档](ai/README.md)。
 - **现代全栈架构**：Vue 3、Vite 8、Django 5.2、PostgreSQL 18、Redis 8，提供统一 Docker Compose 部署入口。
 - **安全账户体系**：支持 Authentik OIDC、会话管理、个人资料和独立管理后台。
@@ -115,7 +127,7 @@ DEPLOY_MODE=build
 ### 从 Authentik 主机安全注入 OIDC
 
 生产 OJ 不应把 Authentik client secret 贴入聊天、命令行或 `.env`。仓库提供
-`ops/configure-authentik-oidc.py`：可在 OJ 主机本地隐藏输入，也可接收 Authentik
+`deploy/ops/configure-authentik-oidc.py`：可在 OJ 主机本地隐藏输入，也可接收 Authentik
 主机 root 环境通过 SSH 管道传来的两行值，并原子写入 `.env` 与 0600 secret 文件。
 脚本会固定 issuer、callback、xju-OJ 专用 registration URL、`groups` scope，并关闭 OJ
 本地登录/注册。
@@ -231,6 +243,10 @@ docker compose --env-file .env -f compose.yaml down
 - `frontend/`：Vue 3、Vite 8、Pinia、Element Plus 用户端和 `/admin/` 管理端
 - `backend/`：Django 5.2 API 与 Dramatiq Worker
 - `server/`：JudgeServer 与 Judger/Seccomp 沙箱
-- `compose.yaml`：隔离服务拓扑
-- `deploy.sh`：构建、初始化、迁移、启动和 smoke 入口
+- `ai/`：AI 工作台的 Notebook、Codabench 评测与题包代理，独立部署
+- `deploy/`：数据服务镜像（`deploy/images/`）与运维脚本（`deploy/ops/`）
 - `docs/`：兼容合同、升级计划和验收记录
+- `tools/`：远程判题探针等开发工具
+- `compose.yaml`、`compose.dev.yaml`：服务拓扑与前端开发覆盖
+- `deploy.sh`、`docker-bake.hcl`：构建、初始化、迁移、启动和 smoke 入口
+- `aoci*.txt`、`.aoci/`：仓库认知索引，维护规则见 [AGENTS.md](AGENTS.md)
