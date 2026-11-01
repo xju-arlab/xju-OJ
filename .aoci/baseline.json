@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-06T17:53:56Z",
-  "updated_at": "2026-11-01T05:13:37Z",
+  "updated_at": "2026-11-01T05:19:45Z",
   "files": {
     ".claude/settings.json": {
       "sha256": "59cd026e4908233436b0c60537fdbe34e3105b3e3ff45e3f620cccfd3b4d3718",
@@ -272,9 +272,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "d7b8a45346135f4c840bc90db31e2119c805a5052f7e02e98f002a0155b54e64",
-      "size": 234715,
-      "normalized_sha256": "d7b8a45346135f4c840bc90db31e2119c805a5052f7e02e98f002a0155b54e64"
+      "sha256": "d63bb74f473c6afd028ad71d5f5014ad4f988767fa6bf07b0507c665e57ea1cf",
+      "size": 234949,
+      "normalized_sha256": "d63bb74f473c6afd028ad71d5f5014ad4f988767fa6bf07b0507c665e57ea1cf"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3600,9 +3600,9 @@
     },
     "frontend/src/pages/oj/views/submission/SubmissionList.vue": {
       "role": "index",
-      "sha256": "d0624c69e89b72c2a876295ac53b9f11b965f229c2dbbacbe62bdcefe474df91",
-      "size": 16617,
-      "normalized_sha256": "d0624c69e89b72c2a876295ac53b9f11b965f229c2dbbacbe62bdcefe474df91"
+      "sha256": "0b955578aedc0752545e08bd3c3827a1b263c9f785af1a892e81f84821827a62",
+      "size": 18365,
+      "normalized_sha256": "0b955578aedc0752545e08bd3c3827a1b263c9f785af1a892e81f84821827a62"
     },
     "frontend/src/pages/oj/views/user/ApplyResetPassword.vue": {
       "role": "index",
@@ -3918,9 +3918,9 @@
     },
     "frontend/tests/browser/contest-teams.spec.mjs": {
       "role": "observe",
-      "sha256": "1f289c4eccb68c27ba86a630e1010d3d776d0619cdb31fed43546fcf772576e3",
-      "size": 18401,
-      "normalized_sha256": "1f289c4eccb68c27ba86a630e1010d3d776d0619cdb31fed43546fcf772576e3"
+      "sha256": "43a429601948bc89204c671680618f5894e9c195c9be8c2b6f58614852203d7b",
+      "size": 19070,
+      "normalized_sha256": "43a429601948bc89204c671680618f5894e9c195c9be8c2b6f58614852203d7b"
     },
     "frontend/tests/browser/fixture.html": {
       "role": "observe",

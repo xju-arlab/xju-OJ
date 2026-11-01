@@ -646,7 +646,7 @@ SecuritySetting.vue[EU6M]: F:管理用户会话撤销、本地MFA和Authentik关
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/submission/===
 SubmissionDetails.vue[EU6L]: F:展示源码、编译诊断、测试结果及分享复制和远程恢复入口 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/components/RemoteSubmissionNotice.vue | A:提交详情页；getSubmission | S:路由ID变化重取且丢弃旧响应；待判轮询、错误退避、卸载清理；源码可见性由后端控制
-SubmissionList.vue[EU7L]: F:筛选公开和比赛提交，刷新待判状态并提供本地重判操作 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/submissionStatus.js | A:提交列表页；getSubmissions | S:主动筛选可替代在途请求，旧代次不覆盖新结果；静默刷新不并发；远程提交不显示本地重判按钮
+SubmissionList.vue[EU7L]: F:筛选公开和比赛提交，刷新待判状态并提供本地重判操作，队伍账号比赛中作者列题为队伍并显示队名 | R:code:frontend/src/pages/oj/api.js,code:frontend/src/pages/oj/submissionStatus.js,code:backend/contest/views/oj.py | A:提交列表页；getSubmissions；loadTeamNames；teamContest | S:主动筛选可替代在途请求，旧代次不覆盖新结果；静默刷新不并发；远程提交不显示本地重判按钮；队名取自比赛榜接口，每场比赛进入时取一次，赛中新加的队在刷新前仍显示账号
 
 ===/home/winbeau/xju-arlab/xju-oj/frontend/src/pages/oj/views/user/===
 ApplyResetPassword.vue[EU5S]: F:验证邮箱与验证码并请求密码重置邮件 | R:code:frontend/src/pages/oj/components/mixins/form.js,code:frontend/src/pages/oj/api.js | A:密码重置申请页 | S:邮件是否发出依赖后端异步任务，页面成功不证明投递
