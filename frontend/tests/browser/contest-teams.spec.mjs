@@ -66,6 +66,7 @@ test.beforeEach(async ({ page }) => {
     if (path === '/api/contest/prep/plan') data = { items: [], progress: [] }
     if (path === '/api/contest/prep/publish') data = { id: 40, title: body.title, teams: body.teams.map((item, index) => ({ ...item, id: index + 1, username: `team-aaa${index}`, password: 'Pass2345' })) }
     if (path === '/api/contest/announcement') data = []
+    if (path === '/api/contest_submissions') data = { results: [], total: 0 }
     if (path === '/api/admin/contest' && req.method() === 'GET') data = { id: 40, title: '新生赛正式', description: '<p>说明</p>', visible: true, password: null, allowed_ip_ranges: [], rule_type: 'ACM' }
     if (path === '/api/admin/contest/teams' && req.method() === 'GET') data = [{ id: 1, name: 'Team Alpha' }, { id: 2, name: 'Team Beta' }]
     if (path === '/api/admin/contest/teams' && req.method() === 'POST') data = body.teams.map((item, index) => ({ ...item, id: index + 3, username: `team-new${index}`, password: 'Pass6789' }))
@@ -102,6 +103,13 @@ test('the board shows team names, members on hover and pending cells while froze
   await expect(page.locator('body')).not.toContainText('team-abcd')
   await expect(page.locator('.rank-problem-pending')).toHaveText('?+2')
   await expect(page.locator('.rank-freeze-banner')).toContainText('封榜')
+  // Penalty in minutes; a team opens only its own cells.
+  await expect(page.locator('.el-table th').nth(3)).toHaveText('罚时')
+  await expect(page.locator('.rank-penalty').first()).toHaveText('50')
+  await expect(page.locator('tbody tr').nth(1).locator('.rank-problem-link')).toHaveCount(0)
+  await page.locator('tbody tr').first().locator('.rank-problem-link').click()
+  await expect(page).toHaveURL(/\/(contest|arena)\/22\/submissions\?.*myself=1/)
+  await expect(page).toHaveURL(/problemID=A/)
 })
 
 test('publishing for team accounts takes a roster instead of a password and hands back the link', async ({ page }) => {
@@ -222,6 +230,8 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(starRow.locator('.rank-star-mark')).toHaveCount(1)
   await expect(starRow.locator('td').first()).toHaveText('*')
   await expect(page.locator('tbody tr').first().locator('td').first()).toHaveText('1')
+  // Contest admins open any team's submissions from its cells.
+  await expect(page.locator('.rank-problem-link')).toHaveCount(2)
   // A team contest ranks teams, thirty to a page.
   await expect(page.locator('.el-table th').nth(1)).toHaveText('队伍')
   expect(state.rankLimits).toContain('30')
@@ -252,4 +262,7 @@ test('star teams take no place on the board and contest admins add teams from th
   await expect(dialog.locator('.team-roster-errors')).toContainText('第 1 行队伍「Team Beta」已在本场比赛中')
   await expect(dialog.locator('.team-roster-errors')).toContainText('第 3 行队伍类型「外卡」应为正式队伍或打星队伍')
   await expect(dialog.getByRole('button', { name: /生成/ })).toBeDisabled()
+  await dialog.getByRole('button', { name: /取消|Cancel/ }).click()
+  await page.locator('tr.rank-star-row .rank-problem-link').click()
+  await expect(page).toHaveURL(/\/contest\/22\/submissions\?.*username=team-wxyz/)
 })

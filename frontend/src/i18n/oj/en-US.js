@@ -78,6 +78,7 @@ export const m = {
   Force_Update: 'Force Update',
   download_csv: 'download csv',
   TotalTime: 'TotalTime',
+  Penalty: 'Penalty',
   Top_10_Teams: 'Top 10 Teams',
   save_as_image: 'save as image',
   // ACMHelper.vue

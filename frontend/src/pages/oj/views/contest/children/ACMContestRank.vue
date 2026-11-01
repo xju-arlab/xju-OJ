@@ -101,11 +101,11 @@
           },
           {
             className: 'rank-hover-cell',
-            title: this.$t('m.TotalTime'),
+            title: this.$t('m.Penalty'),
             align: 'center',
             width: 100,
             render: (h, params) => {
-              return h('span', this.parseTotalTime(params.row.total_time))
+              return h('span', { class: 'rank-penalty' }, this.penaltyMinutes(params.row.total_time))
             }
           }
         ],
@@ -298,6 +298,14 @@
                   errorNumber = h('span', {class: 'rank-problem-errors'}, '(-' + status.error_number + ')')
                 }
                 const pending = status.frozen_number ? h('span', {class: 'rank-problem-pending'}, '?+' + status.frozen_number) : null
+                if (this.canOpenSubmissions(params.row)) {
+                  return h('button', {
+                    type: 'button',
+                    class: 'rank-problem-result rank-problem-link',
+                    title: '查看提交',
+                    on: { click: () => this.openSubmissions(params.row, problem) }
+                  }, [acTime, pending, errorNumber])
+                }
                 return h('div', {class: 'rank-problem-result'}, [acTime, pending, errorNumber])
               }
             }
@@ -317,8 +325,10 @@
           }).then(() => this.getContestRankData(1)).finally(() => { this.unfreezing = false })
         }).catch(() => {})
       },
-      parseTotalTime (totalTime) {
-        return this.formatRankTime(totalTime)
+      // ACM penalty in whole minutes. The board is ordered by total seconds and
+      // flooring keeps that order, so a higher team never shows a larger penalty.
+      penaltyMinutes (totalSeconds) {
+        return Math.floor(Math.max(0, Number(totalSeconds) || 0) / 60)
       },
       formatRankTime (totalSeconds) {
         const value = Math.max(0, Number(totalSeconds) || 0)
@@ -350,6 +360,9 @@
   :deep(.rank-problem-cell .cell) { padding-inline: 2px; overflow: hidden; }
   :deep(.rank-problem-result) { max-width: 100%; overflow: hidden; white-space: nowrap; font-size: clamp(9px, 0.75vw, 11px); line-height: 1.1; font-variant-numeric: tabular-nums; }
   :deep(.rank-problem-time), :deep(.rank-problem-errors) { display: block; margin: 0; }
+  :deep(.rank-penalty) { font-variant-numeric: tabular-nums; }
+  :deep(.rank-problem-link) { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: center; cursor: pointer; }
+  :deep(.rank-problem-link:hover), :deep(.rank-problem-link:focus-visible) { outline: none; text-decoration: underline; }
   :deep(.el-table__body tr:hover > td.el-table__cell) { background-color: var(--color-bg) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.rank-hover-cell) { background-color: var(--color-bg-subtle) !important; }
   :deep(.el-table__body tr:hover > td.el-table__cell.first-ac),

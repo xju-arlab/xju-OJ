@@ -64,6 +64,7 @@ export const m = {
   Force_Update: '強制重新載入',
   download_csv: '下載csv檔',
   TotalTime: '總時間',
+  Penalty: '罰時',
   Top_10_Teams: '前10名隊伍',
   save_as_image: '保存圖片',
   // ACMHelper.vue

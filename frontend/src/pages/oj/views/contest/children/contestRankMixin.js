@@ -24,6 +24,17 @@ export default {
       if (params.row.place !== undefined) return params.row.place ?? '*'
       return params.index + (this.page - 1) * this.limit + 1
     },
+    // Contest admins open any team's submissions from a cell; everyone else only their own.
+    canOpenSubmissions (row) {
+      const me = this.$store.state.user.profile.user
+      return this.isContestAdmin || Boolean(me && me.id === row.user.id)
+    },
+    openSubmissions (row, problem) {
+      const me = this.$store.state.user.profile.user
+      const query = me && me.id === row.user.id ? { problemID: problem._id, myself: '1' }
+        : { problemID: problem._id, username: row.user.username }
+      this.$router.push({ name: 'contest-submission-list', params: { contestID: this.contestID }, query })
+    },
     rankRowClass ({ row }) {
       return row.team && row.team.star ? 'rank-star-row' : ''
     },
