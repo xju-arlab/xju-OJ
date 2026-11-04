@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 _PROVIDER = "authentik"
 _PENDING_SESSION_KEY = "authentik_oidc_pending"
+_RESTART_SESSION_KEY = "authentik_oidc_restarted_at"
+_RESTART_WINDOW_SECONDS = 60
 _LEGACY_LINK_ATTEMPT_LIMIT = 5
 _LEGACY_LINK_ATTEMPT_WINDOW = 15 * 60
 _DISCOVERY_TTL = 300
@@ -736,11 +738,32 @@ def oidc_link(request):
         return redirect(_error_redirect(request.GET.get("next", "/setting/security"), exc.code))
 
 
+def _restart_login(request, pending, next_path):
+    """Start one fresh login for a callback this browser can no longer complete.
+
+    Registering from OJ ends in a mailed verification link. Opened later than the
+    state TTL, or in another browser, it brings back a state this session does not
+    hold, although Authentik has just signed the user in. The stale code is
+    discarded and a new authorization starts, which Authentik completes at once.
+    Account linking needs its original context, so only logins restart, and only
+    once a minute so a broken setup cannot loop.
+    """
+    if pending.get("mode", "login") != "login":
+        return None
+    now = int(time.time())
+    last = request.session.get(_RESTART_SESSION_KEY)
+    if isinstance(last, int) and 0 <= now - last < _RESTART_WINDOW_SECONDS:
+        return None
+    request.session[_RESTART_SESSION_KEY] = now
+    return HttpResponseRedirect(start(request, "login", next_path))
+
+
 @require_GET
 @never_cache
 def oidc_callback(request):
     state = request.GET.get("state", "")
     next_path = "/"
+    pending = {}
     try:
         pending = _pending_states(request).get(state, {})
         next_path = _safe_next(pending.get("next", "/"))
@@ -751,6 +774,13 @@ def oidc_callback(request):
         next_path = complete(request, state, request.GET.get("code", ""))
         return redirect(next_path)
     except OIDCError as exc:
+        if exc.code in ("state_invalid", "state_expired") and request.GET.get("code"):
+            try:
+                restarted = _restart_login(request, pending, next_path)
+            except OIDCError:
+                restarted = None
+            if restarted is not None:
+                return restarted
         return redirect(_error_redirect(next_path, exc.code))
     except (KeyError, TypeError, ValueError) as exc:
         logger.warning("Authentik OIDC callback protocol error: %s", exc.__class__.__name__)
