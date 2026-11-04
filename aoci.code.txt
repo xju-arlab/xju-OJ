@@ -33,7 +33,7 @@ uv.lock[FV7L]: F:锁定后端Python3.10依赖图、包来源及分发文件摘�
 decorators.py[MI8S]: F:执行登录、角色、题目所有权和比赛参与权限检查 | R:code:backend/account/models.py,code:backend/contest/models.py | A:login_required；admin_role_required；check_contest_permission；ensure_created_by | S:权限装饰器不保存共享request；筹备比赛对非成员报不存在，成员跳过窗口、报名和密码门禁；ensure_created_by对筹备比赛题只放行超管和比赛创建者；赛后登录用户免报名密码练习，已结束的队伍比赛匿名也可只读；赛前仅开放详情；非实时OI赛中隐藏排名和提交
 middleware.py[MI8T]: F:识别APPKEY认证、限制后台角色并记录浏览器会话活动 | R:code:backend/oj/settings.py,code:backend/account/models.py | A:APITokenAuthMiddleware；SessionRecordMiddleware；AdminRoleRequiredMiddleware | S:有效APPKEY免CSRF且不创建浏览器会话；IP依赖入口代理清洗；会话列表行锁更新且只保存session_keys，避免覆盖并发角色或密码变更
 models.py[PI9S]: F:定义用户角色、外部身份、资料和ACM/OI个人统计的持久化结构 | R:code:backend/account/oidc.py,code:backend/judge/dispatcher.py | A:User；UserManager；ExternalIdentity；UserProfile；AdminType；ProblemPermission | S:外部身份以issuer和subject唯一，Studio账号非空唯一；本地角色覆盖独立于组声明；用户名查找忽略大小写但数据库唯一性未归一大小写
-oidc.py[II9L]: F:实现Authentik授权码PKCE登录、旧账号证明关联、身份创建和角色同步 | R:code:backend/account/models.py,code:backend/account/urls/oj.py | A:start；complete；provision_or_get；ProvidersAPI；LegacyEmailLinkAPI；oidc_logout | S:state会话绑定且一次消费；next只接受固定站内路径白名单，含筹备邀请页/invite；不按邮箱自动合并；本地角色覆盖优先；旧无邮箱账号须密码、验证码及既有TFA证明且不提前登录，回调在行锁下重验资格；不存令牌
+oidc.py[II9L]: F:实现Authentik授权码PKCE登录、旧账号证明关联、身份创建和角色同步 | R:code:backend/account/models.py,code:backend/account/urls/oj.py | A:start；complete；oidc_callback；provision_or_get；ProvidersAPI；LegacyEmailLinkAPI | S:state会话绑定且一次消费，只留5分钟；邮件验证链接迟开或换浏览器会带回过期或陌生state，此时丢弃授权码重新登录一次，绑定模式不重试，每分钟至多一次；next只接受固定站内路径白名单，含筹备邀请页/invite；不按邮箱自动合并；本地角色覆盖优先；旧无邮箱账号须密码、验证码及既有TFA证明且不提前登录，回调在行锁下重验资格；不存令牌
 serializers.py[EI7S]: F:定义账户操作输入校验和用户资料、排名的输出字段 | R:code:backend/account/views/oj.py,code:backend/account/models.py | A:UserSerializer；UserProfileSerializer；RankInfoSerializer；EditUserSerializer；EditUserProfileSerializer | S:姓名学号仅本人资料可见；公开排名隐藏学号；资料更新强制真实姓名与学号，其余字段接受空值与null，因OIDC建档留下NULL列
 tasks.py[AM5T]: F:通过Dramatiq异步发送系统配置的邮件 | R:code:backend/utils/shortcuts.py,code:backend/options/options.py | A:send_email_async | S:SMTP未配置即返回；异常被捕获记录，因此装饰器重试不会接收发送异常
 tests.py[TI6L]: F:回归账户登录、二次验证、资料与首次姓名学号确认、会话、管理和管理员覆盖流程 | R:code:backend/account/views/oj.py,code:backend/account/views/admin.py | A:Django账户API测试 | S:权限装饰器与题目显示编号刷新仍有空测试；会话删除只检查随机无效键，未覆盖其他用户会话
@@ -41,6 +41,7 @@ tests_oidc.py[TI7S]: F:验证首次身份创建、显式绑定、标识冲突及
 tests_oidc_contract.py[TI6S]: F:验证OIDC返回路径、账号标识、令牌排除及角色同步契约 | R:code:backend/account/oidc.py | A:OIDCContractTests | S:角色测试用轻量替身而非数据库；覆盖缺失groups和手工授权优先级
 tests_legacy_link.py[TI6T]: F:回归旧无邮箱账号关联前的身份证明和回调资格重验 | R:code:backend/account/oidc.py | A:LegacyAccountLinkTests | S:OIDC跳转和验证码使用替身；不证明真实身份服务登录或邮件投递
 tests_security.py[TI7S]: F:回归并发权限隔离、会话撤销归属、角色更新和题号映射 | R:code:backend/account/decorators.py,code:backend/account/views/oj.py | A:PermissionConcurrencyTests；SessionSecurityTests；ProfileDisplayIdTests | S:权限测试以线程交错复现共享request问题；会话测试检查受害者缓存仍可认证
+tests_oidc_callback.py[TI6T]: F:回归OIDC回调带回过期或陌生state时自动重新登录一次，以及绑定模式、授权错误、缺授权码和一分钟内重复时不重试 | R:code:backend/account/oidc.py | A:StaleCallbackRestartTests | S:start被替身替换，不连接Authentik，也不验证真实的邮件链接
 
 ===/home/winbeau/xju-arlab/xju-oj/backend/account/migrations/===
 0001_initial.py[PD5T]: F:创建自定义用户和一对一资料表及历史JSON字段 | R:code:backend/account/models.py | A:account初始迁移 | S:表名固定为user和user_profile，历史加载依赖jsonfield
